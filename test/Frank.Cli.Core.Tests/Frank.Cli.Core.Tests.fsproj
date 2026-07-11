@@ -25,6 +25,7 @@
     <Compile Include="RefreshV3Tests.fs" />
     <Compile Include="ValidateTests.fs" />
     <Compile Include="StatusTests.fs" />
+    <Compile Include="VocabWarningTests.fs" />
     <Compile Include="FinalizeTests.fs" />
     <Compile Include="AstRenderTests.fs" />
     <Compile Include="ValidationEmitterTests.fs" />

@@ -1394,9 +1394,16 @@ let acceptTests =
                           [ "schema",
                             { v1Empty with
                                 Uri = "https://schema.org/"
+                                Validated =
+                                    { IsValidated = true
+                                      Reason = None
+                                      LastChecked = None }
                                 FetchedAt = System.DateTimeOffset.UnixEpoch
                                 Hash = "stub" } ]
-                    DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ]
+                    DeclaredPrefixes =
+                      Map.ofList
+                          [ "ttt", "https://example.org/tictactoe#"
+                            "schema", "https://schema.org/" ]
                     Mappings =
                       [ { FSharpType = "App.MoveRequest"
                           Iri = None
@@ -1430,9 +1437,7 @@ let acceptTests =
               Expect.equal summary.Merged 1 "mapping must be written (warn, not reject)"
               Expect.equal summary.Rejected [] "no rejections for uncovered declared-prefix CURIE"
               Expect.isNonEmpty summary.Warnings "must emit a warning for the unfetched ttt prefix"
-
-              let hasExpectedWarning = summary.Warnings |> List.exists (fun w -> w.Contains "ttt")
-
+              let hasExpectedWarning = summary.Warnings |> List.exists (fun w -> w.Prefix = "ttt")
               Expect.isTrue hasExpectedWarning "warning must mention the 'ttt' prefix"
           }
 
@@ -1452,9 +1457,13 @@ let acceptTests =
                           [ "schema",
                             { v1Empty with
                                 Uri = "https://schema.org/"
+                                Validated =
+                                    { IsValidated = true
+                                      Reason = None
+                                      LastChecked = None }
                                 FetchedAt = System.DateTimeOffset.UnixEpoch
                                 Hash = "stub" } ]
-                    DeclaredPrefixes = Map.empty
+                    DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/" ]
                     Mappings =
                       [ { FSharpType = "App.Game"
                           Iri = None

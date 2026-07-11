@@ -146,3 +146,12 @@ module VocabClassifier =
     /// by the #378 analyzer which consumes entry.Terms. Do NOT add term-membership checking here.
     let classifyReferencedVocab (lock: LockFile) (now: DateTimeOffset) (referencedNs: string list) : VocabState list =
         classifyReferencedVocabWith lock (buildVocabUriIndex lock.Vocabularies) now referencedNs
+
+    /// Canonical string form of a VocabState, shared across all surfaces (accept, status, JSON).
+    let vocabStateToString (state: VocabState) : string =
+        match state with
+        | Confirmed -> "Confirmed"
+        | Proposed -> "Proposed"
+        | Undereferenceable -> "Undereferenceable"
+        | LocallyServedUnconfirmed -> "LocallyServedUnconfirmed"
+        | Stale -> "Stale"

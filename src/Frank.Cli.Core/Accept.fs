@@ -5,6 +5,7 @@ open System.Text.Json
 open System.Text.Json.Nodes
 open Frank.Semantic
 open Frank.Semantic.LockFile
+open Frank.Semantic.VocabClassifier
 open Frank.Semantic.VocabFetcher
 
 type ResolvedField = { Name: string; Iri: string option }
@@ -31,6 +32,20 @@ type ResolvedDoc =
 
 type RejectedEntry = { FSharpType: string; Reason: string }
 
+/// Location context for a vocab warning: the type (simple name) and optional field that references the namespace.
+/// None at the record level means no mapping reference was found (status path).
+type VocabWarningLocation = { Type: string; Field: string option }
+
+/// Warning emitted when a referenced vocabulary namespace is Undereferenceable.
+/// State is typed as VocabState and stringified only at the JSON boundary.
+/// Location is None when no mapping reference to this namespace was found (status scan path).
+type VocabWarning =
+    { Prefix: string
+      State: VocabState
+      Iri: string
+      Location: VocabWarningLocation option
+      Hint: string }
+
 type AcceptSummary =
     { Merged: int
       Excluded: int
@@ -38,7 +53,7 @@ type AcceptSummary =
       Unchanged: int
       AlreadyConfirmed: int
       FieldsUnresolved: int
-      Warnings: string list }
+      Warnings: VocabWarning list }
 
 // ── Parse helpers ─────────────────────────────────────────────────────────────
 
@@ -312,6 +327,25 @@ let private isInAnyCategory (oracle: TermOracle) (absIri: string) : bool =
     || Set.contains absIri oracle.Properties
     || Set.contains absIri oracle.Individuals
 
+let private checkAbsoluteIri
+    (oracle: TermOracle)
+    (casesAllowed: Set<string>)
+    (pos: IriPosition)
+    (absIri: string)
+    : string option =
+    if not (isCoveredByOracle oracle.CoveredBases absIri) then
+        None
+    else
+        let allowed = allowedForPosition oracle casesAllowed pos
+
+        if Set.contains absIri allowed then
+            None
+        elif isInAnyCategory oracle absIri then
+            let expected = positionLabel pos
+            Some $"term '{absIri}' exists in the vocabulary but not as a {expected} (used in {pos} position)"
+        else
+            Some $"term '{absIri}' not found in vocabulary; check spelling"
+
 let private checkIri
     (prefixes: Map<string, System.Uri>)
     (oracle: TermOracle)
@@ -319,24 +353,16 @@ let private checkIri
     (pos: IriPosition)
     (iri: string)
     : string option =
-    match VocabularyRegistry.tryResolveIri prefixes (Some iri) with
-    | Error msg -> Some $"unresolvable iri '{iri}': {msg}; use CURIE form (e.g. schema:Foo)"
-    | Ok(Some absUri) ->
-        let absIri = absUri.AbsoluteUri
-
-        if not (isCoveredByOracle oracle.CoveredBases absIri) then
-            None
-        else
-            let allowed = allowedForPosition oracle casesAllowed pos
-
-            if Set.contains absIri allowed then
-                None
-            elif isInAnyCategory oracle absIri then
-                let expected = positionLabel pos
-                Some $"term '{iri}' exists in the vocabulary but not as a {expected} (used in {pos} position)"
-            else
-                Some $"term '{iri}' not found in vocabulary; check spelling"
-    | Ok None -> None
+    // Absolute IRIs in field/case positions are treated as pre-resolved (item 2).
+    // TypePos still requires CURIE form — FIX2 invariant: absolute type IRIs are rejected
+    // so that authors receive an actionable error message rather than silent misbehavior.
+    if iri.Contains("://") && pos <> TypePos then
+        checkAbsoluteIri oracle casesAllowed pos iri
+    else
+        match VocabularyRegistry.tryResolveIri prefixes (Some iri) with
+        | Error msg -> Some $"unresolvable iri '{iri}': {msg}; use CURIE form (e.g. schema:Foo)"
+        | Ok(Some absUri) -> checkAbsoluteIri oracle casesAllowed pos absUri.AbsoluteUri
+        | Ok None -> None
 
 let private firstCaseIriError
     (prefixes: Map<string, System.Uri>)
@@ -399,35 +425,109 @@ let internal prefixOfCurie (iri: string) : string option =
         | -1 -> None
         | idx -> Some iri.[.. idx - 1]
 
-let private iriStringsFromEntry (e: ResolvedEntry) : string list =
-    let fromFields (fs: ResolvedField list) = fs |> List.choose (fun f -> f.Iri)
+let private simpleTypeName (fsType: string) : string =
+    match fsType.LastIndexOf('.') with
+    | -1 -> fsType
+    | idx -> fsType.[idx + 1 ..]
 
-    let fromCases (cs: ResolvedCase list) =
-        cs |> List.collect (fun c -> (c.Iri |> Option.toList) @ fromFields c.Payload)
+/// Format the "host-it" hint for a vocabulary namespace IRI.
+/// Strips a trailing '#' so the hint names the dereferenceable document, not the fragment root.
+let vocabWarningHint (iri: string) : string =
+    let derefTarget = if iri.EndsWith("#") then iri.[.. iri.Length - 2] else iri
+    $"publish the vocabulary namespace at {derefTarget} as dereferenceable RDF"
 
-    (e.Iri |> Option.toList)
-    @ match e.Shape with
-      | ResolvedShape.Record fs -> fromFields fs
-      | ResolvedShape.Union cs -> fromCases cs
+// Returns (prefix, simpleTypeName, fieldName option) for each IRI in the entry using the given
+// prefix-extraction function. Type-level IRI → field = None. Field/case/payload IRI → field = Some name.
+let private extractIriContexts
+    (getPrefix: string -> string option)
+    (e: ResolvedEntry)
+    : (string * string * string option) list =
+    let tname = simpleTypeName e.FSharpType
 
-let private collectPrefixWarnings (lf: LockFile) (entries: ResolvedEntry list) : string list =
-    let fetchedKeys = lf.Vocabularies |> Map.toSeq |> Seq.map fst |> Set.ofSeq
+    let fromFields (fs: ResolvedField list) =
+        fs
+        |> List.choose (fun f -> f.Iri |> Option.bind getPrefix |> Option.map (fun p -> p, tname, Some f.Name))
 
-    let unfetchedDeclared =
-        lf.DeclaredPrefixes
-        |> Map.filter (fun k _ -> not (Set.contains k fetchedKeys))
-        |> Map.toSeq
-        |> Seq.map fst
-        |> Set.ofSeq
+    let fromCase (c: ResolvedCase) =
+        let caseCtx =
+            c.Iri
+            |> Option.bind getPrefix
+            |> Option.map (fun p -> p, tname, Some c.Name)
+            |> Option.toList
 
-    entries
-    |> List.collect iriStringsFromEntry
-    |> List.choose (fun iri ->
-        match prefixOfCurie iri with
-        | Some prefix when Set.contains prefix unfetchedDeclared ->
-            Some $"vocabulary '{prefix}' referenced but not published — host it or check the URL"
-        | _ -> None)
-    |> List.distinct
+        caseCtx @ fromFields c.Payload
+
+    let typeCtx =
+        e.Iri
+        |> Option.bind getPrefix
+        |> Option.map (fun p -> p, tname, None)
+        |> Option.toList
+
+    let shapeCtxs =
+        match e.Shape with
+        | ResolvedShape.Record fs -> fromFields fs
+        | ResolvedShape.Union cs -> cs |> List.collect fromCase
+
+    typeCtx @ shapeCtxs
+
+// Extract (prefix, typeName, fieldName) for CURIE-spelled references.
+let private iriContextsFromEntry = extractIriContexts prefixOfCurie
+
+// Match an absolute IRI against DeclaredPrefixes values, returning the matching prefix key.
+// Requires a namespace boundary delimiter (#/) so "tictactoe-extra#..." is not attributed to "tictactoe".
+let private namespacePrefixOfAbsIri (declaredPrefixes: Map<string, string>) (iri: string) : string option =
+    if not (iri.Contains("://")) then
+        None
+    else
+        declaredPrefixes
+        |> Map.tryFindKey (fun _ nsIri ->
+            iri.StartsWith(nsIri, System.StringComparison.Ordinal)
+            && (nsIri.EndsWith("#", System.StringComparison.Ordinal)
+                || nsIri.EndsWith("/", System.StringComparison.Ordinal)
+                || (iri.Length > nsIri.Length
+                    && (iri.[nsIri.Length] = '#' || iri.[nsIri.Length] = '/'))))
+
+// Extract (prefix, typeName, fieldName) for absolute-IRI-spelled references (item 2).
+let private absIriContextsFromEntry (declaredPrefixes: Map<string, string>) =
+    extractIriContexts (namespacePrefixOfAbsIri declaredPrefixes)
+
+// Classify referenced prefixes via the SHARED classifyReferencedVocab (single oracle).
+// Warn set = { Undereferenceable } only. Decision is VocabState only; location is enrichment.
+let private collectVocabWarnings (lf: LockFile) (entries: ResolvedEntry list) : VocabWarning list =
+    let curieCtxs = entries |> List.collect iriContextsFromEntry
+    let absCtxs = entries |> List.collect (absIriContextsFromEntry lf.DeclaredPrefixes)
+    let allCtxs = curieCtxs @ absCtxs
+    let uniquePrefixes = allCtxs |> List.map (fun (p, _, _) -> p) |> List.distinct
+
+    if List.isEmpty uniquePrefixes then
+        []
+    else
+        let now = System.DateTimeOffset.UtcNow
+        let states = classifyReferencedVocab lf now uniquePrefixes
+        let stateMap = List.zip uniquePrefixes states |> Map.ofList
+
+        allCtxs
+        |> List.choose (fun (prefix, typeName, fieldName) ->
+            match Map.tryFind prefix stateMap with
+            | Some VocabState.Undereferenceable ->
+                // Item 1: skip when prefix has no declared IRI — avoids emitting a non-IRI token as iri.
+                // Live guard: buildPrefixMap (used in partitionByIri) includes Vocabularies keys, so a
+                // CURIE whose prefix is a Vocabulary key but absent from DeclaredPrefixes resolves,
+                // survives partitioning, and reaches here as Undereferenceable (lookupEntry keys on
+                // DeclaredPrefixes → None). Returning None suppresses the warning rather than substituting
+                // the bare prefix label as a namespace IRI.
+                match Map.tryFind prefix lf.DeclaredPrefixes with
+                | None -> None
+                | Some iri ->
+                    Some
+                        { Prefix = prefix
+                          State = VocabState.Undereferenceable
+                          Iri = iri
+                          Location = Some { Type = typeName; Field = fieldName }
+                          Hint = vocabWarningHint iri }
+            | _ -> None)
+        |> List.distinctBy (fun w ->
+            w.Prefix, w.Location |> Option.map (fun l -> l.Type), w.Location |> Option.bind (fun l -> l.Field))
 
 let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) (oracle: TermOracle) : LockFile * AcceptSummary =
     let lockTypes = lf.Mappings |> List.map (fun m -> m.FSharpType) |> Set.ofList
@@ -488,7 +588,7 @@ let apply (lf: LockFile) (doc: ResolvedDoc) (source: MappingSource) (oracle: Ter
     let fieldsUnresolved =
         countUnresolvedFields updated.Mappings (toMerge |> List.map (fun e -> e.FSharpType) |> Set.ofList)
 
-    let warnings = collectPrefixWarnings lf toMerge
+    let warnings = collectVocabWarnings lf toMerge
 
     let summary =
         { Merged = toMerge.Length
@@ -520,6 +620,39 @@ let buildOracle (vocabs: Map<string, VocabularyEntry>) (cacheDir: string) : Term
       Individuals = loaded |> Seq.map (fun (_, t) -> t.IndividualIris) |> Set.unionMany
       CoveredBases = loaded |> List.map (fun (e, _) -> e.Uri) }
 
+// ── Public: shared vocab-warning JSON helpers ─────────────────────────────────
+
+let private vocabWarningToJsonObject (w: VocabWarning) : JsonObject =
+    let entry = JsonObject()
+    entry.Add("prefix", JsonValue.Create w.Prefix)
+    entry.Add("state", JsonValue.Create(vocabStateToString w.State))
+    entry.Add("iri", JsonValue.Create w.Iri)
+
+    match w.Location with
+    | Some loc ->
+        entry.Add("type", JsonValue.Create loc.Type)
+
+        match loc.Field with
+        | Some f -> entry.Add("field", JsonValue.Create f)
+        | None -> entry.Add("field", JsonNode.op_Implicit null)
+    | None ->
+        entry.Add("type", JsonNode.op_Implicit null)
+        entry.Add("field", JsonNode.op_Implicit null)
+
+    entry.Add("hint", JsonValue.Create w.Hint)
+    entry
+
+/// Serialize a list of VocabWarnings as a JSON array string.
+/// Used by the status --format json path (standalone array) and accept --format json (embedded in summary).
+let vocabWarningsToJson (warnings: VocabWarning list) : string =
+    let arr = JsonArray()
+
+    for w in warnings do
+        arr.Add(vocabWarningToJsonObject w)
+
+    let opts = JsonSerializerOptions(WriteIndented = false)
+    arr.ToJsonString(opts)
+
 // ── Public: summaryToJson ─────────────────────────────────────────────────────
 
 let private summaryWriteOptions =
@@ -537,7 +670,7 @@ let summaryToJson (s: AcceptSummary) : string =
     let warningsArr = JsonArray()
 
     for w in s.Warnings do
-        warningsArr.Add(JsonValue.Create w)
+        warningsArr.Add(vocabWarningToJsonObject w)
 
     let root = JsonObject()
     root.Add("merged", JsonValue.Create s.Merged)

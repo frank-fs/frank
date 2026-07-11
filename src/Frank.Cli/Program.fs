@@ -18,28 +18,32 @@ open Frank.Cli.Core.Status
 type ClarifyArgs =
     | [<AltCommandLine("-p")>] Project of path: string
     | [<AltCommandLine("-l")>] Lock_File of path: string
-    | Output_Format of format: string
+    | Format of format: string
+    | [<Hidden>] Output_Format of format: string
 
     interface IArgParserTemplate with
         member a.Usage =
             match a with
             | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
             | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
-            | Output_Format _ -> "output format: 'json' (default) | 'markdown' | 'resolved-template'"
+            | Format _ -> "output format: 'json' (default) | 'markdown' | 'resolved-template'"
+            | Output_Format _ -> "deprecated; use --format"
 
 /// Arguments for the `frank semantic extract` subcommand.
 [<CliPrefix(CliPrefix.DoubleDash)>]
 type ExtractArgs =
     | [<AltCommandLine("-p")>] Project of path: string
     | [<AltCommandLine("-v")>] Vocabulary_File of path: string
-    | Output_Format of format: string
+    | Format of format: string
+    | [<Hidden>] Output_Format of format: string
 
     interface IArgParserTemplate with
         member a.Usage =
             match a with
             | Project _ -> "path to the .fsproj file (defaults to first .fsproj in current directory)"
             | Vocabulary_File _ -> "path to the vocabulary CE file (defaults to Vocabulary.fs)"
-            | Output_Format _ -> "output format: 'text' (default) or 'json'"
+            | Format _ -> "output format: 'text' (default) or 'json'"
+            | Output_Format _ -> "deprecated; use --format"
 
 /// Arguments for the `frank semantic accept` subcommand.
 [<CliPrefix(CliPrefix.DoubleDash)>]
@@ -48,7 +52,8 @@ type AcceptArgs =
     | Source of source: string
     | [<AltCommandLine("-p")>] Project of path: string
     | [<AltCommandLine("-l")>] Lock_File of path: string
-    | Output_Format of format: string
+    | Format of format: string
+    | Strict
 
     interface IArgParserTemplate with
         member a.Usage =
@@ -57,7 +62,9 @@ type AcceptArgs =
             | Source _ -> "mapping source: 'llm' (default) or 'manual'"
             | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
             | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
-            | Output_Format _ -> "output format: 'text' (default) or 'json'"
+            | Format _ -> "output format: 'text' (default) or 'json'"
+            | Strict ->
+                "promote any Undereferenceable-vocab warning to exit code 3 (distinct from 0=clean/1=error/2=diff)"
 
 /// Arguments for the `frank semantic status` subcommand.
 [<CliPrefix(CliPrefix.DoubleDash)>]
@@ -65,6 +72,8 @@ type StatusArgs =
     | [<AltCommandLine("-p")>] Project of path: string
     | [<AltCommandLine("-l")>] Lock_File of path: string
     | By_Package
+    | Format of format: string
+    | Strict
 
     interface IArgParserTemplate with
         member a.Usage =
@@ -72,6 +81,9 @@ type StatusArgs =
             | Project _ -> "path to the .fsproj (defaults to first .fsproj in current directory)"
             | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
             | By_Package -> "break down coverage and vocabulary usage per F# namespace"
+            | Format _ -> "output format: 'text' (default) or 'json'"
+            | Strict ->
+                "promote any Undereferenceable-vocab warning to exit code 3 (distinct from 0=clean/1=error/2=diff)"
 
 /// Arguments for the `frank semantic finalize` subcommand.
 [<CliPrefix(CliPrefix.DoubleDash)>]
@@ -183,7 +195,8 @@ let private buildExtractOpts
     (args: ParseResults<ExtractArgs>)
     : Result<Pipeline.OutputFormat * Pipeline.ExtractOptions, string> =
     let fmtResult =
-        args.TryGetResult(ExtractArgs.Output_Format)
+        (args.TryGetResult(ExtractArgs.Format)
+         |> Option.orElse (args.TryGetResult(ExtractArgs.Output_Format)))
         |> Option.map parseOutputFormat
         |> Option.defaultValue (Ok Pipeline.Text)
 
@@ -237,7 +250,9 @@ let private clarifyFormats =
 
 let private handleClarify (args: ParseResults<ClarifyArgs>) : int =
     let formatStr =
-        args.TryGetResult(ClarifyArgs.Output_Format) |> Option.defaultValue "json"
+        args.TryGetResult(ClarifyArgs.Format)
+        |> Option.orElse (args.TryGetResult(ClarifyArgs.Output_Format))
+        |> Option.defaultValue "json"
 
     match parseChoice "output format" clarifyFormats formatStr with
     | Error e ->
@@ -285,8 +300,7 @@ let private parseSource: string -> Result<MappingSource, string> =
 let private parseAcceptInputs
     (args: ParseResults<AcceptArgs>)
     : Result<Pipeline.OutputFormat * Accept.ResolvedDoc * MappingSource * string, string> =
-    let formatStr =
-        args.TryGetResult(AcceptArgs.Output_Format) |> Option.defaultValue "text"
+    let formatStr = args.TryGetResult(AcceptArgs.Format) |> Option.defaultValue "text"
 
     let inputPath = args.GetResult(AcceptArgs.Input)
     let sourceStr = args.TryGetResult(AcceptArgs.Source) |> Option.defaultValue "llm"
@@ -321,9 +335,20 @@ let private applyAcceptDoc
         stampAndWrite (fun () -> DateTimeOffset.UtcNow) lockPath updated
         summary)
 
+let private vocabWarningText (w: Accept.VocabWarning) : string =
+    match w.Location with
+    | None -> $"vocabulary '{w.Prefix}' ({w.Iri}): {w.Hint}"
+    | Some loc ->
+        let locationStr =
+            match loc.Field with
+            | Some f -> $"{loc.Type}.{f}"
+            | None -> loc.Type
+
+        $"vocabulary '{w.Prefix}' ({w.Iri}) used in {locationStr}: {w.Hint}"
+
 let private renderAcceptSummary (fmt: Pipeline.OutputFormat) (summary: Accept.AcceptSummary) : unit =
     for w in summary.Warnings do
-        eprintfn "warning: %s" w
+        eprintfn "warning: %s" (vocabWarningText w)
 
     for r in summary.Rejected do
         eprintfn "%s: %s" r.FSharpType r.Reason
@@ -352,7 +377,11 @@ let private handleAccept (args: ParseResults<AcceptArgs>) : int =
             1
         | Ok summary ->
             renderAcceptSummary fmt summary
-            0
+
+            if args.Contains AcceptArgs.Strict && not (List.isEmpty summary.Warnings) then
+                3
+            else
+                0
 
 let private parseFinalizeInputs (args: ParseResults<FinalizeArgs>) : Result<string option * string, string> =
     parseOptionalBaseUri (args.TryGetResult FinalizeArgs.Base_Uri)
@@ -407,15 +436,30 @@ let private handleStatus (args: ParseResults<StatusArgs>) : int =
             1
         | Ok lf ->
             let now = DateTimeOffset.UtcNow
+            let warnings = getWarnings now lf
 
-            let output =
-                if args.Contains StatusArgs.By_Package then
-                    formatByPackage now lf
+            let fmtStr = args.TryGetResult(StatusArgs.Format) |> Option.defaultValue "text"
+
+            match parseOutputFormat fmtStr with
+            | Error e ->
+                eprintfn "error: %s" e
+                1
+            | Ok fmt ->
+                match fmt with
+                | Pipeline.Json -> printfn "%s" (Accept.vocabWarningsToJson warnings)
+                | Pipeline.Text ->
+                    let output =
+                        if args.Contains StatusArgs.By_Package then
+                            formatByPackage now lf
+                        else
+                            format now lf
+
+                    printfn "%s" output
+
+                if args.Contains StatusArgs.Strict && not (List.isEmpty warnings) then
+                    3
                 else
-                    format now lf
-
-            printfn "%s" output
-            0
+                    0
 
 let private printRefreshOutcomes (report: RefreshReport) : unit =
     for prefix, outcome in report.Outcomes do
