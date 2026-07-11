@@ -8,18 +8,26 @@
 
   <ItemGroup>
     <Compile Include="DuplicateHandlerAnalyzer.fs" />
+    <Compile Include="AstExtractors.fs" />
     <Compile Include="UndereferenceableVocabAnalyzer.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- NU1608 suppressed in Directory.Build.props: FSharp.Analyzers.SDK 0.35.0 requests
-         FSharp.Core=10.0.101 but Frank.Semantic requires >=10.1.301 on net10.0;
-         runtime compatibility is maintained — pin removed to unblock restore. -->
+    <!-- No explicit FCS PackageReference: rely on the SDK 0.35.0 transitive pin (#378). -->
     <PackageReference Include="FSharp.Analyzers.SDK" Version="0.35.0" />
   </ItemGroup>
 
+  <!-- Pin FSharp.Core for net8.0 so the analyzer DLL matches what fsharp-analyzers 0.35.0
+       CLI loads (assembly version 10.0.0.0 / NuGet 10.0.101).  Without this pin the SDK
+       implicit reference resolves 10.1.301 (assembly 10.1.0.0) and the CLI rejects the
+       plugin with "expected assembly version 10.0.0.0". -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Update="FSharp.Core" Version="10.0.101" />
+  </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="../Frank.Semantic/Frank.Semantic.fsproj" />
+    <!-- Frank.Semantic.Core only: pure reasoning (no dotNetRdf, no full FCS in load closure) -->
+    <ProjectReference Include="../Frank.Semantic.Core/Frank.Semantic.Core.fsproj" />
   </ItemGroup>
 
 </Project>

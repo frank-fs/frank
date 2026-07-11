@@ -395,6 +395,30 @@ let applicationXmlRdfTests =
               | Unchanged -> failtest "expected Updated, got Unchanged"
           } ]
 
+// ── Contract pin: termsInNamespace produces bare local names (not CURIEs) ─────
+
+[<Tests>]
+let termsInNamespaceContractTests =
+    testList
+        "RdfConneg.termsInNamespace contract: Terms are bare local names"
+        [ testCase "termsInNamespace extracts bare local names, never CURIEs"
+          <| fun _ ->
+              // This test pins the producer/consumer contract for VocabularyEntry.Terms.
+              // Frank.Analyzers.checkTermMembership calls terms.Contains localName.
+              // If a future refactor changes this to CURIE form, this test goes RED.
+              let namespaceBase = Uri("https://schema.org/")
+
+              let iris: VocabTermIris =
+                  { ClassIris = Set.ofList [ "https://schema.org/Person"; "https://schema.org/Game" ]
+                    PropertyIris = Set.empty
+                    IndividualIris = Set.empty }
+
+              let terms = RdfConneg.termsInNamespace namespaceBase iris
+              Expect.contains terms "Person" "termsInNamespace must produce bare 'Person', not 'schema:Person'"
+              Expect.contains terms "Game" "termsInNamespace must produce bare 'Game', not 'schema:Game'"
+              Expect.isFalse (terms.Contains "schema:Person") "CURIE-form 'schema:Person' must NOT appear in Terms"
+              Expect.isFalse (terms.Contains "schema:Game") "CURIE-form 'schema:Game' must NOT appear in Terms" ]
+
 // ── Item-8 regression: application/xhtml+xml → UnverifiableNonRdf ────────────
 
 [<Tests>]

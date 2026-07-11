@@ -348,14 +348,20 @@ let slaTests =
           }
 
           test "stale vocab classifies as Stale" {
-              let entry = { v1Empty with FetchedAt = fixedNow.AddDays(-60.0); Owned = false; Validated = { IsValidated = true; Reason = None; LastChecked = Some fixedNow } }
+              let entry =
+                  { v1Empty with
+                      Uri = "https://schema.org/"
+                      FetchedAt = fixedNow.AddDays(-60.0)
+                      Owned = false
+                      Validated = { IsValidated = true; Reason = None; LastChecked = Some fixedNow } }
 
               let lf: LockFile =
                   { SchemaVersion = 2
                     Generated = fixedNow
                     Integrity = None
                     Vocabularies = Map.ofList [ "schema", entry ]
-                    DeclaredPrefixes = Map.empty
+                    // DeclaredPrefixes always includes the prefix — IRI-first lookup requires it.
+                    DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/" ]
                     Mappings = [] }
 
               let states = classifyReferencedVocab lf fixedNow [ "schema" ]

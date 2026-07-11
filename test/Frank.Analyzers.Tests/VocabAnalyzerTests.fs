@@ -5,8 +5,10 @@ open System.IO
 open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Text
 open Expecto
+open Frank.Semantic
 open Frank.Semantic.LockFile
-open Frank.Semantic.VocabCheck
+open Frank.Semantic.VocabClassifier
+open Frank.Analyzers.AstExtractors
 open Frank.Analyzers.UndereferenceableVocabAnalyzer
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -45,9 +47,11 @@ let private fixturesDir =
 
 let private fixture name = Path.Combine(fixturesDir, $"{name}.fs")
 
-let private emptyLock =
-    { SchemaVersion = 1
-      Generated = DateTimeOffset.UtcNow
+let private fixedNow = DateTimeOffset(2026, 7, 9, 12, 0, 0, TimeSpan.Zero)
+
+let private emptyLock : LockFile =
+    { SchemaVersion = 2
+      Generated = fixedNow
       Integrity = None
       Vocabularies = Map.empty
       DeclaredPrefixes = Map.empty
@@ -60,78 +64,63 @@ let private makeLock (declaredPrefixes: (string * string) list) (fetchedVocabs: 
             prefix,
             { v1Empty with
                 Uri = uri
-                FetchedAt = DateTimeOffset.UtcNow
-                Hash = "testhash" })
+                FetchedAt = fixedNow
+                Hash = "testhash"
+                Validated =
+                    { IsValidated = true
+                      Reason = None
+                      LastChecked = Some fixedNow } })
         |> Map.ofList
 
-    { emptyLock with
-        DeclaredPrefixes = Map.ofList declaredPrefixes
-        Vocabularies = vocabularies }
+    withIntegrity
+        { emptyLock with
+            DeclaredPrefixes = Map.ofList declaredPrefixes
+            Vocabularies = vocabularies }
 
 let private tttNsUri = "https://example.org/tictactoe#"
 let private schemaNsUri = "https://schema.org/"
 
 let private tttLockUnfetched = makeLock [ "ttt", tttNsUri ] []
 let private tttLockFetched = makeLock [ "ttt", tttNsUri ] [ "ttt", tttNsUri ]
+let private schemaLockFetched = makeLock [ "schema", schemaNsUri ] [ "schema", schemaNsUri ]
 
-let private schemaLockFetched =
-    makeLock [ "schema", schemaNsUri ] [ "schema", schemaNsUri ]
-
-// ── checkUndereferenceableVocab pure-fn tests ─────────────────────────────────
+// ── classifyReferencedVocab pure-fn tests (replaces checkUndereferenceableVocab) ──
 
 [<Tests>]
 let pureFnTests =
     testList
-        "checkUndereferenceableVocab"
-        [
-
-          testCase "AT1: ttt not in Vocabularies + no routes → warns ttt"
+        "classifyReferencedVocab (replacing checkUndereferenceableVocab)"
+        [ testCase "AT1 equiv: ttt not in Vocabularies -> Undereferenceable"
           <| fun _ ->
-              let result = checkUndereferenceableVocab tttLockUnfetched [] [ "ttt" ]
-              Expect.equal result [ "ttt" ] "Expected ttt in result"
+              let states = classifyReferencedVocab tttLockUnfetched fixedNow [ "ttt" ]
+              Expect.equal states [ VocabState.Undereferenceable ] "Expected Undereferenceable for unfetched ttt"
 
-          testCase "AT2: route /tictactoe covers ttt namespace → no warning"
+          testCase "AT3 equiv: ttt in Vocabularies (validated) -> Confirmed"
           <| fun _ ->
-              let result = checkUndereferenceableVocab tttLockUnfetched [ "/tictactoe" ] [ "ttt" ]
+              let states = classifyReferencedVocab tttLockFetched fixedNow [ "ttt" ]
+              Expect.equal states [ VocabState.Confirmed ] "Expected Confirmed when ttt is fetched and validated"
 
-              Expect.isEmpty result "Expected no warnings when route covers namespace"
-
-          testCase "AT3: ttt in Vocabularies → no warning"
+          testCase "AT5 equiv: schema.org in Vocabularies -> Confirmed"
           <| fun _ ->
-              let result = checkUndereferenceableVocab tttLockFetched [] [ "ttt" ]
-              Expect.isEmpty result "Expected no warning when vocab is dereferenceable"
+              let states = classifyReferencedVocab schemaLockFetched fixedNow [ "schema" ]
+              Expect.equal states [ VocabState.Confirmed ] "Expected Confirmed for fetched schema.org"
 
-          testCase "AT5: schema.org in Vocabularies → no warning"
+          testCase "empty referencedNs -> empty result"
           <| fun _ ->
-              let result = checkUndereferenceableVocab schemaLockFetched [] [ "schema" ]
-              Expect.isEmpty result "Expected no warning for fetched schema.org"
+              let states = classifyReferencedVocab tttLockUnfetched fixedNow []
+              Expect.isEmpty states "Empty input -> empty output"
 
-          testCase "route /tic does NOT cover /tictactoe namespace"
-          <| fun _ ->
-              let result = checkUndereferenceableVocab tttLockUnfetched [ "/tic" ] [ "ttt" ]
-
-              Expect.equal result [ "ttt" ] "Route /tic must not cover /tictactoe"
-
-          testCase "route /tictactoe/game covers /tictactoe/game namespace"
-          <| fun _ ->
-              let subNsUri = "https://example.org/tictactoe/game#"
-              let lock = makeLock [ "tttg", subNsUri ] []
-              let result = checkUndereferenceableVocab lock [ "/tictactoe/game" ] [ "tttg" ]
-              Expect.isEmpty result "Route /tictactoe/game covers /tictactoe/game"
-
-          testCase "prefix without URI in lock → no warning (benefit of doubt)"
+          testCase "multiple prefixes produce states in order"
           <| fun _ ->
               let lock =
-                  { emptyLock with
-                      DeclaredPrefixes = Map.empty }
+                  makeLock [ "ttt", tttNsUri; "schema", schemaNsUri ] [ "schema", schemaNsUri ]
 
-              let result = checkUndereferenceableVocab lock [] [ "orphan" ]
-              Expect.isEmpty result "No URI → no warning (benefit of doubt)"
+              let states = classifyReferencedVocab lock fixedNow [ "ttt"; "schema" ]
 
-          testCase "empty referencedNs → empty result"
-          <| fun _ ->
-              let result = checkUndereferenceableVocab tttLockUnfetched [] []
-              Expect.isEmpty result "Empty input → empty output" ]
+              Expect.equal
+                  states
+                  [ VocabState.Undereferenceable; VocabState.Confirmed ]
+                  "ttt Undereferenceable, schema Confirmed" ]
 
 // ── Analyzer fixture tests (FRANK002) ─────────────────────────────────────────
 
@@ -139,17 +128,17 @@ let private frank002 (msgs: FSharp.Analyzers.SDK.Message list) =
     msgs |> List.filter (fun m -> m.Code = "FRANK002")
 
 let private expectFrank002 (fixtureName: string) (lock: LockFile) (description: string) =
-    testCase $"{fixtureName} + lock → {description}"
+    testCase $"{fixtureName} + lock -> {description}"
     <| fun _ ->
         let tree = parseFixture (fixture fixtureName)
-        let messages = analyzeWithLock (Some lock) tree
+        let messages = analyzeWithLock (Some(Ok lock)) fixedNow tree
         Expect.isGreaterThanOrEqual (frank002 messages).Length 1 $"Expected FRANK002 in {fixtureName}"
 
 let private expectNoFrank002 (fixtureName: string) (lock: LockFile) (description: string) =
-    testCase $"{fixtureName} + lock → {description}"
+    testCase $"{fixtureName} + lock -> {description}"
     <| fun _ ->
         let tree = parseFixture (fixture fixtureName)
-        let messages = analyzeWithLock (Some lock) tree
+        let messages = analyzeWithLock (Some(Ok lock)) fixedNow tree
         Expect.isEmpty (frank002 messages) $"Expected no FRANK002 in {fixtureName}"
 
 [<Tests>]
@@ -157,25 +146,28 @@ let analyzerTests =
     testList
         "UndereferenceableVocabAnalyzer"
         [
+          // AT1: ttt not in lock, file references ttt:X -> FRANK002
+          expectFrank002 "VocabWithRouteAndTttRef" tttLockUnfetched "AT1: warns when ttt not in lock and file references ttt prefix"
 
-          // AT1: ttt not in lock + no route → FRANK002
-          expectFrank002 "VocabNoRoute" tttLockUnfetched "AT1: warns when ttt not in lock and no route"
+          // AT2: route does NOT suppress FRANK002; file must reference prefix for scoping
+          testCase "AT2 new: route /tictactoe does NOT suppress FRANK002 (hint only)"
+          <| fun _ ->
+              let tree = parseFixture (fixture "VocabWithRouteAndTttRef")
+              let msgs = analyzeWithLock (Some(Ok tttLockUnfetched)) fixedNow tree
+              Expect.isGreaterThanOrEqual (frank002 msgs).Length 1 "Route does not suppress FRANK002 -- route is hint only"
 
-          // AT2: route /tictactoe in source → no FRANK002
-          expectNoFrank002 "VocabWithRoute" tttLockUnfetched "AT2: no warning when route covers ttt namespace"
+          // AT3: ttt in Vocabularies (validated) -> no FRANK002; file references ttt: so suppression is exercised
+          expectNoFrank002 "VocabWithRouteAndTttRef" tttLockFetched "AT3: no warning when ttt is dereferenceable"
 
-          // AT3: ttt in Vocabularies → no FRANK002
-          expectNoFrank002 "VocabNoRoute" tttLockFetched "AT3: no warning when ttt is dereferenceable"
+          // AT5: schema.org in Vocabularies -> no FRANK002; VocabTermUsage references schema: so suppression is exercised
+          expectNoFrank002 "VocabTermUsage" schemaLockFetched "AT5: no warning for fetched schema.org"
 
-          // AT5: schema.org in Vocabularies → no FRANK002
-          expectNoFrank002 "VocabNoRoute" schemaLockFetched "AT5: no warning for fetched schema.org"
-
-          // No lock → no diagnostics
-          testCase "No lock (None) → no FRANK002"
+          // No lock -> no diagnostics
+          testCase "No lock (None) -> no FRANK002"
           <| fun _ ->
               let tree = parseFixture (fixture "VocabNoRoute")
-              let messages = analyzeWithLock None tree
-              Expect.isEmpty (frank002 messages) "No lock → no diagnostics"
+              let messages = analyzeWithLock None fixedNow tree
+              Expect.isEmpty (frank002 messages) "No lock -> no diagnostics"
 
           // extractRoutes extracts /tictactoe from VocabWithRoute fixture
           testCase "extractRoutes: VocabWithRoute has /tictactoe"

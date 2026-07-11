@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "generated": "2026-07-09T00:00:00+00:00",
+  "declaredPrefixes": {
+    "ext": "https://external.org/undereferenceable-vocab#"
+  },
+  "vocabularies": {},
+  "mappings": []
+}

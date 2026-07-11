@@ -18,7 +18,11 @@
     <OutputType>Library</OutputType>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- NU1608: FSharp.Compiler.Service and FSharp.Analyzers.SDK have exact FSharp.Core
-         constraints that vary by SDK version. Keep as warning, not error. -->
+         constraints that vary by SDK version. Keep as warning, not error.
+         Root cause (#378): Frank.Analyzers net8.0 pins FSharp.Core to 10.0.101 so the
+         fsharp-analyzers 0.35.0 CLI can load the plugin (it expects assembly 10.0.0.0).
+         The .NET 10 SDK implicit FSharp.Core (10.1.301) triggers NU1608 on all TFMs.
+         If a future SDK bump resolves the constraint cleanly, this suppression can be removed. -->
     <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1608</WarningsNotAsErrors>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

@@ -27,6 +27,23 @@ jobs:
         run: |
           dotnet restore Frank.sln
           dotnet build Frank.sln -c Release --no-restore
+      - name: Analyzer liveness (FRANK002 canary)
+        # Guards that Frank.Analyzers still loads and fires on the deliberately-broken fixture.
+        # This is a liveness canary, NOT real-app vocabulary enforcement:
+        #   - it runs over a fixture that intentionally declares an undereferenceable prefix
+        #   - it does NOT gate real-app vocab — real reachability enforcement is
+        #     `frank semantic validate` + the weekly network-recheck.yml cron
+        # --analyzers-path MUST load net8.0: fsharp-analyzers 0.35.0 hosts FSharp.Core 10.0.0.0;
+        # net9.0/net10.0 builds resolve 10.1.x which the CLI rejects with an assembly-version error.
+        run: |
+          dotnet tool restore
+          dotnet fsharp-analyzers \
+            --project test/Frank.Analyzers.Fixture.Undereferenceable/Undereferenceable.fsproj \
+            --analyzers-path src/Frank.Analyzers/bin/Release/net8.0/ \
+            --verbosity diagnostic 2>&1 | tee /tmp/analyzers-out.txt
+          # PASS = canary fired on the deliberately-broken fixture.
+          # Do NOT reuse this grep over real sources (presence=pass is inverted vs normal gates).
+          grep -q "FRANK002" /tmp/analyzers-out.txt
       - name: Test
         # Per-PR test run is OFFLINE only: all tests use loopback HttpListener stubs.
         # Network re-verify (frank semantic refresh against live vocab endpoints) runs

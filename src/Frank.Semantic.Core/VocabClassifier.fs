@@ -70,7 +70,8 @@ module VocabClassifier =
     // ── Staleness ─────────────────────────────────────────────────────────────
 
     /// True iff the entry's age (since FetchedAt) exceeds the policy threshold.
-    /// Precondition: now >= entry.FetchedAt (enforced by DateTimeOffset arithmetic).
+    /// A future-stamped FetchedAt (now < FetchedAt) yields negative elapsed days and is treated as not-stale;
+    /// staleness only ever flags entries older than the SLA.
     /// `now` is injected — never reads DateTimeOffset.UtcNow internally.
     let isStale (policy: SlaPolicy) (prefix: string) (entry: VocabularyEntry) (now: DateTimeOffset) : bool =
         let maxDays =
@@ -86,26 +87,62 @@ module VocabClassifier =
 
     // ── Shared classifier ─────────────────────────────────────────────────────
 
+    // Build a URI → entry lookup for IRI-identity matching (AT7 / #378).
+    // Linear over Vocabularies (lock is small; O(n) acceptable).
+    let buildVocabUriIndex (vocabularies: Map<string, VocabularyEntry>) : Map<string, VocabularyEntry> =
+        vocabularies |> Map.toSeq |> Seq.map (fun (_, e) -> e.Uri, e) |> Map.ofSeq
+
+    /// IRI-first prefix → entry lookup (IRI-identity / AT7):
+    /// Resolve prefix → IRI via DeclaredPrefixes, then match by IRI in byUri.
+    /// Identity is always the namespace IRI, never the prefix label (spec: compare on IRI).
+    let lookupEntry (lock: LockFile) (byUri: Map<string, VocabularyEntry>) (prefix: string) : VocabularyEntry option =
+        match Map.tryFind prefix lock.DeclaredPrefixes with
+        | None -> None
+        | Some iri -> Map.tryFind iri byUri
+
+    let private classifyEntry
+        (policy: SlaPolicy)
+        (prefix: string)
+        (entry: VocabularyEntry)
+        (now: DateTimeOffset)
+        : VocabState =
+        if isStale policy prefix entry now then
+            Stale
+        elif entry.Owned && not entry.Validated.IsValidated then
+            LocallyServedUnconfirmed
+        elif entry.Validated.IsValidated then
+            Confirmed
+        else
+            Proposed
+
+    /// Classify each referenced namespace prefix against a pre-built URI index.
+    /// Prefer when byUri is already built at the call site to avoid redundant Map construction.
+    /// Pure, deterministic, offline-safe. `now` is injected — never reads the system clock.
+    let classifyReferencedVocabWith
+        (lock: LockFile)
+        (byUri: Map<string, VocabularyEntry>)
+        (now: DateTimeOffset)
+        (referencedNs: string list)
+        : VocabState list =
+        let policy = SlaPolicy.defaultPolicy
+
+        referencedNs
+        |> List.map (fun prefix ->
+            match lookupEntry lock byUri prefix with
+            | Some entry -> classifyEntry policy prefix entry now
+            | None -> Undereferenceable)
+
     /// Classify each referenced namespace prefix against the lock using the default SLA policy.
     /// Pure, deterministic, offline-safe. `now` is injected — never reads the system clock.
     /// This is the SINGLE classifier all surfaces (status, analyzer, CI) project from.
+    ///
+    /// Lookup strategy (IRI-identity / AT7):
+    ///  Resolve prefix → IRI via DeclaredPrefixes[prefix], then match by IRI in byUri.
+    ///  Identity is always the namespace IRI, never the prefix label — handles the case
+    ///  where the same namespace IRI is stored under a different prefix key (e.g. sdo/schema).
     ///
     /// H2 boundary: classification is NAMESPACE-LEVEL only (does the namespace dereference to
     /// parseable RDF?). Term-level membership (is the referenced term ∈ entry.Terms?) is enforced
     /// by the #378 analyzer which consumes entry.Terms. Do NOT add term-membership checking here.
     let classifyReferencedVocab (lock: LockFile) (now: DateTimeOffset) (referencedNs: string list) : VocabState list =
-        let policy = SlaPolicy.defaultPolicy
-
-        referencedNs
-        |> List.map (fun prefix ->
-            match Map.tryFind prefix lock.Vocabularies with
-            | Some entry ->
-                if isStale policy prefix entry now then
-                    Stale
-                elif entry.Owned && not entry.Validated.IsValidated then
-                    LocallyServedUnconfirmed
-                elif entry.Validated.IsValidated then
-                    Confirmed
-                else
-                    Proposed
-            | None -> Undereferenceable)
+        classifyReferencedVocabWith lock (buildVocabUriIndex lock.Vocabularies) now referencedNs
