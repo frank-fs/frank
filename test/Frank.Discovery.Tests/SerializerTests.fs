@@ -17,6 +17,80 @@ let private safeToken =
 let private iriGen = safeToken |> Gen.map (fun t -> "https://schema.org/" + t)
 
 [<Tests>]
+let rfc6570Tests =
+    testList
+        "JsonHomeSerializer.extractTemplateVars — RFC 6570"
+        [ testCase "{id} simple var"
+          <| fun _ ->
+              let result = JsonHomeSerializer.extractTemplateVars "{id}"
+              Expect.equal result [ "id" ] "simple var name"
+
+          testCase "/a/{x}/b/{y} two simple vars"
+          <| fun _ ->
+              let result = JsonHomeSerializer.extractTemplateVars "/a/{x}/b/{y}"
+              Expect.equal result [ "x"; "y" ] "two simple vars"
+
+          testCase "{+base} plus operator stripped"
+          <| fun _ ->
+              let result = JsonHomeSerializer.extractTemplateVars "{+base}"
+              Expect.equal result [ "base" ] "result is [base]"
+              Expect.isFalse (List.contains "+base" result) "+base absent"
+
+          testCase "{#frag} hash operator stripped"
+          <| fun _ ->
+              let result = JsonHomeSerializer.extractTemplateVars "{#frag}"
+              Expect.equal result [ "frag" ] "result is [frag]"
+              Expect.isFalse (List.contains "#frag" result) "#frag absent"
+
+          testCase "{/path} slash operator stripped"
+          <| fun _ ->
+              let result = JsonHomeSerializer.extractTemplateVars "{/path}"
+              Expect.equal result [ "path" ] "result is [path]"
+              Expect.isFalse (List.contains "/path" result) "/path absent"
+
+          testCase "{.ext} dot operator stripped"
+          <| fun _ ->
+              let result = JsonHomeSerializer.extractTemplateVars "{.ext}"
+              Expect.equal result [ "ext" ] "result is [ext]"
+              Expect.isFalse (List.contains ".ext" result) ".ext absent"
+
+          testCase "{;p} semicolon operator stripped"
+          <| fun _ ->
+              let result = JsonHomeSerializer.extractTemplateVars "{;p}"
+              Expect.equal result [ "p" ] "result is [p]"
+              Expect.isFalse (List.contains ";p" result) ";p absent"
+
+          testCase "{?q} query operator stripped"
+          <| fun _ ->
+              let result = JsonHomeSerializer.extractTemplateVars "{?q}"
+              Expect.equal result [ "q" ] "result is [q]"
+              Expect.isFalse (List.contains "?q" result) "?q absent"
+
+          testCase "{&r} continuation operator stripped"
+          <| fun _ ->
+              let result = JsonHomeSerializer.extractTemplateVars "{&r}"
+              Expect.equal result [ "r" ] "result is [r]"
+              Expect.isFalse (List.contains "&r" result) "&r absent"
+
+          testCase "{x,y} multi-var expression"
+          <| fun _ ->
+              let result = JsonHomeSerializer.extractTemplateVars "{x,y}"
+              Expect.equal result [ "x"; "y" ] "splits on comma"
+              Expect.isFalse (List.contains "x,y" result) "x,y not a single name"
+
+          testCase "{x:3} prefix modifier stripped"
+          <| fun _ ->
+              let result = JsonHomeSerializer.extractTemplateVars "{x:3}"
+              Expect.equal result [ "x" ] "result is [x]"
+              Expect.isFalse (List.contains "x:3" result) "x:3 absent"
+
+          testCase "{list*} explode modifier stripped"
+          <| fun _ ->
+              let result = JsonHomeSerializer.extractTemplateVars "{list*}"
+              Expect.equal result [ "list" ] "result is [list]"
+              Expect.isFalse (List.contains "list*" result) "list* absent" ]
+
+[<Tests>]
 let alpsTests =
     testList
         "AlpsSerializer"

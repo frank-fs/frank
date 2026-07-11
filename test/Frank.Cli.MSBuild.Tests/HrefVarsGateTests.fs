@@ -29,6 +29,12 @@ let private hrefVarsFixtureFsproj: string =
         "Frank.Discovery.HrefVarsFixture.fsproj"
     )
 
+let private frankFsproj: string =
+    Path.Combine(worktreeRoot, "src", "Frank", "Frank.fsproj")
+
+let private frankDiscoveryFsproj: string =
+    Path.Combine(worktreeRoot, "src", "Frank.Discovery", "Frank.Discovery.fsproj")
+
 let private runProcess (exe: string) (args: string) (capMs: int) : int * string =
     let psi = ProcessStartInfo(exe, args)
     psi.RedirectStandardOutput <- true
@@ -56,6 +62,23 @@ let private runProcess (exe: string) (args: string) (capMs: int) : int * string 
     proc.WaitForExit()
     proc.ExitCode, stdoutTask.Result + stderrTask.Result
 
+/// Pre-compile Frank and Frank.Discovery (fixture ProjectReferences) so the timed
+/// gate-build only measures fixture F# compilation + the 30s app-launch gate in
+/// FrankValidateHrefVars. Frank.Cli.MSBuild is a direct test-project dep and is
+/// rebuilt by the test framework before any test runs.
+/// Do NOT add `dotnet build-server shutdown` before the subprocess build: it
+/// forces a build-server restart that hangs 10+ min on NixOS, turning every
+/// incremental no-op into a many-minute stall.
+let private warmUpDeps () : unit =
+    let assertWarm (proj: string) (extraArgs: string) =
+        let code, out = runProcess "dotnet" $"build \"{proj}\" {extraArgs}" 600_000
+
+        if code <> 0 then
+            invalidOp $"Warm-up of {Path.GetFileName proj} failed (exit {code}):\n{out}"
+
+    assertWarm frankFsproj "-f net10.0"
+    assertWarm frankDiscoveryFsproj "-f net10.0"
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 [<Tests>]
@@ -64,7 +87,13 @@ let hrefVarsGateTests =
     <| testList
         "A3 — HrefVarsFixture build gate (subprocess dotnet build)"
         [ test "Negative: bad fixture build fails non-zero and names gameId" {
-              let capMs = 180_000
+              // Warm the dependency closure (Frank, Frank.Discovery, Frank.Cli.MSBuild task DLL)
+              // untimed. The timed window below only measures the incremental fixture build
+              // plus the 30s app-launch gate in FrankValidateHrefVars.
+              warmUpDeps ()
+              // Fixture has no NuGet PackageReferences so restore is fast (writes project.assets.json only).
+              // Frank and Frank.Discovery are warm from warmUpDeps; only tiny Program.fs compiles here.
+              let capMs = 90_000
               let exitCode, combined = runProcess "dotnet" $"build \"{hrefVarsFixtureFsproj}\"" capMs
 
               Expect.isTrue (exitCode <> 0) $"Bad fixture must exit non-zero; got {exitCode}"
