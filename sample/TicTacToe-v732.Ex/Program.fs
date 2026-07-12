@@ -96,8 +96,10 @@ let private routeId (ctx: HttpContext) =
 let rec private findDescriptorHrefIn (id: string) (descriptors: Frank.Discovery.AlpsDescriptor list) : string option =
     descriptors
     |> List.tryPick (fun d ->
-        if d.Id = id then d.Href
-        else findDescriptorHrefIn id d.Descriptors)
+        if d.Id = id then
+            d.Href
+        else
+            findDescriptorHrefIn id d.Descriptors)
 
 let private findDescriptorHref (id: string) =
     findDescriptorHrefIn id TicTacToe.GeneratedDiscovery.discoveryConfig.AlpsDescriptors
@@ -189,6 +191,7 @@ let private buildExTurtleBody (origin: string) (graph: IGraph) : string =
     use sw = new System.IO.StringWriter()
     let writer = CompressingTurtleWriter()
     writer.Save(graph, sw :> System.IO.TextWriter)
+
     if isNull (box graph.BaseUri) then
         "@base <" + origin + "> .\n" + sw.ToString()
     else
@@ -206,16 +209,6 @@ let private gameResource =
         entryPoint
         relation (TicTacToe.GeneratedSemantics.SemanticResource.Game.Iri.AbsoluteUri)
         get gameHandler
-    }
-
-let private movesResource =
-    resource "/games/{id}/moves" {
-        name "GameMoves"
-
-        relation (
-            TicTacToe.GeneratedSemantics.SemanticResource.MoveRequest.Iri.AbsoluteUri
-        )
-
         post moveHandler
     }
 
@@ -238,7 +231,6 @@ let main args =
         useDiscoveryWith TicTacToe.GeneratedDiscovery.discoveryConfig
         resource homeResource
         resource gameResource
-        resource movesResource
         resource exVocabResource
     }
 

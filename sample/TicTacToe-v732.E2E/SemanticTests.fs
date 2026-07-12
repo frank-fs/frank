@@ -490,10 +490,9 @@ type SemanticTests() =
             let! body = resp.TextAsync()
             Assert.That(body.Contains "urn:frank:", Is.False, "JSON Home leaks urn:frank: rels")
 
-            // ── #9: move resource href-vars {id} must resolve to an absolute IRI ──
-            // The move resource (/games/{id}/moves) inherits {id} from the Game
-            // resource's path segment. Its href-vars must NOT contain "" for id.
-            let moveResource =
+            // ── Corrected model: move is POST on the game resource, not a separate moves resource ──
+            // (1) No resource whose href-template ends /moves — the phantom resource is gone.
+            let movesResourceEntry =
                 resources.EnumerateObject()
                 |> Seq.tryFind (fun r ->
                     let mutable tmpl = Unchecked.defaultof<JsonElement>
@@ -501,40 +500,132 @@ type SemanticTests() =
                     r.Value.TryGetProperty("href-template", &tmpl)
                     && (tmpl.GetString() |> Option.ofObj |> Option.exists (fun s -> s.Contains "/moves")))
 
-            Assert.That(moveResource.IsSome, Is.True, "Move resource not found in JSON Home")
-            let mutable moveHrefVars = Unchecked.defaultof<JsonElement>
-
             Assert.That(
-                moveResource.Value.Value.TryGetProperty("href-vars", &moveHrefVars),
+                movesResourceEntry.IsNone,
                 Is.True,
-                "Move resource missing href-vars"
+                "Phantom moves resource (/games/{id}/moves) must be absent from JSON Home — POST is on the game resource"
             )
 
-            let mutable idVar = Unchecked.defaultof<JsonElement>
-            Assert.That(moveHrefVars.TryGetProperty("id", &idVar), Is.True, "href-vars missing 'id' key")
+            // (2) The game resource entry's hints.allow must include GET, OPTIONS, and POST.
+            let gameEntry =
+                resources.EnumerateObject()
+                |> Seq.tryFind (fun r ->
+                    let mutable tmpl = Unchecked.defaultof<JsonElement>
+                    let mutable hints = Unchecked.defaultof<JsonElement>
+                    let mutable allow = Unchecked.defaultof<JsonElement>
+
+                    r.Value.TryGetProperty("href-template", &tmpl)
+                    && (tmpl.GetString()
+                        |> Option.ofObj
+                        |> Option.exists (fun s -> s.Contains "/games/{id}"))
+                    && r.Value.TryGetProperty("hints", &hints)
+                    && hints.TryGetProperty("allow", &allow)
+                    && allow.EnumerateArray() |> Seq.exists (fun m -> m.GetString() = "GET")
+                    && allow.EnumerateArray() |> Seq.exists (fun m -> m.GetString() = "POST"))
 
             Assert.That(
-                idVar.GetString(),
-                Is.Not.Empty,
-                "href-vars 'id' must not be empty — {id} in /games/{id}/moves must resolve to schema:identifier"
+                gameEntry.IsSome,
+                Is.True,
+                "Game resource entry must carry hints.allow ⊇ {GET, POST} — move is a POST transition on the game"
             )
 
+            let mutable hintsEl2 = Unchecked.defaultof<JsonElement>
+            let mutable allowEl2 = Unchecked.defaultof<JsonElement>
+
+            let allowContainsOptions =
+                gameEntry.IsSome
+                && gameEntry.Value.Value.TryGetProperty("hints", &hintsEl2)
+                && hintsEl2.TryGetProperty("allow", &allowEl2)
+                && allowEl2.EnumerateArray() |> Seq.exists (fun m -> m.GetString() = "OPTIONS")
+
             Assert.That(
-                idVar.GetString().StartsWith "http",
+                allowContainsOptions,
                 Is.True,
-                "href-vars 'id' must be an absolute IRI (schema:identifier)"
+                "Game resource hints.allow must include OPTIONS (RFC 7231 §7.4.1)"
+            )
+
+            // (3) The game resource's href-vars must have an 'id' key that is an absolute IRI
+            // (schema:identifier). This coverage existed for the old moves resource entry and
+            // is re-pointed at the game resource — the id var travels with the game template now.
+            let mutable hrefVarsEl = Unchecked.defaultof<JsonElement>
+            let mutable idVarEl = Unchecked.defaultof<JsonElement>
+
+            let hrefVarsPresent =
+                gameEntry.IsSome
+                && gameEntry.Value.Value.TryGetProperty("href-vars", &hrefVarsEl)
+                && hrefVarsEl.TryGetProperty("id", &idVarEl)
+
+            Assert.That(hrefVarsPresent, Is.True, "Game resource entry must carry href-vars with an 'id' key")
+            let idVarValue = idVarEl.GetString()
+            Assert.That(idVarValue, Is.Not.Empty, "href-vars.id must not be empty")
+            Assert.That(idVarValue.StartsWith "http", Is.True, "href-vars.id must be an absolute IRI")
+
+            Assert.That(
+                idVarValue,
+                Is.EqualTo "https://schema.org/identifier",
+                "href-vars.id must equal schema:identifier"
             )
         }
 
-    // ── AT-S2: OPTIONS yields Allow + Link rel=describedby → ALPS ────────────────
+    // ── AT-S2: OPTIONS yields Allow ⊇ {GET,OPTIONS,POST} + Link rel=describedby → ALPS ──
+    // ALPS MoveAction must carry rt = https://schema.org/Game — move is a POST transition
+    // on the game resource, not a separate resource. OPTIONS must be in Allow (RFC 7231 §7.4.1).
     [<Test>]
     member this.``AT-S2 OPTIONS carries Allow and Link rel=describedby to ALPS``() =
         task {
             use! ctx = this.NewContext()
             let! resp = this.Options(ctx, "/games/at-s2")
             Assert.That(resp.Headers.ContainsKey "allow", Is.True, "OPTIONS missing Allow header")
+
+            let allowStr = resp.Headers.["allow"]
+            Assert.That(allowStr.Contains "GET", Is.True, "Allow must include GET")
+            Assert.That(allowStr.Contains "OPTIONS", Is.True, "Allow must include OPTIONS (RFC 7231 §7.4.1)")
+
+            Assert.That(
+                allowStr.Contains "POST",
+                Is.True,
+                "Allow must include POST — move is a POST transition on the game"
+            )
+
             let rels = SemanticTests.LinkRels resp
             Assert.That(rels.ContainsKey "describedby", Is.True, "OPTIONS missing Link rel=describedby")
+
+            let alpsUrl = rels.["describedby"]
+            let! alpsResp = ctx.GetAsync(alpsUrl)
+            let! alpsBody = alpsResp.TextAsync()
+            use alpsDoc = JsonDocument.Parse alpsBody
+            let mutable alpsEl = Unchecked.defaultof<JsonElement>
+            let mutable descriptorEl = Unchecked.defaultof<JsonElement>
+
+            Assert.That(
+                alpsDoc.RootElement.TryGetProperty("alps", &alpsEl)
+                && alpsEl.TryGetProperty("descriptor", &descriptorEl),
+                Is.True,
+                "ALPS document must have alps.descriptor array"
+            )
+
+            let moveActionRt =
+                descriptorEl.EnumerateArray()
+                |> Seq.tryPick (fun d ->
+                    let mutable typeEl = Unchecked.defaultof<JsonElement>
+                    let mutable rtEl = Unchecked.defaultof<JsonElement>
+
+                    if
+                        d.TryGetProperty("type", &typeEl)
+                        && typeEl.GetString() = "unsafe"
+                        && d.TryGetProperty("rt", &rtEl)
+                    then
+                        rtEl.GetString() |> Option.ofObj
+                    else
+                        None)
+
+            Assert.That(moveActionRt.IsSome, Is.True, "ALPS must have an unsafe descriptor with rt")
+
+            Assert.That(
+                moveActionRt.Value,
+                Is.EqualTo "https://schema.org/Game",
+                "ALPS MoveAction rt must be schema:Game — move is anchored on the game resource"
+            )
         }
 
     // ── AT-S3: ALPS descriptors cite vocabulary IRIs, never urn:frank: ───────────
@@ -566,7 +657,7 @@ type SemanticTests() =
 
             let! resp =
                 ctx.PostAsync(
-                    "/games/at-s4/moves",
+                    "/games/at-s4",
                     APIRequestContextOptions(
                         Headers = dict [ "Content-Type", "application/ld+json" ],
                         DataObject = badMove
@@ -1571,7 +1662,7 @@ type SemanticTests() =
 
             let! resp =
                 ctx.PostAsync(
-                    sprintf "/games/%s/moves" gameId,
+                    sprintf "/games/%s" gameId,
                     APIRequestContextOptions(Headers = dict [ "Content-Type", "application/ld+json" ], Data = body)
                 )
 

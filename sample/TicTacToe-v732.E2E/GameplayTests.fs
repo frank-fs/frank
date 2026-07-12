@@ -41,7 +41,7 @@ type GameplayTests() =
 
             let! resp =
                 ctx.PostAsync(
-                    "/games/e2e-move/moves",
+                    "/games/e2e-move",
                     APIRequestContextOptions(DataObject = {| position = "TopLeft"; player = "X" |})
                 )
 
@@ -61,7 +61,7 @@ type GameplayTests() =
 
             let! first =
                 ctx.PostAsync(
-                    "/games/e2e-illegal/moves",
+                    "/games/e2e-illegal",
                     APIRequestContextOptions(DataObject = {| position = "TopLeft"; player = "X" |})
                 )
 
@@ -70,8 +70,12 @@ type GameplayTests() =
             // X moves again — not X's turn.
             let! second =
                 ctx.PostAsync(
-                    "/games/e2e-illegal/moves",
-                    APIRequestContextOptions(DataObject = {| position = "TopCenter"; player = "X" |})
+                    "/games/e2e-illegal",
+                    APIRequestContextOptions(
+                        DataObject =
+                            {| position = "TopCenter"
+                               player = "X" |}
+                    )
                 )
 
             Assert.That(second.Status, Is.EqualTo 409)

@@ -72,6 +72,17 @@ let private configureProvenanceApp (app: WebApplication) : unit =
         )
     |> ignore
 
+    app
+        .MapMethods(
+            "/orders/{id}",
+            [| "DELETE" |],
+            Func<HttpContext, System.Threading.Tasks.Task>(fun ctx ->
+                ctx.Response.StatusCode <- 204
+                ctx.Response.WriteAsync(""))
+        )
+        .WithMetadata(Microsoft.AspNetCore.Http.ProducesResponseTypeMetadata(204, typeof<unit>, [||]))
+    |> ignore
+
     app.MapGet(
         "/no-produces",
         Func<HttpContext, System.Threading.Tasks.Task>(fun ctx ->

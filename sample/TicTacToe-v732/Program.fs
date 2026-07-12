@@ -340,15 +340,6 @@ let private gameResource =
               GraphFactory = Some gameGraphFactory }
 
         get gameHandler
-    }
-
-let private movesResource =
-    resource "/games/{id}/moves" {
-        name "GameMoves"
-
-        relation (
-            TicTacToe.GeneratedSemantics.SemanticResource.MoveRequest.Iri.AbsoluteUri
-        )
 
         post (
             handler {
@@ -386,7 +377,6 @@ let main args =
         useLinkedData
         resource homeResource
         resource gameResource
-        resource movesResource
         resource tttVocabResource
     }
 

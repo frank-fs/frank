@@ -5,11 +5,16 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.Routing.Template
+open Microsoft.Extensions.Logging
 open Microsoft.Extensions.Primitives
 
-/// Build JSON Home resource entries from live endpoints at request time.
-/// Endpoints carrying ResourceRelationMetadata contribute one entry each; all
-/// others are skipped. HEAD is added when GET is present, matching OPTIONS logic.
+/// Build JSON Home resource entries from live endpoints.
+/// Endpoints carrying ResourceRelationMetadata contribute to one merged entry per
+/// (Relation, Href) pair — a resource with both GET and POST produces a single entry
+/// with allow ⊇ {GET, HEAD, OPTIONS, POST}. HEAD is added when GET is present;
+/// OPTIONS is always added (RFC 7231 §7.4.1).
+/// Returns a list that may contain multiple entries with the same Relation when two
+/// distinct hrefs share a relation IRI; caller is responsible for deduplication.
 /// resourceHrefVars maps each relation IRI to its template-variable meaning IRIs.
 let homeResourcesFromEndpoints
     (resourceHrefVars: Map<string, Map<string, string>>)
@@ -21,16 +26,11 @@ let homeResourcesFromEndpoints
         else
             methods
 
-    let toResource (re: RouteEndpoint) (meta: ResourceRelationMetadata) (methodMeta: HttpMethodMetadata) =
-        let allow = methodMeta.HttpMethods |> Seq.toList |> addHead |> List.sort
-
-        let varMeanings =
-            resourceHrefVars |> Map.tryFind meta.Relation |> Option.defaultValue Map.empty
-
-        { Relation = meta.Relation
-          Href = re.RoutePattern.RawText
-          Allow = allow
-          HrefVars = varMeanings }
+    let addOptions (methods: string list) =
+        if not (List.contains "OPTIONS" methods) then
+            "OPTIONS" :: methods
+        else
+            methods
 
     dataSource.Endpoints
     |> Seq.choose (fun ep ->
@@ -45,16 +45,68 @@ let homeResourcesFromEndpoints
 
                 match ep.Metadata.GetMetadata<HttpMethodMetadata>() with
                 | null -> None
-                | methodMeta -> Some(toResource re relMeta methodMeta)
+                | methodMeta -> Some(relMeta.Relation, re.RoutePattern.RawText, methodMeta.HttpMethods |> Seq.toList)
         | _ -> None)
+    |> Seq.groupBy (fun (relation, href, _) -> (relation, href))
+    |> Seq.map (fun ((relation, href), entries) ->
+        let allMethods =
+            entries
+            |> Seq.collect (fun (_, _, methods) -> methods)
+            |> Seq.distinct
+            |> Seq.toList
+            |> addHead
+            |> addOptions
+            |> List.sort
+
+        let varMeanings =
+            resourceHrefVars |> Map.tryFind relation |> Option.defaultValue Map.empty
+
+        { Relation = relation
+          Href = href
+          Allow = allMethods
+          HrefVars = varMeanings })
     |> Seq.toList
 
 /// Static discovery for the application:
-///  - OPTIONS → `Allow` (methods from matching endpoints) + `Link rel="describedby"`
+///  - OPTIONS → `Allow` (methods from matching endpoints + HEAD + OPTIONS) + `Link rel="describedby"`
 ///  - GET ProfileUri → ALPS profile (application/alps+json)
 ///  - GET HomeRoute with `Accept: application/json-home` → JSON Home directory
 /// Anything else falls through. Runs after UseRouting, before endpoint execution.
-type DiscoveryMiddleware(next: RequestDelegate, config: DiscoveryConfig, endpointDataSource: EndpointDataSource) =
+type DiscoveryMiddleware
+    (
+        next: RequestDelegate,
+        config: DiscoveryConfig,
+        endpointDataSource: EndpointDataSource,
+        logger: ILogger<DiscoveryMiddleware>
+    ) =
+
+    // Dedup by relation at the middleware boundary where the logger lives (Holzmann 14:
+    // surface side-effects at the call site). JSON Home 'resources' is keyed by relation
+    // IRI — one entry per relation per spec. Two distinct hrefs sharing a relation IRI is
+    // a configuration error; first-registered href wins with a LogWarning.
+    // Computed once via Lazy<_> (F3: endpoint set is fixed after startup).
+    let buildHomeResources () =
+        let all = homeResourcesFromEndpoints config.ResourceHrefVars endpointDataSource
+
+        all
+        |> List.groupBy (fun r -> r.Relation)
+        |> List.map (fun (_, rs) ->
+            if rs.Length > 1 then
+                let kept = rs.Head
+
+                for dropped in rs.Tail do
+                    logger.LogWarning(
+                        "DiscoveryMiddleware: relation '{Relation}' registered with multiple hrefs — keeping '{KeptHref}', dropping '{DroppedHref}'. Register each resource with a unique relation IRI.",
+                        kept.Relation,
+                        kept.Href,
+                        dropped.Href
+                    )
+
+                kept
+            else
+                rs.Head)
+
+    let cachedHomeResources = lazy (buildHomeResources ())
 
     let methodsForPath (requestPath: string) =
         let pathString = PathString(requestPath)
@@ -88,6 +140,13 @@ type DiscoveryMiddleware(next: RequestDelegate, config: DiscoveryConfig, endpoin
             else
                 methods
 
+        // RFC 7231 §7.4.1: OPTIONS is always handled by the server, so always advertise it.
+        let methods =
+            if not (List.contains "OPTIONS" methods) then
+                "OPTIONS" :: methods
+            else
+                methods
+
         if not methods.IsEmpty then
             ctx.Response.Headers.["Allow"] <- StringValues(methods |> List.sort |> List.toArray)
 
@@ -117,9 +176,6 @@ type DiscoveryMiddleware(next: RequestDelegate, config: DiscoveryConfig, endpoin
         elif isGet && path = config.HomeRoute && acceptsJsonHome ctx then
             ctx.Response.Headers.Append("Vary", "Accept")
             ctx.Response.ContentType <- "application/json-home"
-
-            ctx.Response.WriteAsync(
-                JsonHomeSerializer.serialize (homeResourcesFromEndpoints config.ResourceHrefVars endpointDataSource)
-            )
+            ctx.Response.WriteAsync(JsonHomeSerializer.serialize cachedHomeResources.Value)
         else
             next.Invoke ctx

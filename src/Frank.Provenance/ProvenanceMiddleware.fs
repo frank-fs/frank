@@ -46,8 +46,21 @@ module private BodyCapture =
         with :? JsonException ->
             []
 
+    // HttpMethods.Is* uses case-insensitive comparison (OrdinalIgnoreCase, allocation-free).
+    // Raw string '=' comparisons are NOT used — ASP.NET Core does not guarantee uppercase methods.
     let isBodyBearing (method: string) =
-        method = "POST" || method = "PUT" || method = "PATCH"
+        HttpMethods.IsPost method
+        || HttpMethods.IsPut method
+        || HttpMethods.IsPatch method
+
+    // RFC 7231 §4.2.1: safe methods (GET/HEAD/OPTIONS/TRACE) observe state without changing it.
+    // Every other method is potentially unsafe and records a prov:Activity entry.
+    // DELETE has no request body but IS state-changing — do not conflate "has body" with "unsafe".
+    let isUnsafeMethod (method: string) =
+        not (HttpMethods.IsGet method)
+        && not (HttpMethods.IsHead method)
+        && not (HttpMethods.IsOptions method)
+        && not (HttpMethods.IsTrace method)
 
     // Read request body for provenance capture, then reset Position to 0 so the downstream
     // handler can read it. Must be called BEFORE next.Invoke. leaveOpen=true prevents the
@@ -210,7 +223,10 @@ type ProvenanceMiddleware
 
             let ended = DateTimeOffset.UtcNow
             let record = Capture.build config origin ctx started ended bodyAttrs
-            store.Append record
+            // Same safe-method gate as InvokeNonProv — both paths must agree.
+            // A prov-profile GET still returns a JSON-LD snapshot; it just does not persist.
+            if BodyCapture.isUnsafeMethod ctx.Request.Method then
+                store.Append record
 
             if ctx.Response.HasStarted then
                 logger.LogWarning(
@@ -251,8 +267,14 @@ type ProvenanceMiddleware
 
         task {
             do! next.Invoke ctx
-            let ended = DateTimeOffset.UtcNow
-            store.Append(Capture.build config origin ctx started ended bodyAttrs)
+            // Record all unsafe (state-changing) methods: POST/PUT/PATCH/DELETE and any
+            // other non-safe method. Safe methods (GET/HEAD/OPTIONS/TRACE) observe state
+            // without changing it and are excluded to keep provenance lineages clean.
+            // Note: isBodyBearing (POST/PUT/PATCH) is kept ONLY for body-read decisions
+            // — do not conflate "has body" with "is state-changing" (DELETE is unsafe, no body).
+            if BodyCapture.isUnsafeMethod ctx.Request.Method then
+                let ended = DateTimeOffset.UtcNow
+                store.Append(Capture.build config origin ctx started ended bodyAttrs)
         }
 
     member private this.InvokeCore(ctx: HttpContext, origin: string) : Task =

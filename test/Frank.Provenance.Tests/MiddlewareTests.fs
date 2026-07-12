@@ -277,17 +277,87 @@ let tests =
                   "schema:agent IRI captured from PATCH body"
           }
 
-          testCaseAsync "GET does not capture body attributes (#14 negative)"
+          testCaseAsync "GET does not record in provenance store — safe methods are excluded (#390)"
           <| async {
+              // Safe methods (GET/HEAD/OPTIONS) observe state without changing it.
+              // Recording them would pollute move-history lineages when GET and POST
+              // share a route (e.g. /games/{id}).
               let captureStore = CapturingStore()
               use app = startProvenanceServerWithStore (orderProvConfig ()) captureStore
               use client = app.GetTestClient()
               let! _ = client.GetAsync("/no-produces") |> Async.AwaitTask
               let records = captureStore.Records
+              Expect.isEmpty records "GET must NOT produce a provenance record in the store"
+          }
 
-              Expect.isNonEmpty records "GET must still produce a provenance record"
+          testCaseAsync
+              "prov-profile GET does not record in store — both InvokeWithProv and InvokeNonProv agree (#390 F1)"
+          <| async {
+              // RED (before fix): InvokeWithProv calls store.Append unconditionally — a GET
+              //   with Accept prov-profile increments the store, violating HTTP safety.
+              // GREEN (after fix): InvokeWithProv gates store.Append on isUnsafeMethod.
+              //   JSON-LD snapshot is still returned to caller; the store is not written.
+              let captureStore = CapturingStore()
+              use app = startProvenanceServerWithStore (orderProvConfig ()) captureStore
+              use client = app.GetTestClient()
+              // First: non-prov GET — must not record (InvokeNonProv path, already fixed)
+              let! _ = client.GetAsync("/no-produces") |> Async.AwaitTask
+              Expect.isEmpty captureStore.Records "non-prov GET must not record"
+              // Second: same GET with prov-profile Accept — must also not record (InvokeWithProv path)
+              use req = new HttpRequestMessage(HttpMethod.Get, "/no-produces")
 
-              Expect.isEmpty records.Head.BodyAttributes "GET must NOT capture body attributes"
+              req.Headers.TryAddWithoutValidation(
+                  "Accept",
+                  "application/ld+json; profile=\"http://www.w3.org/ns/prov\""
+              )
+              |> ignore
+
+              let! _ = client.SendAsync(req) |> Async.AwaitTask
+
+              Expect.isEmpty
+                  captureStore.Records
+                  "prov-profile GET must NOT record in store (safe method — HTTP safety)"
+          }
+
+          testCaseAsync "lowercase method 'get' is classified as safe — not recorded (#390 F2)"
+          <| async {
+              // RED (before fix): isUnsafeMethod uses raw string '=' — "get" <> "GET" is
+              //   true, so isUnsafeMethod "get" = true → store.Append is called.
+              // GREEN (after fix): isUnsafeMethod uses HttpMethods.IsGet (case-insensitive) →
+              //   isUnsafeMethod "get" = false → not recorded.
+              let captureStore = CapturingStore()
+              use app = startProvenanceServerWithStore (orderProvConfig ()) captureStore
+              let server = app.GetTestServer()
+
+              // Inject lowercase method directly, bypassing HTTP layer (which normalises casing).
+              let! _ =
+                  server.SendAsync(
+                      Action<HttpContext>(fun ctx ->
+                          ctx.Request.Method <- "get"
+                          ctx.Request.Scheme <- "http"
+                          ctx.Request.Host <- HostString "localhost"
+                          ctx.Request.Path <- PathString "/no-produces")
+                  )
+                  |> Async.AwaitTask
+
+              Expect.isEmpty captureStore.Records "lowercase 'get' must NOT produce a provenance record"
+          }
+
+          testCaseAsync "DELETE produces a prov:Activity record in the non-prov path — DELETE is state-changing (#390)"
+          <| async {
+              // RED (before fix): InvokeNonProv gates store.Append on isBodyBearing (POST/PUT/PATCH).
+              //   DELETE has no body but IS state-changing — it must produce a provenance record.
+              //   This test fails while the gate uses isBodyBearing alone.
+              // GREEN (after fix): gate uses isUnsafeMethod (records everything except GET/HEAD/OPTIONS/TRACE).
+              //   DELETE is unsafe → record is appended.
+              let captureStore = CapturingStore()
+              use app = startProvenanceServerWithStore (orderProvConfig ()) captureStore
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Delete, "/orders/1")
+              let! _ = client.SendAsync(req) |> Async.AwaitTask
+              let records = captureStore.Records
+              Expect.isNonEmpty records "DELETE must produce a provenance record (state-changing, no body)"
+              Expect.equal records.Head.HttpMethod "DELETE" "record HttpMethod must be DELETE"
           }
 
           testCaseAsync "over-limit POST body on provenance path returns 413 (#13)"
