@@ -8,6 +8,7 @@ type private StoreMessage =
     | Append of ProvenanceRecord
     | QueryByResource of string * AsyncReplyChannel<ProvenanceRecord list>
     | QueryByAgent of string * AsyncReplyChannel<ProvenanceRecord list>
+    | QueryByActivityId of string * AsyncReplyChannel<ProvenanceRecord option>
     | Dispose of AsyncReplyChannel<unit>
 
 type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILogger) =
@@ -21,6 +22,7 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
     let rebuildIndexes (records: ResizeArray<ProvenanceRecord>) =
         let resourceIndex = Dictionary<string, ResizeArray<int>>()
         let agentIndex = Dictionary<string, ResizeArray<int>>()
+        let activityIndex = Dictionary<string, int>()
 
         for i = 0 to records.Count - 1 do
             let r = records.[i]
@@ -39,7 +41,9 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
                 indices.Add(i)
                 agentIndex.[r.Agent.Id] <- indices
 
-        resourceIndex, agentIndex
+            activityIndex.[r.Id] <- i
+
+        resourceIndex, agentIndex, activityIndex
 
     let addToIndex (index: Dictionary<string, ResizeArray<int>>) key position =
         match index.TryGetValue(key) with
@@ -50,11 +54,12 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
             index.[key] <- indices
 
     // Removes oldest records when MaxRecords is exceeded and rebuilds indexes.
-    // Returns the (possibly rebuilt) index pair; caller reassigns its mutable variables.
+    // Returns the (possibly rebuilt) index triple; caller reassigns its mutable variables.
     let evictIfNeeded
         (records: ResizeArray<ProvenanceRecord>)
         (resourceIndex: Dictionary<string, ResizeArray<int>>)
         (agentIndex: Dictionary<string, ResizeArray<int>>)
+        (activityIndex: Dictionary<string, int>)
         =
         if records.Count > config.MaxRecords then
             let evictCount = min config.EvictionBatchSize records.Count
@@ -69,7 +74,7 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
             records.RemoveRange(0, evictCount)
             rebuildIndexes records
         else
-            resourceIndex, agentIndex
+            resourceIndex, agentIndex, activityIndex
 
     let lookupByIndex (records: ResizeArray<ProvenanceRecord>) (index: Dictionary<string, ResizeArray<int>>) key =
         match index.TryGetValue(key) with
@@ -81,6 +86,7 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
             let records = ResizeArray<ProvenanceRecord>()
             let mutable resourceIndex = Dictionary<string, ResizeArray<int>>()
             let mutable agentIndex = Dictionary<string, ResizeArray<int>>()
+            let mutable activityIndex = Dictionary<string, int>()
 
             // Rule 10: loop is bounded by the Dispose message. IDisposable.Dispose posts
             // Dispose to the mailbox; the Dispose handler clears state and returns without
@@ -95,9 +101,11 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
                         records.Add(record)
                         addToIndex resourceIndex record.ResourceUri position
                         addToIndex agentIndex record.Agent.Id position
-                        let ri, ai = evictIfNeeded records resourceIndex agentIndex
+                        activityIndex.[record.Id] <- position
+                        let ri, ai, acti = evictIfNeeded records resourceIndex agentIndex activityIndex
                         resourceIndex <- ri
                         agentIndex <- ai
+                        activityIndex <- acti
                         return! loop ()
                     | QueryByResource(uri, reply) ->
                         reply.Reply(lookupByIndex records resourceIndex uri)
@@ -105,12 +113,21 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
                     | QueryByAgent(agentId, reply) ->
                         reply.Reply(lookupByIndex records agentIndex agentId)
                         return! loop ()
+                    | QueryByActivityId(activityId, reply) ->
+                        let result =
+                            match activityIndex.TryGetValue activityId with
+                            | true, pos -> Some records.[pos]
+                            | false, _ -> None
+
+                        reply.Reply result
+                        return! loop ()
                     | Dispose reply ->
                         logger.LogInformation("Disposing provenance store, draining {Count} records", records.Count)
 
                         records.Clear()
                         resourceIndex.Clear()
                         agentIndex.Clear()
+                        activityIndex.Clear()
                         reply.Reply(())
                 }
 
@@ -140,6 +157,12 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
             ensureNotDisposed ()
 
             agent.PostAndAsyncReply(fun reply -> QueryByAgent(agentId, reply))
+            |> Async.StartImmediateAsTask
+
+        member _.QueryByActivityId(activityId) =
+            ensureNotDisposed ()
+
+            agent.PostAndAsyncReply(fun reply -> QueryByActivityId(activityId, reply))
             |> Async.StartImmediateAsTask
 
     interface System.IDisposable with

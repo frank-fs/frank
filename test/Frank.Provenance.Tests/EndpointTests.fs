@@ -612,4 +612,47 @@ let tests =
                   schemaValue.Value
                   "https://schema.org/"
                   "schema namespace must be exactly 'https://schema.org/' (absolute, no host-mangling)"
+          }
+
+          testCaseAsync "negative-k state entity node key returns 404 not 500"
+          <| async {
+              // RED before fix: handleStateEntity guards only k > records.Length.
+              // A crafted key that decodes to k=-1 slips the guard and hits
+              // buildStateEntityNodeGraph's invalidArg (k<0) → unhandled exception → 500.
+              // GREEN after fix: k < 0 || k > records.Length → 404 before calling graph builder.
+              let builder = WebApplication.CreateBuilder()
+              builder.WebHost.UseTestServer() |> ignore
+
+              let store =
+                  new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance)
+                  :> IProvenanceStore
+
+              builder.Services.AddSingleton<IProvenanceStore>(store) |> ignore
+              builder.Services.AddSingleton<ProvenanceConfig>(defaultConfig) |> ignore
+              let app = builder.Build()
+              let resolvedStore = app.Services.GetRequiredService<IProvenanceStore>()
+
+              app.MapGet(
+                  "/provenance/{nodeId}",
+                  Func<HttpContext, System.Threading.Tasks.Task>(
+                      ProvenanceEndpoint.handleNode resolvedStore defaultConfig
+                  )
+              )
+              |> ignore
+
+              app.StartAsync().GetAwaiter().GetResult()
+              use app = app
+              use client = app.GetTestClient()
+
+              // Craft key encoding ("http://localhost/test", -1) using the same base64url
+              // encoding as stateEntityIri — the only distinction is k=-1, which is negative.
+              let negativeKKey =
+                  let bytes = System.Text.Encoding.UTF8.GetBytes("http://localhost/test|-1")
+
+                  System.Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=')
+
+              let! (resp: HttpResponseMessage) =
+                  client.GetAsync(sprintf "/provenance/entity-%s" negativeKKey) |> Async.AwaitTask
+
+              Expect.equal (int resp.StatusCode) 404 "crafted negative-k key must return 404 not 500"
           } ]

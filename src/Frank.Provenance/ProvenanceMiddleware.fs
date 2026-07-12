@@ -178,7 +178,7 @@ module private Capture =
         let endpoint = ctx.GetEndpoint()
         let domainType = resolveDomainType endpoint config ctx.Response.StatusCode
 
-        { Id = "urn:uuid:" + Guid.NewGuid().ToString()
+        { Id = originStr + "/provenance/" + Guid.NewGuid().ToString()
           ResourceUri = absoluteUri ctx
           HttpMethod = ctx.Request.Method
           StatusCode = ctx.Response.StatusCode

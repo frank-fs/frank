@@ -36,7 +36,11 @@ let tests =
               Expect.stringContains body "/agents/anonymous" "agent IRI uses HTTP /agents/ path"
               Expect.stringContains body "http:methodName" "W3C HTTP methodName term as CURIE"
               Expect.stringContains body "http:statusCodeValue" "W3C HTTP statusCodeValue term as CURIE"
-              Expect.stringContains body "prov:used" "prov:used asserted as CURIE"
+
+              Expect.isFalse
+                  (body.Contains "prov:used")
+                  "single-record graph has no used — no prior state entity exists yet"
+
               Expect.stringContains body "localhost" "entity @id is absolute (contains host)"
           }
 

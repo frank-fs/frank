@@ -12,21 +12,31 @@ open Frank.Builder
 [<AutoOpen>]
 module ProvenanceExtensions =
 
-    let private buildProvenanceEndpoint () : Endpoint =
-        let handler =
-            RequestDelegate(fun ctx ->
-                let store = ctx.RequestServices.GetRequiredService<IProvenanceStore>()
-                let config = ctx.RequestServices.GetRequiredService<ProvenanceConfig>()
-                ProvenanceEndpoint.handle store config ctx)
-
-        let builder =
-            RouteEndpointBuilder(handler, RoutePatternFactory.Parse "/provenance", 0)
-
-        builder.DisplayName <- "GET Provenance"
+    let private buildGetEndpoint (pattern: string) (name: string) (handler: RequestDelegate) : Endpoint =
+        let builder = RouteEndpointBuilder(handler, RoutePatternFactory.Parse pattern, 0)
+        builder.DisplayName <- name
         builder.Metadata.Add(HttpMethodMetadata [| "GET" |])
         builder.Build()
 
-    // Adds the provenance middleware and endpoint to the spec; caller sets Services separately.
+    let private buildProvenanceEndpoint () : Endpoint =
+        buildGetEndpoint
+            "/provenance"
+            "GET Provenance"
+            (RequestDelegate(fun ctx ->
+                let store = ctx.RequestServices.GetRequiredService<IProvenanceStore>()
+                let config = ctx.RequestServices.GetRequiredService<ProvenanceConfig>()
+                ProvenanceEndpoint.handle store config ctx))
+
+    let private buildPerNodeEndpoint () : Endpoint =
+        buildGetEndpoint
+            "/provenance/{nodeId}"
+            "GET Provenance Node"
+            (RequestDelegate(fun ctx ->
+                let store = ctx.RequestServices.GetRequiredService<IProvenanceStore>()
+                let config = ctx.RequestServices.GetRequiredService<ProvenanceConfig>()
+                ProvenanceEndpoint.handleNode store config ctx))
+
+    // Adds the provenance middleware and both endpoints to the spec; caller sets Services separately.
     // Kept as a named function (not inlined) to avoid duplicating the addMiddleware body in two CE members.
     let private addProvenanceMiddlewareAndEndpoint (spec: WebHostSpec) : WebHostSpec =
         let addMiddleware (app: IApplicationBuilder) =
@@ -35,7 +45,7 @@ module ProvenanceExtensions =
             configured
 
         { spec with
-            Endpoints = Array.append spec.Endpoints [| buildProvenanceEndpoint () |]
+            Endpoints = Array.append spec.Endpoints [| buildProvenanceEndpoint (); buildPerNodeEndpoint () |]
             Middleware = addMiddleware }
 
     type WebHostBuilder with

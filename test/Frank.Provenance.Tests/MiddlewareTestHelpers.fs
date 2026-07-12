@@ -31,6 +31,7 @@ type CapturingStore() =
         member _.Append r = records.Add r
         member _.QueryByResource _ = Task.FromResult []
         member _.QueryByAgent _ = Task.FromResult []
+        member _.QueryByActivityId _ = Task.FromResult None
 
 let private configureProvenanceApp (app: WebApplication) : unit =
     app.UseMiddleware<ProvenanceMiddleware>() |> ignore

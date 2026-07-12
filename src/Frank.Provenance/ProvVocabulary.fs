@@ -16,6 +16,8 @@ module ProvVocabulary =
         let Used = Namespace + "used"
         let StartedAtTime = Namespace + "startedAtTime"
         let EndedAtTime = Namespace + "endedAtTime"
+        let WasDerivedFrom = Namespace + "wasDerivedFrom"
+        let SpecializationOf = Namespace + "specializationOf"
 
     module Rdf =
         let Type = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
