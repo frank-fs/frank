@@ -1523,3 +1523,24 @@ let collisionHrefVarTests =
                   2
                   "schema:agent appears in MoveAction ALPS descriptor child + MoveAction ResourceHrefVars only (not polluted into Game)"
           } ]
+
+[<Tests>]
+let buildRegistryCleanupTests =
+    testList
+        "DiscoveryEmitter.buildRegistry — rule-8 dead Prefixes cleanup (AC5 #386)"
+        [ test "buildRegistry returns VocabularyRegistry.empty (Prefixes ignored by ResolvedModel.build)" {
+              let registry = DiscoveryEmitter.buildRegistry ticTacToeLock
+              Expect.equal registry VocabularyRegistry.empty "buildRegistry must return VocabularyRegistry.empty after rule-8 cleanup"
+          }
+
+          test "emit with VocabularyRegistry.empty produces same output as emit with buildRegistry lock" {
+              let registryOld = DiscoveryEmitter.buildRegistry ticTacToeLock
+              let resultOld = DiscoveryEmitter.emit "App.Generated" "/alps/test" registryOld ticTacToeLock
+              let resultNew = DiscoveryEmitter.emit "App.Generated" "/alps/test" VocabularyRegistry.empty ticTacToeLock
+
+              match resultOld, resultNew with
+              | Ok old, Ok newSrc ->
+                  Expect.equal newSrc old "Discovery output must be identical when registry.Prefixes is empty"
+              | Error e, _ -> failtest $"emit with buildRegistry failed: {e}"
+              | _, Error e -> failtest $"emit with VocabularyRegistry.empty failed: {e}"
+          } ]

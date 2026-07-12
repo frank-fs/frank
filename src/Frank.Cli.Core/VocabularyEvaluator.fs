@@ -17,12 +17,22 @@ type private OpHandler = FSharpExpr list -> VocabularyRegistry -> Result<Vocabul
 
 // ── FCS typecheck ─────────────────────────────────────────────────────────────
 
+/// Combined result of a single FCS project typecheck.
+/// Carries both the typed implementation tree (for vocabulary CE walking)
+/// and the signature entities (for type extraction).
+/// Held in-process only — never serialized; valid for the lifetime of the task.
+type SharedCheck =
+    { ImplFiles: FSharpImplementationFileContents list
+      SignatureEntities: FSharpEntity seq
+      ProjectFiles: Set<string> }
+
 /// Build FCS project options using script resolution on the primary (last) source file,
-/// then typecheck all source files together. Returns implementation file contents.
-let private typecheckFiles
+/// then typecheck all source files together. Returns the full check results.
+/// This is the single ParseAndCheckProject call site for the consolidated emitter task.
+let private typecheckFilesCore
     (assemblyRefs: string list)
     (sourceFiles: string list)
-    : Result<FSharpImplementationFileContents list, string> =
+    : Result<FSharpCheckProjectResults, string> =
     let primaryFile = List.last sourceFiles
     let extraRefArgs = assemblyRefs |> List.map (fun r -> $"-r:{r}") |> List.toArray
     let primaryText = SourceText.ofString (File.ReadAllText primaryFile)
@@ -61,7 +71,7 @@ let private typecheckFiles
             let msg = checkErrors |> Array.map (fun d -> d.ToString()) |> String.concat "; "
             Error msg
         else
-            Ok results.AssemblyContents.ImplementationFiles
+            Ok results
 
 // ── Type identity resolution ──────────────────────────────────────────────────
 
@@ -484,7 +494,25 @@ let typecheckSources
     (assemblyRefs: string list)
     (sourceFiles: string list)
     : Result<FSharpImplementationFileContents list, string> =
-    typecheckFiles assemblyRefs sourceFiles
+    typecheckFilesCore assemblyRefs sourceFiles
+    |> Result.map (fun r -> r.AssemblyContents.ImplementationFiles)
+
+/// Typecheck F# source files once and return a SharedCheck carrying both the
+/// typed implementation tree (for vocabulary CE walking via evalImplFiles) and
+/// the signature entities (for type extraction via Extractor.extractTypeInfosFromEntities).
+/// This is the entry point for the consolidated FCS emitter task — one call serves all four emitters.
+let typecheckShared (assemblyRefs: string list) (sourceFiles: string list) : Result<SharedCheck, string> =
+    if assemblyRefs.IsEmpty then
+        invalidArg (nameof assemblyRefs) "assemblyRefs must not be empty"
+
+    if sourceFiles.IsEmpty then
+        invalidArg (nameof sourceFiles) "sourceFiles must not be empty"
+
+    typecheckFilesCore assemblyRefs sourceFiles
+    |> Result.map (fun results ->
+        { ImplFiles = results.AssemblyContents.ImplementationFiles
+          SignatureEntities = results.AssemblySignature.Entities
+          ProjectFiles = sourceFiles |> List.map Path.GetFullPath |> Set.ofList })
 
 /// Walk the post-typecheck typed AST and evaluate the named binding as a VocabularyRegistry.
 /// Pure function: no file I/O, no FCS typecheck — implFiles must be pre-typechecked.
@@ -529,6 +557,6 @@ let evalRegistry
     if String.IsNullOrWhiteSpace bindingName then
         invalidArg (nameof bindingName) "bindingName must not be empty"
 
-    match typecheckSources assemblyRefs sourceFiles with
+    match typecheckFilesCore assemblyRefs sourceFiles with
     | Error e -> Error e
-    | Ok implFiles -> evalImplFiles implFiles bindingName
+    | Ok results -> evalImplFiles results.AssemblyContents.ImplementationFiles bindingName

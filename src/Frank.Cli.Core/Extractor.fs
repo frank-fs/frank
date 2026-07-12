@@ -344,6 +344,22 @@ let extractTypeInfos (projectFile: string) : Result<TypeInfo list, string> =
             let options = buildProjectOptions projectFile sourceFiles refs
             checkProjectAndCollect options sourceFiles
 
+// ── pre-typechecked signature entry point ─────────────────────────────────────
+
+/// Extract TypeInfo records from a pre-typechecked project signature.
+/// signatureEntities: top-level entities from FSharpCheckProjectResults.AssemblySignature.Entities.
+/// projectFiles: absolute paths to the project's own source files.
+/// Only types declared in projectFiles are returned; cross-project types are excluded.
+/// No ParseAndCheckProject call — the caller has already performed the typecheck.
+let extractTypeInfosFromEntities (signatureEntities: FSharpEntity seq) (projectFiles: Set<string>) : TypeInfo list =
+    if Seq.isEmpty signatureEntities then
+        []
+    else
+        let inProject (entity: FSharpEntity) =
+            Set.contains (Path.GetFullPath(entity.DeclarationLocation.FileName)) projectFiles
+
+        signatureEntities |> Seq.collect (collectFromEntity inProject) |> Seq.toList
+
 // ── source-set entry point ─────────────────────────────────────────────────────
 
 /// Extract TypeInfo records from a set of on-disk F# source files and explicit

@@ -69,6 +69,10 @@ let private runProcess (exe: string) (args: string) (capMs: int) : int * string 
 let private runDotnetBuild (projPath: string) (capMs: int) : int * string =
     runProcess "dotnet" $"build \"{projPath}\"" capMs
 
+/// Same as runDotnetBuild but at normal verbosity so MessageImportance.High messages appear.
+let private runDotnetBuildNormal (projPath: string) (capMs: int) : int * string =
+    runProcess "dotnet" $"build \"{projPath}\" -v:n" capMs
+
 let private runDotnetMsBuildTarget (projPath: string) (target: string) (capMs: int) : int * string =
     runProcess "dotnet" $"msbuild \"{projPath}\" /t:{target} /p:Configuration=Debug" capMs
 
@@ -107,7 +111,7 @@ let private writeProjectWith
     projPath
 
 /// Minimal fixture project: ValidateLockFileTask gate under test.
-/// Overrides vocab-eval codegen targets — fixture has no Vocabulary.fs.
+/// Overrides FrankGenerateFcsEmitters — fixture has no Vocabulary.fs or FCS package refs.
 let private writeFixtureProject (dir: string) (lockPath: string) : string =
     writeProjectWith
         dir
@@ -116,11 +120,7 @@ let private writeFixtureProject (dir: string) (lockPath: string) : string =
         lockPath
         ""
         ""
-        """  <Target Name="FrankGenerateSemanticModel" />
-  <Target Name="FrankGenerateLinkedData" />
-  <Target Name="FrankGenerateValidation" />
-  <Target Name="FrankGenerateProvenance" />
-"""
+        "  <Target Name=\"FrankGenerateFcsEmitters\" />\n"
 
 /// Discovery fixture project: uses a genuine ProjectReference to trigger _FrankHasDiscovery.
 /// Canonicalized temp dir ensures MSBuild can resolve the ProjectReference path correctly.
@@ -218,6 +218,38 @@ let buildGateIntegrationTests =
                   let exitCode, combined = runDotnetBuild projPath capMs
 
                   Expect.equal exitCode 0 $"Confirmed-only lock must pass build gate; output:\n{combined}")
+          }
+
+          test "AC1b: TicTacToe-v732 build emits FRANK_FCS_PASS_COUNT=1 exactly once (#386)" {
+              let tttFsproj =
+                  Path.Combine(worktreeRoot, "sample", "TicTacToe-v732", "TicTacToe.v732.fsproj")
+
+              Expect.isTrue (File.Exists tttFsproj) $"TicTacToe-v732 fsproj must exist at {tttFsproj}"
+
+              let capMs = 600_000
+
+              // Clean before build so FrankGenerateFcsEmitters always runs (not skipped incrementally).
+              runProcess "dotnet" $"clean \"{tttFsproj}\"" capMs |> ignore
+              // Build at normal verbosity so MessageImportance.High messages appear.
+              let exitCode, combined = runDotnetBuildNormal tttFsproj capMs
+
+              Expect.equal exitCode 0 $"TicTacToe-v732 must build successfully; output:\n{combined}"
+
+              Expect.stringContains
+                  combined
+                  "FRANK_FCS_PASS_COUNT=1"
+                  "FRANK_FCS_PASS_COUNT=1 must appear in build output (FrankGenerateFcsEmitters ran and counted one FCS pass)"
+
+              let passLines =
+                  combined.Split('\n')
+                  |> Array.filter (fun l -> l.Contains("FRANK_FCS_PASS_COUNT="))
+
+              let passLinesStr = passLines |> String.concat "\n"
+
+              Expect.equal
+                  passLines.Length
+                  1
+                  $"FRANK_FCS_PASS_COUNT must appear exactly once (one consolidated FCS task); got {passLines.Length} occurrences: {passLinesStr}"
           } ]
 
 /// Item-2: library-style fixture (no Program.fs) — inject ordering with non-domain trailing file.
@@ -278,10 +310,7 @@ let item2LibraryInjectTests =
     <Compile Include="GeneratedStub.fs" />
   </ItemGroup>
   <Import Project="{targetsFilePath}" />
-  <Target Name="FrankGenerateSemanticModel" />
-  <Target Name="FrankGenerateLinkedData" />
-  <Target Name="FrankGenerateValidation" />
-  <Target Name="FrankGenerateProvenance" />
+  <Target Name="FrankGenerateFcsEmitters" />
   <Target Name="DumpCompileOrder" AfterTargets="FrankInjectGeneratedFile">
     <WriteLinesToFile File="$(MSBuildProjectDirectory)/compile-order.txt"
                       Lines="@(Compile->'%%(Filename)%%(Extension)')"

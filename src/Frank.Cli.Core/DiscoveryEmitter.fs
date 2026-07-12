@@ -212,11 +212,11 @@ let private configExpr
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/// Build a VocabularyRegistry from a lock file's vocabulary entries.
-/// Populates only Prefixes; Using stays empty (the lock supplies confirmed IRIs).
-let buildRegistry (lock: LockFile) : VocabularyRegistry =
-    { VocabularyRegistry.empty with
-        Prefixes = lock.Vocabularies |> Map.map (fun _ v -> Uri(v.Uri)) }
+/// Return VocabularyRegistry.empty for use as the Discovery registry.
+/// The Prefixes field was previously populated from lock.Vocabularies, but
+/// ResolvedModel.build ignores registry.Prefixes for IRI resolution (it calls
+/// LockFile.buildPrefixMap directly). Populating Prefixes was dead code (rule 8).
+let buildRegistry (_lock: LockFile) : VocabularyRegistry = VocabularyRegistry.empty
 
 /// Emit a GeneratedDiscovery F# module from a lock file and vocabulary registry.
 ///
