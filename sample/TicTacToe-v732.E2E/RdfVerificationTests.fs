@@ -55,68 +55,11 @@ type RdfVerificationTests() =
 
         merged :> IGraph
 
-    /// Parse a Turtle body into an IGraph.
-    static member private ParseTurtle(body: string) : IGraph =
-        let g = new Graph()
-        let parser = TurtleParser()
-        use reader = new StringReader(body)
-        parser.Load(g, reader)
-        g :> IGraph
-
     // ── Graph query helpers ──────────────────────────────────────────────────
 
     /// All triples in graph whose predicate matches predIri.
     static member private TriplesWithPred(g: IGraph, predIri: string) : Triple seq =
         g.GetTriplesWithPredicate(Uri predIri)
-
-    /// Objects of triples matching (subject, predIri) in graph.
-    static member private ObjectsFor(g: IGraph, subj: INode, predIri: string) : INode seq =
-        g.GetTriplesWithSubjectPredicate(subj, g.CreateUriNode(Uri predIri))
-        |> Seq.map (fun t -> t.Object)
-
-    /// Subjects typed by the given class IRI (via rdf:type).
-    static member private SubjectsByType(g: IGraph, classIri: string) : INode list =
-        let rdfType = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
-
-        RdfVerificationTests.TriplesWithPred(g, rdfType)
-        |> Seq.filter (fun t ->
-            match t.Object with
-            | :? IUriNode as u -> u.Uri.AbsoluteUri = classIri
-            | _ -> false)
-        |> Seq.map (fun t -> t.Subject)
-        |> Seq.distinctBy (fun n -> n.ToString())
-        |> Seq.toList
-
-    /// Extract a literal string value from an INode (literal or URI).
-    static member private NodeString(node: INode) : string =
-        match node with
-        | :? ILiteralNode as l -> l.Value
-        | :? IUriNode as u -> u.Uri.AbsoluteUri
-        | n -> n.ToString()
-
-    // ── Link header parsing ──────────────────────────────────────────────────
-
-    static member private ParseLinkRels(resp: IAPIResponse) : IDictionary<string, string> =
-        let rels = Dictionary<string, string>()
-
-        let raw =
-            resp.Headers
-            |> Seq.filter (fun kv -> kv.Key.ToLowerInvariant() = "link")
-            |> Seq.map (fun kv -> kv.Value)
-            |> String.concat ", "
-
-        for part in raw.Split(',') do
-            let seg = part.Trim()
-
-            if seg.Contains "<" && seg.Contains ">" && seg.Contains "rel=" then
-                let url = seg.Substring(seg.IndexOf '<' + 1, seg.IndexOf '>' - seg.IndexOf '<' - 1)
-
-                let rel =
-                    seg.Substring(seg.IndexOf "rel=" + 4).Trim().Split(';').[0].Trim().Trim('"', '\'')
-
-                rels.[rel] <- url
-
-        rels :> IDictionary<string, string>
 
     // ── Context inspection helpers ───────────────────────────────────────────
 
