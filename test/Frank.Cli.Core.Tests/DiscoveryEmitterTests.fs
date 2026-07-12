@@ -542,7 +542,8 @@ let homeResourcesAbsentTests =
               Expect.isFalse ((unwrapOk src).Contains "HomeResources") "HomeResources absent"
           }
 
-          test "generated record literal contains ProfileUri, HomeRoute, AlpsDescriptors, DescribedByLinks, ResourceHrefVars" {
+          test
+              "generated record literal contains ProfileUri, HomeRoute, AlpsDescriptors, DescribedByLinks, ResourceHrefVars" {
               let src =
                   DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry ticTacToeLock
 
@@ -1017,7 +1018,9 @@ let m2DeclaredLinkageTests =
                   |> List.tryFind (fun d -> d.Id = "Submit")
                   |> Option.defaultWith (fun () -> failwith "Submit descriptor not found")
 
-              Expect.isTrue submit.IsAction "Submit (Rt=Some) must be an action even though name doesn't end in 'Action'"
+              Expect.isTrue
+                  submit.IsAction
+                  "Submit (Rt=Some) must be an action even though name doesn't end in 'Action'"
           }
 
           test "class with Rt=Some but name not ending in 'Action' → type='unsafe' in emitted source" {
@@ -1221,6 +1224,7 @@ let minor7HostRelativeTests =
 
               let bases = Set.ofList [ "https://example.org/ex#" ]
               let _, links = DiscoveryEmitter.projectDiscovery bases model
+
               Expect.exists
                   links
                   (fun l -> l.Contains "/ex#Game")
@@ -1240,6 +1244,7 @@ let minor7HostRelativeTests =
 
               let bases = Set.ofList [ "https://example.org/tictactoe#" ]
               let _, links = DiscoveryEmitter.projectDiscovery bases model
+
               Expect.exists
                   links
                   (fun l -> l.Contains "https://schema.org/MoveAction")
@@ -1248,15 +1253,15 @@ let minor7HostRelativeTests =
 
           test "computeHrefVars: declared-only field IRIs emit host-relative meaning in generated source" {
               let src =
-                  DiscoveryEmitter.emit
-                      "Ex.Generated"
-                      "/alps"
-                      VocabularyRegistry.empty
-                      exDeclaredOnlyLock
+                  DiscoveryEmitter.emit "Ex.Generated" "/alps" VocabularyRegistry.empty exDeclaredOnlyLock
 
               Expect.isOk src "emit should succeed"
               let source = unwrapOk src
-              Expect.stringContains source "/ex#identifier" "declared-only field IRI /ex#identifier is host-relative in href-vars"
+
+              Expect.stringContains
+                  source
+                  "/ex#identifier"
+                  "declared-only field IRI /ex#identifier is host-relative in href-vars"
 
               Expect.isFalse
                   (source.Contains "\"https://example.org/ex#identifier\"")
@@ -1265,11 +1270,7 @@ let minor7HostRelativeTests =
 
           test "computeHrefVars: external vocab field IRIs stay absolute" {
               let src =
-                  DiscoveryEmitter.emit
-                      "TicTacToe.Generated"
-                      "/alps"
-                      schemaRegistry
-                      tttDeclaredOnlyLock
+                  DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry tttDeclaredOnlyLock
 
               Expect.isOk src "emit should succeed"
               Expect.stringContains (unwrapOk src) "https://schema.org/agent" "schema:agent stays absolute in href-vars"
@@ -1322,7 +1323,9 @@ let uniquenessCheckTests =
         "DiscoveryEmitter — #11 descriptor-id uniqueness check"
         [ test "duplicate id 'identifier' (same IRI in two classes) triggers invalidOp" {
               Expect.throws
-                  (fun () -> DiscoveryEmitter.emit "MyApp.Generated" "/alps" schemaRegistry dupIdLock |> ignore)
+                  (fun () ->
+                      DiscoveryEmitter.emit "MyApp.Generated" "/alps" schemaRegistry dupIdLock
+                      |> ignore)
                   "duplicate ALPS descriptor IDs must raise an exception"
           }
 
@@ -1395,7 +1398,9 @@ let parentPathVarTests =
               // MoveRequest.Rt = Some "schema:Game" → follow to Game → Game.Id → schema:identifier.
               // MoveRequest's own fields (player, position) do not include "id".
               // The Rt-based fix supplements "id" from Game's field, not from a global pool.
-              let src = DiscoveryEmitter.emit "App.Generated" "/alps" schemaRegistry inheritVarLock
+              let src =
+                  DiscoveryEmitter.emit "App.Generated" "/alps" schemaRegistry inheritVarLock
+
               Expect.isOk src "emit should succeed"
               let source = unwrapOk src
               Expect.stringContains source "\"id\"" "MoveAction ResourceHrefVars must contain inherited 'id' key"
@@ -1488,8 +1493,7 @@ let collisionHrefVarTests =
               Expect.isOk src "emit should succeed"
               let source = unwrapOk src
 
-              let productIdOccurrences =
-                  source.Split("https://schema.org/productID").Length - 1
+              let productIdOccurrences = source.Split("https://schema.org/productID").Length - 1
 
               Expect.equal
                   productIdOccurrences
@@ -1503,7 +1507,11 @@ let collisionHrefVarTests =
 
               Expect.isOk src "emit should succeed"
               let source = unwrapOk src
-              Expect.stringContains source "https://schema.org/identifier" "schema:identifier must be in source (Game + MoveAction)"
+
+              Expect.stringContains
+                  source
+                  "https://schema.org/identifier"
+                  "schema:identifier must be in source (Game + MoveAction)"
           }
 
           test "Game ResourceHrefVars is not polluted by MoveAction fields (no player/position in Game entry)" {
@@ -1530,17 +1538,34 @@ let buildRegistryCleanupTests =
         "DiscoveryEmitter.buildRegistry — rule-8 dead Prefixes cleanup (AC5 #386)"
         [ test "buildRegistry returns VocabularyRegistry.empty (Prefixes ignored by ResolvedModel.build)" {
               let registry = DiscoveryEmitter.buildRegistry ticTacToeLock
-              Expect.equal registry VocabularyRegistry.empty "buildRegistry must return VocabularyRegistry.empty after rule-8 cleanup"
+
+              Expect.equal
+                  registry
+                  VocabularyRegistry.empty
+                  "buildRegistry must return VocabularyRegistry.empty after rule-8 cleanup"
           }
 
-          test "emit with VocabularyRegistry.empty produces same output as emit with buildRegistry lock" {
-              let registryOld = DiscoveryEmitter.buildRegistry ticTacToeLock
-              let resultOld = DiscoveryEmitter.emit "App.Generated" "/alps/test" registryOld ticTacToeLock
-              let resultNew = DiscoveryEmitter.emit "App.Generated" "/alps/test" VocabularyRegistry.empty ticTacToeLock
+          test "emit output is identical whether Prefixes are populated or empty (Prefixes are dead on Discovery path)" {
+              // Construct the registry that OLD buildRegistry would have returned (before AC5 cleanup).
+              // This is the golden: Prefixes populated from lock.Vocabularies, all other fields empty.
+              let populatedRegistry =
+                  { VocabularyRegistry.empty with
+                      Prefixes = ticTacToeLock.Vocabularies |> Map.map (fun _ v -> Uri(v.Uri)) }
 
-              match resultOld, resultNew with
-              | Ok old, Ok newSrc ->
-                  Expect.equal newSrc old "Discovery output must be identical when registry.Prefixes is empty"
-              | Error e, _ -> failtest $"emit with buildRegistry failed: {e}"
+              let resultPopulated =
+                  DiscoveryEmitter.emit "App.Generated" "/alps/test" populatedRegistry ticTacToeLock
+
+              let resultEmpty =
+                  DiscoveryEmitter.emit "App.Generated" "/alps/test" VocabularyRegistry.empty ticTacToeLock
+
+              // If Prefixes were NOT dead, emit would produce different output for populated vs empty.
+              // This test would fail under a hypothetical where Discovery reads registry.Prefixes.
+              match resultPopulated, resultEmpty with
+              | Ok populated, Ok empty ->
+                  Expect.equal
+                      empty
+                      populated
+                      "Discovery output must be identical regardless of Prefixes population — Prefixes are dead on the Discovery path"
+              | Error e, _ -> failtest $"emit with populated registry failed: {e}"
               | _, Error e -> failtest $"emit with VocabularyRegistry.empty failed: {e}"
           } ]
