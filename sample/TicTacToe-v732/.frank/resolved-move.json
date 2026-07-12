@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "resolved": [
+    {
+      "fsharpType": "TicTacToe.Model.Game",
+      "iri": "schema:Game",
+      "shape": "record",
+      "fields": [
+        { "name": "Id", "iri": "schema:identifier" },
+        { "name": "Result", "iri": "schema:result" }
+      ]
+    },
+    {
+      "fsharpType": "TicTacToe.Model.MoveRequest",
+      "iri": "schema:MoveAction",
+      "shape": "record",
+      "fields": [
+        { "name": "Position", "iri": "ttt:square" },
+        { "name": "Player", "iri": "schema:agent" }
+      ]
+    }
+  ]
+}
