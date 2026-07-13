@@ -38,6 +38,9 @@ let private taskDllPath: string = typeof<ValidateLockFileTask>.Assembly.Location
 let private frankDiscoveryFsproj: string =
     Path.Combine(worktreeRoot, "src", "Frank.Discovery", "Frank.Discovery.fsproj")
 
+let private frankSemanticFsproj: string =
+    Path.Combine(worktreeRoot, "src", "Frank.Semantic", "Frank.Semantic.fsproj")
+
 /// Shared subprocess driver. Captures combined stdout+stderr; kills on capMs timeout.
 let private runProcess (exe: string) (args: string) (capMs: int) : int * string =
     let psi = ProcessStartInfo(exe, args)
@@ -132,9 +135,49 @@ let private writeDiscoveryFixtureProject (dir: string) (lockPath: string) : stri
         lockPath
         $"\n    <FrankDiscoveryModuleName>FixtureApp.GeneratedDiscovery</FrankDiscoveryModuleName>"
         $"\n  <ItemGroup>\n    <ProjectReference Include=\"{frankDiscoveryFsproj}\" />\n  </ItemGroup>"
-        """  <Target Name="FrankGenerateSemanticModel" />
+        """  <Target Name="FrankGenerateDiscoveryModel" />
   <Target Name="FrankInjectGeneratedFile" />
 """
+
+/// Single-package fixture: has Frank.Semantic ProjectReference + minimal vocabulary source.
+/// Used to test incremental skip: only GeneratedSemantics.fs is written, so correct
+/// Outputs= must list only that file (not all four) for the second build to skip.
+let private writeSinglePackageFixtureProject (dir: string) (lockPath: string) : string =
+    let vocabPath = Path.Combine(dir, "Vocabulary.fs")
+
+    File.WriteAllText(
+        vocabPath,
+        """namespace SinglePkg
+
+open Frank.Semantic
+
+type Widget = { id: int }
+
+module Vocab =
+    let registry =
+        vocabulary {
+            prefix "ex" "https://example.org/"
+            using "ex"
+            seeAlso typeof<Widget> "ex:Widget"
+        }
+"""
+    )
+
+    // AppEntry.fs must be the last domain file so FrankInjectGeneratedSemanticModelFile
+    // anchors here — placing GeneratedSemantics.fs AFTER Vocabulary.fs (which defines Widget).
+    // Without an anchor after Vocabulary.fs the inject puts GeneratedSemantics.fs before
+    // Vocabulary.fs → FS0039 (typeof<SinglePkg.Widget> undefined at that compile position).
+    let appEntryPath = Path.Combine(dir, "AppEntry.fs")
+    File.WriteAllText(appEntryPath, "module SinglePkg.AppEntry\n")
+
+    writeProjectWith
+        dir
+        "SinglePkg.Stub"
+        "SinglePkgFixture"
+        lockPath
+        ""
+        $"\n  <ItemGroup>\n    <Compile Include=\"Vocabulary.fs\" />\n    <Compile Include=\"AppEntry.fs\" />\n  </ItemGroup>\n  <ItemGroup>\n    <ProjectReference Include=\"{frankSemanticFsproj}\" />\n  </ItemGroup>"
+        ""
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -172,7 +215,7 @@ let buildGateIntegrationTests =
           }
 
           test
-              "AT1: dotnet msbuild FrankGenerateSemantic with confirmed ex: lock produces GeneratedDiscovery.fs with ex: IRI" {
+              "AT1: dotnet msbuild FrankGenerateDiscovery with confirmed ex: lock produces GeneratedDiscovery.fs with ex: IRI" {
               withTempDir (fun dir ->
                   let lockPath = writeLockFile dir confirmedExLock
                   let projPath = writeDiscoveryFixtureProject dir lockPath
@@ -181,12 +224,12 @@ let buildGateIntegrationTests =
                   let capMs = 60_000
 
                   let exitCode, combined =
-                      runDotnetMsBuildTarget projPath "FrankGenerateSemantic" capMs
+                      runDotnetMsBuildTarget projPath "FrankGenerateDiscovery" capMs
 
                   Expect.equal
                       exitCode
                       0
-                      $"FrankGenerateSemantic must succeed with all-confirmed ex: lock; output:\n{combined}"
+                      $"FrankGenerateDiscovery must succeed with all-confirmed ex: lock; output:\n{combined}"
 
                   // IntermediateOutputPath uses OS-specific separators (obj\Debug/ on macOS via SDK).
                   // Search recursively to find the file regardless of separator convention.
@@ -218,6 +261,35 @@ let buildGateIntegrationTests =
                   let exitCode, combined = runDotnetBuild projPath capMs
 
                   Expect.equal exitCode 0 $"Confirmed-only lock must pass build gate; output:\n{combined}")
+          }
+
+          test "AC1c: second dotnet build of single-package consumer skips FrankGenerateFcsEmitters (incremental, A1 #386)" {
+              withTempDir (fun dir ->
+                  let lockPath = writeLockFile dir singlePkgLock
+                  let projPath = writeSinglePackageFixtureProject dir lockPath
+
+                  let capMs = 600_000
+
+                  // First build: FrankGenerateFcsEmitters must run.
+                  let exitCode1, combined1 = runDotnetBuildNormal projPath capMs
+
+                  Expect.equal exitCode1 0 $"First build must succeed; output:\n{combined1}"
+
+                  Expect.stringContains
+                      combined1
+                      "FRANK_FCS_PASS_COUNT=1"
+                      "First build must run FrankGenerateFcsEmitters (FRANK_FCS_PASS_COUNT=1 expected)"
+
+                  // Second build without clean: GeneratedSemantics.fs already exists and is up-to-date.
+                  // FrankGenerateFcsEmitters must be SKIPPED (incremental). A1 fix: Outputs= must
+                  // match what was actually written — only GeneratedSemantics.fs — so MSBuild skips.
+                  let exitCode2, combined2 = runDotnetBuildNormal projPath capMs
+
+                  Expect.equal exitCode2 0 $"Second build must succeed; output:\n{combined2}"
+
+                  Expect.isFalse
+                      (combined2.Contains "FRANK_FCS_PASS_COUNT=")
+                      $"Second build must skip FrankGenerateFcsEmitters (incremental); output:\n{combined2}")
           }
 
           test "AC1b: TicTacToe-v732 build emits FRANK_FCS_PASS_COUNT=1 exactly once (#386)" {

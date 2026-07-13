@@ -11,11 +11,12 @@ open Frank.Cli.Core
 /// Consolidated MSBuild task: runs ONE FCS ParseAndCheckProject over the shared sources
 /// and calls LinkedData / Semantic / Validation / Provenance emitters in sequence.
 ///
-/// Per-package gating: set HasLinkedData/HasSemantic/HasValidation/HasProvenance to
-/// emit only the packages referenced by the consuming project.
+/// HasLinkedData/HasValidation/HasProvenance gate their respective emitters.
+/// Semantics emits unconditionally whenever the target runs (lock-only, no package gate).
+/// HasSemantic is retained for API compatibility but is not used as a gate.
 /// Discovery is NOT handled here — it uses its own GenerateDiscoveryTask (lock-only, no FCS).
 ///
-/// FcsPassCount (output property) is 1 after a successful run, 0 when all HasX are false.
+/// FcsPassCount (output property) is always 1 after a successful run.
 /// Use it in unit tests to assert exactly one ParseAndCheckProject call.
 type GenerateFcsEmittersTask() =
     inherit Task()
@@ -35,6 +36,7 @@ type GenerateFcsEmittersTask() =
     member val VocabularyBinding: string = "registry" with get, set
 
     member val HasLinkedData: bool = false with get, set
+    /// Retained for API compatibility. Semantics emits unconditionally; this flag is ignored.
     member val HasSemantic: bool = false with get, set
     member val HasValidation: bool = false with get, set
     member val HasProvenance: bool = false with get, set
@@ -56,21 +58,13 @@ type GenerateFcsEmittersTask() =
     [<Output>]
     member val GeneratedProvenanceFile: string = "" with get, set
 
-    /// Counts ParseAndCheckProject invocations. 1 after a normal run; 0 when all HasX=false.
+    /// Counts ParseAndCheckProject invocations. Always 1 after a successful run.
     /// Exposed as an output property for unit-test counting seam (AC1 #386).
     [<Output>]
     member val FcsPassCount: int = 0 with get, set
 
     override this.Execute() =
-        let anyEnabled =
-            this.HasLinkedData
-            || this.HasSemantic
-            || this.HasValidation
-            || this.HasProvenance
-
-        if not anyEnabled then
-            true
-        elif String.IsNullOrWhiteSpace this.LockFilePath then
+        if String.IsNullOrWhiteSpace this.LockFilePath then
             this.Log.LogError("GenerateFcsEmittersTask: LockFilePath must not be empty.")
             false
         elif String.IsNullOrWhiteSpace this.OutputPath then
@@ -100,15 +94,16 @@ type GenerateFcsEmittersTask() =
                 this.Log.LogError($"GenerateFcsEmittersTask: FCS typecheck failed: {msg}")
                 false
             | Ok check ->
-                this.FcsPassCount <- this.FcsPassCount + 1
+                this.FcsPassCount <- 1
                 this.Log.LogMessage(MessageImportance.High, $"FRANK_FCS_PASS_COUNT={this.FcsPassCount}")
                 this.RunEmitters check lock binding
 
-    member private this.RunEmitters (check: VocabularyEvaluator.SharedCheck) (lock: LockFile) (binding: string) =
+    member private this.PrepareEmitterInputs
+        (check: VocabularyEvaluator.SharedCheck)
+        (binding: string)
+        : Result<VocabularyRegistry * TypeInfo list, string> =
         match VocabularyEvaluator.evalImplFiles check.ImplFiles binding with
-        | Error msg ->
-            this.Log.LogError($"GenerateFcsEmittersTask: vocabulary evaluation failed: {msg}")
-            false
+        | Error msg -> Error msg
         | Ok registry ->
             let typeInfos =
                 if this.HasValidation then
@@ -116,31 +111,54 @@ type GenerateFcsEmittersTask() =
                 else
                     []
 
-            let r1 = this.EmitLinkedData registry lock
-            let r2 = this.EmitSemantics registry lock
+            Ok(registry, typeInfos)
+
+    member private this.RunEmitters (check: VocabularyEvaluator.SharedCheck) (lock: LockFile) (binding: string) =
+        match this.PrepareEmitterInputs check binding with
+        | Error msg ->
+            this.Log.LogError($"GenerateFcsEmittersTask: vocabulary evaluation failed: {msg}")
+            false
+        | Ok(registry, typeInfos) ->
+            let r1 =
+                this.RunEmitter
+                    this.HasLinkedData
+                    "GeneratedLinkedData.fs"
+                    (fun () -> LinkedDataEmitter.emit this.LinkedDataModuleName registry lock)
+                    (fun p -> this.GeneratedLinkedDataFile <- p)
+
+            let r2 =
+                this.RunEmitter
+                    true
+                    "GeneratedSemantics.fs"
+                    (fun () -> SemanticModelEmitter.emit this.SemanticsModuleName registry lock)
+                    (fun p -> this.GeneratedSemanticsFile <- p)
+
             let r3 = this.EmitValidation registry lock typeInfos
-            let r4 = this.EmitProvenance registry lock
+
+            let r4 =
+                this.RunEmitter
+                    this.HasProvenance
+                    "GeneratedProvenance.fs"
+                    (fun () -> ProvenanceEmitter.emit this.ProvenanceModuleName registry lock)
+                    (fun p -> this.GeneratedProvenanceFile <- p)
+
             r1 && r2 && r3 && r4
 
-    member private this.EmitLinkedData (registry: VocabularyRegistry) (lock: LockFile) =
-        if not this.HasLinkedData then
+    /// Shared emitter runner: gate on enabled flag, call emitFn, write output.
+    member private this.RunEmitter
+        (enabled: bool)
+        (fileName: string)
+        (emitFn: unit -> Result<string, string>)
+        (setPath: string -> unit)
+        : bool =
+        if not enabled then
             true
         else
-            match LinkedDataEmitter.emit this.LinkedDataModuleName registry lock with
+            match emitFn () with
             | Error msg ->
-                this.Log.LogError($"GenerateFcsEmittersTask: LinkedData codegen failed: {msg}")
+                this.Log.LogError($"GenerateFcsEmittersTask: {fileName} codegen failed: {msg}")
                 false
-            | Ok source -> this.WriteOutput source "GeneratedLinkedData.fs" (fun p -> this.GeneratedLinkedDataFile <- p)
-
-    member private this.EmitSemantics (registry: VocabularyRegistry) (lock: LockFile) =
-        if not this.HasSemantic then
-            true
-        else
-            match SemanticModelEmitter.emit this.SemanticsModuleName registry lock with
-            | Error msg ->
-                this.Log.LogError($"GenerateFcsEmittersTask: Semantics codegen failed: {msg}")
-                false
-            | Ok source -> this.WriteOutput source "GeneratedSemantics.fs" (fun p -> this.GeneratedSemanticsFile <- p)
+            | Ok source -> this.WriteOutput source fileName setPath
 
     member private this.EmitValidation (registry: VocabularyRegistry) (lock: LockFile) (typeInfos: TypeInfo list) =
         if not this.HasValidation then
@@ -150,19 +168,9 @@ type GenerateFcsEmittersTask() =
 
             match ValidationEmitter.emit this.ValidationModuleName registry lock typesByName with
             | Error msg ->
-                this.Log.LogError($"GenerateFcsEmittersTask: Validation codegen failed: {msg}")
+                this.Log.LogError($"GenerateFcsEmittersTask: GeneratedValidation.fs codegen failed: {msg}")
                 false
             | Ok source -> this.WriteOutput source "GeneratedValidation.fs" (fun p -> this.GeneratedValidationFile <- p)
-
-    member private this.EmitProvenance (registry: VocabularyRegistry) (lock: LockFile) =
-        if not this.HasProvenance then
-            true
-        else
-            match ProvenanceEmitter.emit this.ProvenanceModuleName registry lock with
-            | Error msg ->
-                this.Log.LogError($"GenerateFcsEmittersTask: Provenance codegen failed: {msg}")
-                false
-            | Ok source -> this.WriteOutput source "GeneratedProvenance.fs" (fun p -> this.GeneratedProvenanceFile <- p)
 
     member private this.WriteOutput (source: string) (fileName: string) (setPath: string -> unit) =
         let outPath = Path.Combine(this.OutputPath, fileName)

@@ -105,9 +105,9 @@ if [ "$proposed_count" -ne 0 ]; then
     fail 1 "finalized lock still has $proposed_count proposed/unresolved entries"
 fi
 
-# (b) Run FrankGenerateSemantic target (codegen + gate, no full compile)
+# (b) Run FrankGenerateDiscovery target (codegen + gate, no full compile)
 clean_build_dirs
-codegen_out=$( dotnet build "$FSPROJ" /t:FrankGenerateSemantic 2>&1 )
+codegen_out=$( dotnet build "$FSPROJ" /t:FrankGenerateDiscovery 2>&1 )
 codegen_rc=$?
 AT1_APPROACH="target"
 

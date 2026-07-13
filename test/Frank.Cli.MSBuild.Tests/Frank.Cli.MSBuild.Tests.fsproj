@@ -10,6 +10,10 @@
   <ItemGroup>
     <Compile Include="StubBuildEngine.fs" />
     <Compile Include="Fixtures.fs" />
+    <Compile Include="../../src/Frank.Cli.MSBuild/GenerateLinkedDataTask.fs" />
+    <Compile Include="../../src/Frank.Cli.MSBuild/GenerateValidationTask.fs" />
+    <Compile Include="../../src/Frank.Cli.MSBuild/GenerateProvenanceTask.fs" />
+    <Compile Include="../../src/Frank.Cli.MSBuild/GenerateSemanticsTask.fs" />
     <Compile Include="ValidateLockFileTaskTests.fs" />
     <Compile Include="BuildGateIntegrationTests.fs" />
     <Compile Include="HrefVarsGateTests.fs" />

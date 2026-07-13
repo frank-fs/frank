@@ -296,6 +296,10 @@ let private buildProjectOptions (projectFile: string) (sourceFiles: string[]) (r
 
 // ── shared project-check core ─────────────────────────────────────────────────
 
+/// True when the entity is declared in one of the given project source files.
+let private inProjectFiles (projectFiles: Set<string>) (entity: FSharpEntity) : bool =
+    Set.contains (Path.GetFullPath(entity.DeclarationLocation.FileName)) projectFiles
+
 let private checkProjectAndCollect
     (options: FSharpProjectOptions)
     (sourceFiles: string[])
@@ -314,12 +318,9 @@ let private checkProjectAndCollect
     else
         let projectSourceFiles = sourceFiles |> Array.map Path.GetFullPath |> Set.ofArray
 
-        let inProject (entity: FSharpEntity) =
-            Set.contains (Path.GetFullPath(entity.DeclarationLocation.FileName)) projectSourceFiles
-
         Ok(
             results.AssemblySignature.Entities
-            |> Seq.collect (collectFromEntity inProject)
+            |> Seq.collect (collectFromEntity (inProjectFiles projectSourceFiles))
             |> Seq.toList
         )
 
@@ -355,10 +356,9 @@ let extractTypeInfosFromEntities (signatureEntities: FSharpEntity seq) (projectF
     if Seq.isEmpty signatureEntities then
         []
     else
-        let inProject (entity: FSharpEntity) =
-            Set.contains (Path.GetFullPath(entity.DeclarationLocation.FileName)) projectFiles
-
-        signatureEntities |> Seq.collect (collectFromEntity inProject) |> Seq.toList
+        signatureEntities
+        |> Seq.collect (collectFromEntity (inProjectFiles projectFiles))
+        |> Seq.toList
 
 // ── source-set entry point ─────────────────────────────────────────────────────
 

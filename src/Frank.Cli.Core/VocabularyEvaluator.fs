@@ -75,34 +75,36 @@ let private typecheckFilesCore
 
 // ── Type identity resolution ──────────────────────────────────────────────────
 
+/// Reject typeof of a concrete generic; accept typedefof or non-generic typeof.
+let private resolveConcreteTypeName (ent: FSharpEntity) (fullName: string) (t: FSharpType) : Result<string, string> =
+    let hasConcreteArgs =
+        t.GenericArguments.Count > 0
+        && t.GenericArguments |> Seq.forall (fun a -> not a.IsGenericParameter)
+
+    if hasConcreteArgs then
+        Error
+            $"type '{ent.DisplayName}' is a constructed generic applied with typeof; use typedefof<{ent.DisplayName}<_>> for generic type definitions"
+    else
+        Ok fullName
+
 /// Resolve the FCS entity from a typeInstArgs type argument of a TypeOf/TypeDefOf call.
 /// Returns Error for type abbreviations (C1) or typeof with constructed generics (C2).
 let private resolveTypeArg (isTypeDefOf: bool) (t: FSharpType) : Result<string, string> =
     if not t.HasTypeDefinition then
         Error "type argument has no type definition (generic parameter or unknown type)"
     else
-
         let ent = t.TypeDefinition
 
         if ent.IsFSharpAbbreviation then
             Error $"type abbreviation '{ent.DisplayName}' cannot be mapped; use the underlying declared type instead"
         else
-
             match ent.TryFullName with
             | None -> Error $"type '{ent.DisplayName}' has no FullName (may be a compiler-generated or anonymous type)"
             | Some fullName ->
                 if isTypeDefOf then
                     Ok fullName
                 else
-                    let hasConcreteArgs =
-                        t.GenericArguments.Count > 0
-                        && t.GenericArguments |> Seq.forall (fun a -> not a.IsGenericParameter)
-
-                    if hasConcreteArgs then
-                        Error
-                            $"type '{ent.DisplayName}' is a constructed generic applied with typeof; use typedefof<{ent.DisplayName}<_>> for generic type definitions"
-                    else
-                        Ok fullName
+                    resolveConcreteTypeName ent fullName t
 
 // ── Argument extraction helpers ───────────────────────────────────────────────
 

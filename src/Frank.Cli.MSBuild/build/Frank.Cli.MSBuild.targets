@@ -24,28 +24,12 @@
     TaskName="Frank.Cli.MSBuild.GenerateFcsEmittersTask"
     AssemblyFile="$(FrankMSBuildAssemblyFile)" />
 
-  <UsingTask
-    TaskName="Frank.Cli.MSBuild.GenerateLinkedDataTask"
-    AssemblyFile="$(FrankMSBuildAssemblyFile)" />
-
-  <UsingTask
-    TaskName="Frank.Cli.MSBuild.GenerateSemanticsTask"
-    AssemblyFile="$(FrankMSBuildAssemblyFile)" />
-
-  <UsingTask
-    TaskName="Frank.Cli.MSBuild.GenerateValidationTask"
-    AssemblyFile="$(FrankMSBuildAssemblyFile)" />
-
-  <UsingTask
-    TaskName="Frank.Cli.MSBuild.GenerateProvenanceTask"
-    AssemblyFile="$(FrankMSBuildAssemblyFile)" />
-
   <!--
-    FrankGenerateSemantic: validate lock file and generate GeneratedDiscovery.fs.
+    FrankGenerateDiscovery: validate lock file and generate GeneratedDiscovery.fs.
     Incremental: skipped when lock file is unchanged and output already exists.
     Always validates (gate); generates only when Frank.Discovery is referenced.
   -->
-  <Target Name="FrankGenerateSemantic"
+  <Target Name="FrankGenerateDiscovery"
           BeforeTargets="FrankInjectGeneratedFile"
           Inputs="$(FrankLockFilePath)"
           Outputs="$(IntermediateOutputPath)GeneratedDiscovery.fs"
@@ -150,30 +134,46 @@
   </Target>
 
   <!--
+    FrankComputeFcsEmitterOutputs: compute per-package flags and the expected output
+    file list BEFORE the incremental check runs on FrankGenerateFcsEmitters.
+    MSBuild evaluates DependsOnTargets before Inputs/Outputs, so _FrankFcsExpectedOutputs
+    is available when MSBuild decides whether to skip the generate step.
+
+    Semantics always emits (lock-only, no package gate).
+    LinkedData/Validation/Provenance emit only when their package is referenced.
+  -->
+  <Target Name="FrankComputeFcsEmitterOutputs">
+    <PropertyGroup>
+      <_FrankHasLinkedData Condition="@(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.LinkedData')) == 'True' or @(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.LinkedData')) == 'True'">true</_FrankHasLinkedData>
+      <_FrankHasValidation Condition="@(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Validation')) == 'True' or @(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.Validation')) == 'True'">true</_FrankHasValidation>
+      <_FrankHasProvenance Condition="@(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Provenance')) == 'True' or @(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.Provenance')) == 'True'">true</_FrankHasProvenance>
+      <!-- Semantics always expected; optionals appended when package referenced. -->
+      <_FrankFcsExpectedOutputs>$(IntermediateOutputPath)GeneratedSemantics.fs</_FrankFcsExpectedOutputs>
+      <_FrankFcsExpectedOutputs Condition="'$(_FrankHasLinkedData)' == 'true'">$(_FrankFcsExpectedOutputs);$(IntermediateOutputPath)GeneratedLinkedData.fs</_FrankFcsExpectedOutputs>
+      <_FrankFcsExpectedOutputs Condition="'$(_FrankHasValidation)' == 'true'">$(_FrankFcsExpectedOutputs);$(IntermediateOutputPath)GeneratedValidation.fs</_FrankFcsExpectedOutputs>
+      <_FrankFcsExpectedOutputs Condition="'$(_FrankHasProvenance)' == 'true'">$(_FrankFcsExpectedOutputs);$(IntermediateOutputPath)GeneratedProvenance.fs</_FrankFcsExpectedOutputs>
+    </PropertyGroup>
+  </Target>
+
+  <!--
     FrankGenerateFcsEmitters: consolidated target that runs ONE FCS ParseAndCheckProject
     and calls LinkedData / Semantic / Validation / Provenance emitters in sequence.
     Replaces the four individual FrankGenerateLinkedData / FrankGenerateSemanticModel /
     FrankGenerateValidation / FrankGenerateProvenance targets.
 
-    Gate: Exists(lock file) AND at least one of the four packages is referenced.
-    Per-package flags (HasLinkedData etc.) control which emitters actually write output.
-    Incremental: Inputs = lock file + compile items; Outputs = all four generated files.
+    Gate: Exists(lock file). Semantics always emits; other emitters fire only when their
+    package is referenced (controlled by _FrankHasX flags from FrankComputeFcsEmitterOutputs).
+    Incremental: Inputs = lock file + compile items; Outputs = dynamically computed from
+    _FrankFcsExpectedOutputs (GeneratedSemantics.fs always + referenced-package files).
 
-    Discovery stays in its own FrankGenerateSemantic target (lock-only, no FCS).
+    Discovery stays in its own FrankGenerateDiscovery target (lock-only, no FCS).
   -->
   <Target Name="FrankGenerateFcsEmitters"
           BeforeTargets="FrankInjectGeneratedLinkedDataFile;FrankInjectGeneratedSemanticModelFile;FrankInjectGeneratedValidationFile;FrankInjectGeneratedProvenanceFile"
+          DependsOnTargets="FrankComputeFcsEmitterOutputs"
           Inputs="$(FrankLockFilePath);@(Compile)"
-          Outputs="$(IntermediateOutputPath)GeneratedLinkedData.fs;$(IntermediateOutputPath)GeneratedSemantics.fs;$(IntermediateOutputPath)GeneratedValidation.fs;$(IntermediateOutputPath)GeneratedProvenance.fs"
-          Condition="Exists('$(FrankLockFilePath)') and (
-            @(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.LinkedData')) == 'True' or
-            @(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.LinkedData')) == 'True' or
-            @(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Semantic')) == 'True' or
-            @(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.Semantic')) == 'True' or
-            @(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Validation')) == 'True' or
-            @(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.Validation')) == 'True' or
-            @(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Provenance')) == 'True' or
-            @(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.Provenance')) == 'True')">
+          Outputs="$(_FrankFcsExpectedOutputs)"
+          Condition="Exists('$(FrankLockFilePath)')">
 
     <PropertyGroup>
       <FrankLockFilePath Condition="'$(FrankLockFilePath)' == ''">$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json</FrankLockFilePath>
@@ -184,13 +184,7 @@
       <FrankVocabularyBinding Condition="'$(FrankVocabularyBinding)' == ''">registry</FrankVocabularyBinding>
     </PropertyGroup>
 
-    <!-- Per-package boolean flags for the consolidated task. -->
-    <PropertyGroup>
-      <_FrankHasLinkedData Condition="@(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.LinkedData')) == 'True' or @(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.LinkedData')) == 'True'">true</_FrankHasLinkedData>
-      <_FrankHasSemantic Condition="@(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Semantic')) == 'True' or @(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.Semantic')) == 'True'">true</_FrankHasSemantic>
-      <_FrankHasValidation Condition="@(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Validation')) == 'True' or @(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.Validation')) == 'True'">true</_FrankHasValidation>
-      <_FrankHasProvenance Condition="@(PackageReference->AnyHaveMetadataValue('Identity', 'Frank.Provenance')) == 'True' or @(ProjectReference->AnyHaveMetadataValue('Filename', 'Frank.Provenance')) == 'True'">true</_FrankHasProvenance>
-    </PropertyGroup>
+    <!-- _FrankHasLinkedData/_FrankHasValidation/_FrankHasProvenance already set by FrankComputeFcsEmitterOutputs. -->
 
     <!--
       Source files for FCS eval = vocabulary CE dependency closure.
@@ -209,7 +203,6 @@
       AssemblyRefs="@(ReferencePath)"
       VocabularyBinding="$(FrankVocabularyBinding)"
       HasLinkedData="$(_FrankHasLinkedData)"
-      HasSemantic="$(_FrankHasSemantic)"
       HasValidation="$(_FrankHasValidation)"
       HasProvenance="$(_FrankHasProvenance)"
       LinkedDataModuleName="$(FrankLinkedDataModuleName)"

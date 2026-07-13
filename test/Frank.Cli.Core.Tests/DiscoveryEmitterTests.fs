@@ -1535,17 +1535,8 @@ let collisionHrefVarTests =
 [<Tests>]
 let buildRegistryCleanupTests =
     testList
-        "DiscoveryEmitter.buildRegistry — rule-8 dead Prefixes cleanup (AC5 #386)"
-        [ test "buildRegistry returns VocabularyRegistry.empty (Prefixes ignored by ResolvedModel.build)" {
-              let registry = DiscoveryEmitter.buildRegistry ticTacToeLock
-
-              Expect.equal
-                  registry
-                  VocabularyRegistry.empty
-                  "buildRegistry must return VocabularyRegistry.empty after rule-8 cleanup"
-          }
-
-          test "emit output is identical whether Prefixes are populated or empty (Prefixes are dead on Discovery path)" {
+        "DiscoveryEmitter — AC5 Prefixes are dead on Discovery path (#386)"
+        [ test "emit output is identical whether Prefixes are populated or empty (Prefixes are dead on Discovery path)" {
               // Construct the registry that OLD buildRegistry would have returned (before AC5 cleanup).
               // This is the golden: Prefixes populated from lock.Vocabularies, all other fields empty.
               let populatedRegistry =

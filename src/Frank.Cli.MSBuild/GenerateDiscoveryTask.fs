@@ -45,9 +45,7 @@ type GenerateDiscoveryTask() =
                 this.Log.LogError($"GenerateDiscoveryTask: could not read lock file: {msg}")
                 false
             | Ok lock ->
-                let registry = DiscoveryEmitter.buildRegistry lock
-
-                match DiscoveryEmitter.emit this.ModuleName this.ProfileUri registry lock with
+                match DiscoveryEmitter.emit this.ModuleName this.ProfileUri VocabularyRegistry.empty lock with
                 | Error msg ->
                     this.Log.LogError($"GenerateDiscoveryTask: code generation failed: {msg}")
                     false

@@ -136,6 +136,37 @@ let confirmedExLock: LockFile =
                       Source = Convention
                       Status = Confirmed } ] } ] }
 
+/// A confirmed lock mapping SinglePkg.Widget to ex:Widget.
+/// Used with writeSinglePackageFixtureProject — the generated GeneratedSemantics.fs
+/// references typeof<SinglePkg.Widget> which is defined in that fixture's Vocabulary.fs.
+let singlePkgLock: LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Integrity = None
+      Vocabularies =
+        Map.ofList
+            [ "ex",
+              { v1Empty with
+                  Uri = "https://example.org/"
+                  FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                  Hash = "sha256:single-pkg-ex" } ]
+      DeclaredPrefixes = Map.empty
+      Mappings =
+        [ { FSharpType = "SinglePkg.Widget"
+            Iri = Some "ex:Widget"
+            Confidence = 1.0
+            Source = Convention
+            Status = Confirmed
+            Alternates = []
+            Rt = None
+            Shape =
+              MappingShape.Record
+                  [ { Name = "id"
+                      Iri = Some "ex:id"
+                      Confidence = 1.0
+                      Source = Convention
+                      Status = Confirmed } ] } ] }
+
 let writeLockFile (dir: string) (lock: LockFile) : string =
     let path = System.IO.Path.Combine(dir, "semantic-mappings.lock.json")
     LockFile.write path lock

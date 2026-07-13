@@ -51,6 +51,13 @@ let private caseDescriptor (bases: Set<string>) (c: ResolvedCase) : ResolvedDesc
       Rt = None
       Children = [] }
 
+/// Build child descriptors for a resource: cases for DUs, field IRIs for records.
+let private buildChildren (bases: Set<string>) (r: ResolvedResource) : ResolvedDescriptor list =
+    if not (List.isEmpty r.Cases) then
+        r.Cases |> List.map (caseDescriptor bases)
+    else
+        r.Fields |> List.choose (fieldDescriptor bases)
+
 /// Collect all class-level descriptors. Each class descriptor carries its children:
 /// - Union types: confirmed case descriptors (AC1 #17 — outcome terms discoverable).
 /// - Record types: field descriptors with IRIs (AC1 #4 nesting).
@@ -62,22 +69,15 @@ let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource
         r.ClassIri
         |> Option.map (fun uri ->
             let absolute = uri.AbsoluteUri
-            let isAction = r.Rt.IsSome
-
-            let children =
-                if not (List.isEmpty r.Cases) then
-                    r.Cases |> List.map (caseDescriptor bases)
-                else
-                    r.Fields |> List.choose (fieldDescriptor bases)
 
             let rt =
                 r.Rt |> Option.map (fun rtUri -> EmitterShared.hrefFor bases rtUri.AbsoluteUri)
 
             { Id = localName absolute
               Href = hrefOption (EmitterShared.hrefFor bases absolute)
-              IsAction = isAction
+              IsAction = r.Rt.IsSome
               Rt = rt
-              Children = children }))
+              Children = buildChildren bases r }))
 
 /// Collect unique `rel="type"` link values for resources that have a ClassIri.
 /// Declared-only prefix class IRIs are emitted as host-relative link targets.
@@ -161,6 +161,21 @@ let private resourceHrefVarsExpr (vars: (string * (string * string) list) list) 
                 AstRender.tupleExpr [ AstRender.strExpr rel; AstRender.parenExpr (fieldVarMapExpr entries) ])
         ))
 
+/// Collect supplemental href-var entries from the Rt target (one hop), excluding own keys.
+let private supplementalEntries
+    (toFieldEntry: ResolvedField -> (string * string) option)
+    (byClassIri: Map<string, ResolvedResource>)
+    (ownKeys: Set<string>)
+    (r: ResolvedResource)
+    : (string * string) list =
+    r.Rt
+    |> Option.bind (fun rtUri -> Map.tryFind rtUri.AbsoluteUri byClassIri)
+    |> Option.map (fun rtResource ->
+        rtResource.Fields
+        |> List.choose toFieldEntry
+        |> List.filter (fun (k, _) -> not (Set.contains k ownKeys)))
+    |> Option.defaultValue []
+
 /// For each resource with a class IRI and confirmed field IRIs, build a
 /// (classIri, [(varName, meaningIri)]) entry. varName is the field name lowercased;
 /// meaningIri is host-relative for declared-only prefix IRIs, absolute for external vocab IRIs.
@@ -184,17 +199,8 @@ let private computeHrefVars (bases: Set<string>) (model: ResolvedModel) : (strin
         |> Option.map (fun classIri ->
             let ownEntries = r.Fields |> List.choose toFieldEntry
             let ownKeys = ownEntries |> List.map fst |> Set.ofList
-
-            let supplemental =
-                r.Rt
-                |> Option.bind (fun rtUri -> Map.tryFind rtUri.AbsoluteUri byClassIri)
-                |> Option.map (fun rtResource ->
-                    rtResource.Fields
-                    |> List.choose toFieldEntry
-                    |> List.filter (fun (k, _) -> not (Set.contains k ownKeys)))
-                |> Option.defaultValue []
-
-            classIri.AbsoluteUri, ownEntries @ supplemental))
+            let extra = supplementalEntries toFieldEntry byClassIri ownKeys r
+            classIri.AbsoluteUri, ownEntries @ extra))
     |> List.filter (fun (_, entries) -> not entries.IsEmpty)
 
 let private configExpr
@@ -211,12 +217,6 @@ let private configExpr
           "ResourceHrefVars", resourceHrefVarsExpr hrefVars ]
 
 // ── Public API ────────────────────────────────────────────────────────────────
-
-/// Return VocabularyRegistry.empty for use as the Discovery registry.
-/// The Prefixes field was previously populated from lock.Vocabularies, but
-/// ResolvedModel.build ignores registry.Prefixes for IRI resolution (it calls
-/// LockFile.buildPrefixMap directly). Populating Prefixes was dead code (rule 8).
-let buildRegistry (_lock: LockFile) : VocabularyRegistry = VocabularyRegistry.empty
 
 /// Emit a GeneratedDiscovery F# module from a lock file and vocabulary registry.
 ///

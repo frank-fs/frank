@@ -166,7 +166,7 @@ let fcsOnceTests =
                   Expect.equal task.FcsPassCount 1 "Exactly one FCS ParseAndCheckProject call for all four emitters")
           }
 
-          test "FcsPassCount = 0 when no HasX flags are set (task is a no-op)" {
+          test "FcsPassCount = 1 when no HasX flags (Semantics emits unconditionally, A2 #386)" {
               withTempDir (fun dir ->
                   let outDir = Path.Combine(dir, "obj")
                   let engine = StubBuildEngine()
@@ -177,8 +177,14 @@ let fcsOnceTests =
                   let task = makeTask engine lockPath outDir srcPath refs
 
                   let result = task.Execute()
-                  Expect.isTrue result "Execute returns true when all HasX=false (no-op)"
-                  Expect.equal task.FcsPassCount 0 "No FCS call when all emitters are gated out")
+                  let errMsgs = collectErrors engine
+
+                  Expect.isTrue result $"Execute returns true (Semantics unconditional); errors: {errMsgs}"
+                  Expect.equal task.FcsPassCount 1 "One FCS call even with all HasX=false (Semantics emits unconditionally)"
+
+                  Expect.isTrue
+                      (File.Exists(Path.Combine(outDir, "GeneratedSemantics.fs")))
+                      "GeneratedSemantics.fs written even with no HasX flags (lock-only, A2)")
           }
 
           test "FcsPassCount = 1 when only HasLinkedData is set (single emitter)" {
@@ -201,108 +207,85 @@ let fcsOnceTests =
 
 // ── AC2: byte-identical output ────────────────────────────────────────────────
 
+/// Data specification for a single byte-identity cross-check.
+type private ByIdCase =
+    { FileName: string
+      RunIndividual: StubBuildEngine -> string -> string -> string -> string list -> bool
+      SetConsolidatedFlag: GenerateFcsEmittersTask -> unit }
+
+let private runByteIdentityTest (c: ByIdCase) =
+    withTempDir (fun dir ->
+        let outDir1 = Path.Combine(dir, "individual")
+        let outDir2 = Path.Combine(dir, "consolidated")
+        let lockPath = writeLockFile dir allEmittersLock
+        let srcPath = writeAllVocabSource dir
+        let refs = frankSemanticDll :: fsharpCoreDll :: sdkRefs ()
+
+        let engine1 = StubBuildEngine()
+        let r1 = c.RunIndividual engine1 lockPath outDir1 srcPath refs
+        let errMsgs1 = collectErrors engine1
+        Expect.isTrue r1 $"Individual task must succeed; errors: {errMsgs1}"
+
+        let engine2 = StubBuildEngine()
+        let task = makeTask engine2 lockPath outDir2 srcPath refs
+        c.SetConsolidatedFlag task
+        let r2 = task.Execute()
+        let errMsgs2 = collectErrors engine2
+        Expect.isTrue r2 $"Consolidated task must succeed; errors: {errMsgs2}"
+
+        let golden = File.ReadAllText(Path.Combine(outDir1, c.FileName))
+        let actual = File.ReadAllText(Path.Combine(outDir2, c.FileName))
+        Expect.equal actual golden $"{c.FileName} must be byte-identical to individual task output")
+
+let private byIdCases: ByIdCase list =
+    [ { FileName = "GeneratedLinkedData.fs"
+        RunIndividual =
+            fun engine lockPath outDir srcPath refs ->
+                let t = GenerateLinkedDataTask()
+                t.BuildEngine <- engine
+                t.LockFilePath <- lockPath
+                t.OutputPath <- outDir
+                t.ModuleName <- "FcsFixture.GeneratedLinkedData"
+                t.SourceFiles <- [| makeTaskItem srcPath |]
+                t.AssemblyRefs <- refs |> List.map makeTaskItem |> Array.ofList
+                t.VocabularyBinding <- "FcsFixture.AllVocab.registry"
+                t.Execute()
+        SetConsolidatedFlag = fun t -> t.HasLinkedData <- true }
+      { FileName = "GeneratedSemantics.fs"
+        RunIndividual =
+            fun engine lockPath outDir srcPath refs ->
+                let t = GenerateSemanticsTask()
+                t.BuildEngine <- engine
+                t.LockFilePath <- lockPath
+                t.OutputPath <- outDir
+                t.ModuleName <- "FcsFixture.GeneratedSemantics"
+                t.SourceFiles <- [| makeTaskItem srcPath |]
+                t.AssemblyRefs <- refs |> List.map makeTaskItem |> Array.ofList
+                t.VocabularyBinding <- "FcsFixture.AllVocab.registry"
+                t.Execute()
+        // Semantics emits unconditionally in the consolidated task; no flag needed.
+        SetConsolidatedFlag = fun _ -> () }
+      { FileName = "GeneratedProvenance.fs"
+        RunIndividual =
+            fun engine lockPath outDir srcPath refs ->
+                let t = GenerateProvenanceTask()
+                t.BuildEngine <- engine
+                t.LockFilePath <- lockPath
+                t.OutputPath <- outDir
+                t.ModuleName <- "FcsFixture.GeneratedProvenance"
+                t.SourceFiles <- [| makeTaskItem srcPath |]
+                t.AssemblyRefs <- refs |> List.map makeTaskItem |> Array.ofList
+                t.VocabularyBinding <- "FcsFixture.AllVocab.registry"
+                t.Execute()
+        SetConsolidatedFlag = fun t -> t.HasProvenance <- true } ]
+
 [<Tests>]
 let byteIdenticalTests =
     testList
         "GenerateFcsEmittersTask — AC2 byte-identical output vs individual tasks (#386)"
-        [ test "GeneratedLinkedData.fs byte-identical to GenerateLinkedDataTask output" {
-              withTempDir (fun dir ->
-                  let outDir1 = Path.Combine(dir, "individual")
-                  let outDir2 = Path.Combine(dir, "consolidated")
-                  let lockPath = writeLockFile dir allEmittersLock
-                  let srcPath = writeAllVocabSource dir
-                  let refs = frankSemanticDll :: fsharpCoreDll :: sdkRefs ()
-
-                  let engine1 = StubBuildEngine()
-                  let individual = GenerateLinkedDataTask()
-                  individual.BuildEngine <- engine1
-                  individual.LockFilePath <- lockPath
-                  individual.OutputPath <- outDir1
-                  individual.ModuleName <- "FcsFixture.GeneratedLinkedData"
-                  individual.SourceFiles <- [| makeTaskItem srcPath |]
-                  individual.AssemblyRefs <- refs |> List.map makeTaskItem |> Array.ofList
-                  individual.VocabularyBinding <- "FcsFixture.AllVocab.registry"
-                  let r1 = individual.Execute()
-                  let errMsgs1 = collectErrors engine1
-                  Expect.isTrue r1 $"Individual task must succeed; errors: {errMsgs1}"
-
-                  let engine2 = StubBuildEngine()
-                  let task = makeTask engine2 lockPath outDir2 srcPath refs
-                  task.HasLinkedData <- true
-                  let r2 = task.Execute()
-                  let errMsgs2 = collectErrors engine2
-                  Expect.isTrue r2 $"Consolidated task must succeed; errors: {errMsgs2}"
-
-                  let golden = File.ReadAllText(Path.Combine(outDir1, "GeneratedLinkedData.fs"))
-                  let actual = File.ReadAllText(Path.Combine(outDir2, "GeneratedLinkedData.fs"))
-                  Expect.equal actual golden "GeneratedLinkedData.fs must be byte-identical to individual task output")
-          }
-
-          test "GeneratedSemantics.fs byte-identical to GenerateSemanticsTask output" {
-              withTempDir (fun dir ->
-                  let outDir1 = Path.Combine(dir, "individual")
-                  let outDir2 = Path.Combine(dir, "consolidated")
-                  let lockPath = writeLockFile dir allEmittersLock
-                  let srcPath = writeAllVocabSource dir
-                  let refs = frankSemanticDll :: fsharpCoreDll :: sdkRefs ()
-
-                  let engine1 = StubBuildEngine()
-                  let individual = GenerateSemanticsTask()
-                  individual.BuildEngine <- engine1
-                  individual.LockFilePath <- lockPath
-                  individual.OutputPath <- outDir1
-                  individual.ModuleName <- "FcsFixture.GeneratedSemantics"
-                  individual.SourceFiles <- [| makeTaskItem srcPath |]
-                  individual.AssemblyRefs <- refs |> List.map makeTaskItem |> Array.ofList
-                  individual.VocabularyBinding <- "FcsFixture.AllVocab.registry"
-                  let r1 = individual.Execute()
-                  let errMsgs1 = collectErrors engine1
-                  Expect.isTrue r1 $"Individual task must succeed; errors: {errMsgs1}"
-
-                  let engine2 = StubBuildEngine()
-                  let task = makeTask engine2 lockPath outDir2 srcPath refs
-                  task.HasSemantic <- true
-                  let r2 = task.Execute()
-                  let errMsgs2 = collectErrors engine2
-                  Expect.isTrue r2 $"Consolidated task must succeed; errors: {errMsgs2}"
-
-                  let golden = File.ReadAllText(Path.Combine(outDir1, "GeneratedSemantics.fs"))
-                  let actual = File.ReadAllText(Path.Combine(outDir2, "GeneratedSemantics.fs"))
-                  Expect.equal actual golden "GeneratedSemantics.fs must be byte-identical to individual task output")
-          }
-
-          test "GeneratedProvenance.fs byte-identical to GenerateProvenanceTask output" {
-              withTempDir (fun dir ->
-                  let outDir1 = Path.Combine(dir, "individual")
-                  let outDir2 = Path.Combine(dir, "consolidated")
-                  let lockPath = writeLockFile dir allEmittersLock
-                  let srcPath = writeAllVocabSource dir
-                  let refs = frankSemanticDll :: fsharpCoreDll :: sdkRefs ()
-
-                  let engine1 = StubBuildEngine()
-                  let individual = GenerateProvenanceTask()
-                  individual.BuildEngine <- engine1
-                  individual.LockFilePath <- lockPath
-                  individual.OutputPath <- outDir1
-                  individual.ModuleName <- "FcsFixture.GeneratedProvenance"
-                  individual.SourceFiles <- [| makeTaskItem srcPath |]
-                  individual.AssemblyRefs <- refs |> List.map makeTaskItem |> Array.ofList
-                  individual.VocabularyBinding <- "FcsFixture.AllVocab.registry"
-                  let r1 = individual.Execute()
-                  let errMsgs1 = collectErrors engine1
-                  Expect.isTrue r1 $"Individual task must succeed; errors: {errMsgs1}"
-
-                  let engine2 = StubBuildEngine()
-                  let task = makeTask engine2 lockPath outDir2 srcPath refs
-                  task.HasProvenance <- true
-                  let r2 = task.Execute()
-                  let errMsgs2 = collectErrors engine2
-                  Expect.isTrue r2 $"Consolidated task must succeed; errors: {errMsgs2}"
-
-                  let golden = File.ReadAllText(Path.Combine(outDir1, "GeneratedProvenance.fs"))
-                  let actual = File.ReadAllText(Path.Combine(outDir2, "GeneratedProvenance.fs"))
-                  Expect.equal actual golden "GeneratedProvenance.fs must be byte-identical to individual task output")
-          } ]
+        (byIdCases
+         |> List.map (fun c ->
+             test $"{c.FileName} byte-identical to individual task output" { runByteIdentityTest c }))
 
 // ── AC3: per-package gating ───────────────────────────────────────────────────
 
@@ -310,7 +293,7 @@ let byteIdenticalTests =
 let gatingTests =
     testList
         "GenerateFcsEmittersTask — AC3 per-package gating (#386)"
-        [ test "only HasLinkedData=true: only GeneratedLinkedData.fs written" {
+        [ test "HasLinkedData=true: GeneratedLinkedData.fs + GeneratedSemantics.fs written; others skipped" {
               withTempDir (fun dir ->
                   let outDir = Path.Combine(dir, "obj")
                   let engine = StubBuildEngine()
@@ -328,9 +311,9 @@ let gatingTests =
                       (File.Exists(Path.Combine(outDir, "GeneratedLinkedData.fs")))
                       "GeneratedLinkedData.fs written when HasLinkedData"
 
-                  Expect.isFalse
+                  Expect.isTrue
                       (File.Exists(Path.Combine(outDir, "GeneratedSemantics.fs")))
-                      "GeneratedSemantics.fs NOT written when HasSemantic=false"
+                      "GeneratedSemantics.fs ALWAYS written (unconditional, A2)"
 
                   Expect.isFalse
                       (File.Exists(Path.Combine(outDir, "GeneratedValidation.fs")))
@@ -341,7 +324,7 @@ let gatingTests =
                       "GeneratedProvenance.fs NOT written when HasProvenance=false")
           }
 
-          test "only HasSemantic=true: only GeneratedSemantics.fs written" {
+          test "no HasX flags: only GeneratedSemantics.fs written (unconditional, A2)" {
               withTempDir (fun dir ->
                   let outDir = Path.Combine(dir, "obj")
                   let engine = StubBuildEngine()
@@ -350,18 +333,17 @@ let gatingTests =
                   let refs = frankSemanticDll :: fsharpCoreDll :: sdkRefs ()
 
                   let task = makeTask engine lockPath outDir srcPath refs
-                  task.HasSemantic <- true
 
                   let result = task.Execute()
                   Expect.isTrue result "Execute must succeed"
 
+                  Expect.isTrue
+                      (File.Exists(Path.Combine(outDir, "GeneratedSemantics.fs")))
+                      "GeneratedSemantics.fs written even with no HasX flags (lock-only, A2)"
+
                   Expect.isFalse
                       (File.Exists(Path.Combine(outDir, "GeneratedLinkedData.fs")))
                       "GeneratedLinkedData.fs NOT written when HasLinkedData=false"
-
-                  Expect.isTrue
-                      (File.Exists(Path.Combine(outDir, "GeneratedSemantics.fs")))
-                      "GeneratedSemantics.fs written when HasSemantic"
 
                   Expect.isFalse
                       (File.Exists(Path.Combine(outDir, "GeneratedValidation.fs")))

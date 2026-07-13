@@ -131,12 +131,10 @@ let private extractLock (fetch: Fetch) (projPath: string) : LockFile =
     LockFile.read lockPath
     |> Result.defaultWith (fun e -> failwith $"lock read: {e}")
 
-/// Emit ALPS Discovery F# source from a lock using the shared DiscoveryEmitter.buildRegistry.
-/// Mirrors exactly what GenerateDiscoveryTask does — both use the same production function.
+/// Emit ALPS Discovery F# source from a lock using VocabularyRegistry.empty.
+/// Mirrors exactly what GenerateDiscoveryTask does.
 let private emitDiscovery (lock: LockFile) : string =
-    let registry = DiscoveryEmitter.buildRegistry lock
-
-    DiscoveryEmitter.emit "Fixture.GeneratedDiscovery" "/alps/fixture" registry lock
+    DiscoveryEmitter.emit "Fixture.GeneratedDiscovery" "/alps/fixture" VocabularyRegistry.empty lock
     |> Result.defaultWith failwith
 
 // ── Lazy fixtures ─────────────────────────────────────────────────────────────
