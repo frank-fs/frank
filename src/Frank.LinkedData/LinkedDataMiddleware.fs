@@ -162,6 +162,18 @@ module private Serializers =
     let buildJsonLdResponse (graph: IGraph) (externalContext: string) (base': string) : string =
         let prefixPairs = collectNamespacePairs graph
 
+        // Only prefixes whose namespace IRI is under the response's own origin belong in the
+        // inline @context[0] object — an external prefix (e.g. schema.org's own domain) must
+        // resolve solely via the remote @context array element, not a locally-declared shortcut
+        // that would make it always resolvable offline (#394). Precondition on the caller: every
+        // off-origin namespace prefix registered on the graph must be covered by a document
+        // referenced in externalContext's @context array, or its compact IRIs will be served
+        // with no definition anywhere (neither inline nor remote) — see linkedDataGraphWith's
+        // JsonLdContext field.
+        let localPrefixPairs =
+            prefixPairs
+            |> List.filter (fun (_, iri) -> Frank.Semantic.VocabClassifier.isOwnedByAuthority base' iri)
+
         let compactedJson =
             Frank.Semantic.RdfSerialization.compactGraphJsonLd graph prefixPairs base'
 
@@ -178,7 +190,7 @@ module private Serializers =
         jsonWriter.WriteStartObject()
         jsonWriter.WriteString("@base", base')
 
-        for prefix, iri in prefixPairs do
+        for prefix, iri in localPrefixPairs do
             jsonWriter.WriteString(prefix, iri)
 
         jsonWriter.WriteEndObject()

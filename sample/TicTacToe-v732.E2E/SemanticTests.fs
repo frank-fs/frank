@@ -27,6 +27,12 @@ type SemanticTests() =
         c.DefaultRequestHeaders.Add("User-Agent", "Frank-E2E-Test/1.0")
         c
 
+    /// Well-known schema.org prefix fallback (#394): neither prefix walker below
+    /// dereferences the remote schema.org @context element, so both seed this to
+    /// recognize schema:-compacted keys. A "schema" entry declared inline in the
+    /// served @context still overrides the seed.
+    static let schemaOrgPrefix = "https://schema.org/"
+
     member this.NewContext() : Task<IAPIRequestContext> =
         this.Playwright.APIRequest.NewContextAsync(APIRequestNewContextOptions(BaseURL = Server.Url()))
 
@@ -255,6 +261,7 @@ type SemanticTests() =
         : JsonElement option =
         use doc = JsonDocument.Parse ldBody
         let prefixes = System.Collections.Generic.Dictionary<string, string>()
+        prefixes.["schema"] <- schemaOrgPrefix
         let mutable contextBase = ""
         let mutable ctxEl = Unchecked.defaultof<JsonElement>
 
@@ -372,6 +379,7 @@ type SemanticTests() =
     static member private ParseContextPrefixes(body: string) : System.Collections.Generic.Dictionary<string, string> =
         use doc = JsonDocument.Parse body
         let result = System.Collections.Generic.Dictionary<string, string>()
+        result.["schema"] <- schemaOrgPrefix
         let mutable ctxEl = Unchecked.defaultof<JsonElement>
 
         if doc.RootElement.TryGetProperty("@context", &ctxEl) then

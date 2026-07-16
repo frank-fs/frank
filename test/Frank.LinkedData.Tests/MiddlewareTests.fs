@@ -201,7 +201,7 @@ let tests =
               let vary = resp.Headers.Vary |> Seq.toList
               Expect.contains vary "Accept" "Vary: Accept must be present on 406 response"
 
-          testCase "#16 ld+json @context includes schema and ttt from graph.NamespaceMap"
+          testCase "#16 ld+json @context includes local ttt but not off-origin schema from graph.NamespaceMap"
           <| fun _ ->
               use app = startServer sampleConfigWithNamespaces
               use client = app.GetTestClient()
@@ -213,8 +213,12 @@ let tests =
               let mutable tttEl = Unchecked.defaultof<JsonElement>
               use doc = JsonDocument.Parse(body)
               let firstObj = doc.RootElement.GetProperty("@context").EnumerateArray() |> Seq.head
-              Expect.isTrue (firstObj.TryGetProperty("schema", &schemaEl)) "@context has 'schema' prefix"
-              Expect.isTrue (firstObj.TryGetProperty("ttt", &tttEl)) "@context has 'ttt' prefix"
+
+              // #394: 'schema' is off-origin (schema.org, not this app's origin) — inline
+              // @context[0] must not declare it, else schema: CURIEs always resolve offline
+              // regardless of the remote @context array element.
+              Expect.isFalse (firstObj.TryGetProperty("schema", &schemaEl)) "@context must not have off-origin 'schema' prefix"
+              Expect.isTrue (firstObj.TryGetProperty("ttt", &tttEl)) "@context has origin-local 'ttt' prefix"
               // #16 real compaction: @graph must contain the compacted ttt: IRI, not the full IRI.
               Expect.stringContains
                   body
@@ -224,6 +228,33 @@ let tests =
               Expect.isFalse
                   (body.Contains "/tictactoe#Square")
                   "full tictactoe#Square IRI must not appear in body after compaction"
+
+          testCase
+              "#394 inline @context[0] excludes off-origin external prefix but body compaction still uses it"
+          <| fun _ ->
+              use app = startServer sampleConfigWithExternalAndLocalNamespaces
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "application/ld+json")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              let mutable schemaEl = Unchecked.defaultof<JsonElement>
+              let mutable tttEl = Unchecked.defaultof<JsonElement>
+              use doc = JsonDocument.Parse(body)
+              let firstObj = doc.RootElement.GetProperty("@context").EnumerateArray() |> Seq.head
+
+              Expect.isFalse
+                  (firstObj.TryGetProperty("schema", &schemaEl))
+                  "inline @context[0] must not declare the off-origin 'schema' prefix (#394)"
+
+              Expect.isTrue
+                  (firstObj.TryGetProperty("ttt", &tttEl))
+                  "inline @context[0] must still declare the origin-local 'ttt' prefix"
+
+              Expect.stringContains
+                  body
+                  "\"schema:actionStatus\""
+                  "compacted @graph must still use the schema: CURIE — body compaction is unaffected by #394"
 
           testCase "double-@base: turtle body has exactly one @base line when graph.BaseUri is set"
           <| fun _ ->

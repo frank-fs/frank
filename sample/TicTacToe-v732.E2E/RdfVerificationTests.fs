@@ -18,32 +18,49 @@ open Newtonsoft.Json.Linq
 /// assertions with real graph queries. Proves false-green risk of the
 /// existing Contains checks (AT-R5).
 ///
-/// Offline strict loader (Option A): returns empty @context for exactly
-/// https://schema.org / https://schema.org/; throws for any other remote URI.
+/// Offline strict loader (Option A): stubs the canonical https-current schema.org
+/// context document (https://schema.org/version/latest/schemaorg-current-https.jsonld)
+/// with a minimal {"@context":{"schema":"https://schema.org/"}} document — the one
+/// substantive fact it supplies when fetched live (#394); throws for any other
+/// remote URI.
 [<TestFixture>]
 type RdfVerificationTests() =
     inherit PlaywrightTest()
 
+    static let canonicalSchemaOrgContextUrl =
+        "https://schema.org/version/latest/schemaorg-current-https.jsonld"
+
     // ── Strict offline document loader ───────────────────────────────────────
+    // Simulates "if the remote vocab document were reachable": stubs each canonical
+    // external context document with the one substantive prefix mapping it supplies
+    // when fetched live (#394) — without ever touching the real network. Any other
+    // remote URI throws.
     static let strictLoader: Func<Uri, JsonLdLoaderOptions, RemoteDocument> =
         Func<Uri, JsonLdLoaderOptions, RemoteDocument>(fun uri _ ->
-            let s = uri.ToString()
-
-            if s = "https://schema.org" || s = "https://schema.org/" then
+            let stub (contextJson: string) =
                 let doc = RemoteDocument()
-                doc.Document <- JObject.Parse """{"@context":{}}"""
+                doc.Document <- JObject.Parse contextJson
                 doc.DocumentUrl <- uri
                 doc
-            else
-                invalidOp (sprintf "strictOfflineLoader: blocked remote URI '%s'" s))
+
+            match uri.ToString() with
+            | s when s = canonicalSchemaOrgContextUrl -> stub """{"@context":{"schema":"https://schema.org/"}}"""
+            | "http://www.w3.org/1999/02/22-rdf-syntax-ns#" ->
+                stub """{"@context":{"rdf":"http://www.w3.org/1999/02/22-rdf-syntax-ns#"}}"""
+            | "http://www.w3.org/2000/01/rdf-schema#" ->
+                stub """{"@context":{"rdfs":"http://www.w3.org/2000/01/rdf-schema#"}}"""
+            | "http://www.w3.org/2002/07/owl#" -> stub """{"@context":{"owl":"http://www.w3.org/2002/07/owl#"}}"""
+            | s -> invalidOp (sprintf "strictOfflineLoader: blocked remote URI '%s'" s))
 
     // ── Core parsing helpers ─────────────────────────────────────────────────
 
-    /// Parse a JSON-LD body into an IGraph using the strict offline loader.
-    /// Merges all named graphs from the JSON-LD document into one flat IGraph.
-    static member private ParseJsonLd(body: string) : IGraph =
+    /// Shared parse: merges all named graphs from a JSON-LD document into one flat IGraph
+    /// using the given document loader.
+    static member private ParseJsonLdWith
+        (body: string, loader: Func<Uri, JsonLdLoaderOptions, RemoteDocument>)
+        : IGraph =
         let opts = JsonLdProcessorOptions()
-        opts.DocumentLoader <- strictLoader
+        opts.DocumentLoader <- loader
         let parser = JsonLdParser(opts)
         use store = new TripleStore()
         use reader = new StringReader(body)
@@ -55,6 +72,17 @@ type RdfVerificationTests() =
 
         merged :> IGraph
 
+    /// Parse a JSON-LD body into an IGraph using the strict offline loader.
+    static member private ParseJsonLd(body: string) : IGraph =
+        RdfVerificationTests.ParseJsonLdWith(body, strictLoader)
+
+    /// Parse a JSON-LD body into an IGraph using dotNetRDF's real, live-network loader.
+    static member private ParseJsonLdLive(body: string) : IGraph =
+        RdfVerificationTests.ParseJsonLdWith(
+            body,
+            Func<Uri, JsonLdLoaderOptions, RemoteDocument>(fun uri o -> DefaultDocumentLoader.LoadJson(uri, o))
+        )
+
     // ── Graph query helpers ──────────────────────────────────────────────────
 
     /// All triples in graph whose predicate matches predIri.
@@ -64,7 +92,8 @@ type RdfVerificationTests() =
     // ── Context inspection helpers ───────────────────────────────────────────
 
     /// True if the JSON-LD body's @context array contains exactly the literal
-    /// string "https://schema.org" (not a relative ref, not http://, not example.org).
+    /// canonical https-current schema.org context URL (not a relative ref, not
+    /// bare https://schema.org, not example.org).
     static member private HasCanonicalSchemaOrgRef(body: string) : bool =
         use doc = JsonDocument.Parse body
         let mutable ctxEl = Unchecked.defaultof<JsonElement>
@@ -75,7 +104,9 @@ type RdfVerificationTests() =
             match ctxEl.ValueKind with
             | JsonValueKind.Array ->
                 ctxEl.EnumerateArray()
-                |> Seq.exists (fun el -> el.ValueKind = JsonValueKind.String && el.GetString() = "https://schema.org")
+                |> Seq.exists (fun el ->
+                    el.ValueKind = JsonValueKind.String
+                    && el.GetString() = canonicalSchemaOrgContextUrl)
             | _ -> false
 
     member this.NewContext() : Task<IAPIRequestContext> =
@@ -110,11 +141,11 @@ type RdfVerificationTests() =
 
             let! body = resp.TextAsync()
 
-            // @context must contain the canonical "https://schema.org" literal
+            // @context must contain the canonical https-current schema.org context URL
             Assert.That(
                 RdfVerificationTests.HasCanonicalSchemaOrgRef body,
                 Is.True,
-                "body @context must contain the literal string \"https://schema.org\" (https, canonical)"
+                "body @context must contain the canonical https-current schema.org context URL"
             )
 
             // Parse as real RDF
@@ -452,4 +483,180 @@ type RdfVerificationTests() =
                     sprintf "(b) mutated object must be under example.org, got: %s" u.Uri.AbsoluteUri
                 )
             | _ -> Assert.Fail(sprintf "(b) actionStatus object is not a URI node after mutation: %A" objUri_b)
+        }
+
+    // ── AT-R6: /tictactoe vocab JSON-LD resolves all external prefixes ───────
+    //
+    // GET /tictactoe was never exercised via Accept: application/ld+json (#394 review):
+    // its graph registers rdf/rdfs/owl/schema alongside ttt, so after the origin-filter
+    // fix ALL FOUR must be covered by JsonLdContext or their compact IRIs are undefined.
+    // Proves it via the same strict offline loader used by AT-R1/AT-R4.
+    [<Test>]
+    member this.``AT-R6 ttt vocabulary JSON-LD resolves rdf, rdfs, owl and schema externally``() =
+        task {
+            use! ctx = this.NewContext()
+
+            let! resp =
+                ctx.GetAsync("/tictactoe", APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ]))
+
+            Assert.That(resp.Status, Is.EqualTo 200, "GET /tictactoe ld+json not 200")
+            let! body = resp.TextAsync()
+            use g = RdfVerificationTests.ParseJsonLd body
+
+            let assertPredicateResolves (predIri: string) (label: string) =
+                Assert.That(
+                    RdfVerificationTests.TriplesWithPred(g, predIri) |> Seq.isEmpty |> not,
+                    Is.True,
+                    sprintf "IGraph has no triple with predicate %s (%s)" predIri label
+                )
+
+            // rdf:type (via ttl "a" shorthand)
+            assertPredicateResolves "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "rdf"
+            // rdfs:label
+            assertPredicateResolves "http://www.w3.org/2000/01/rdf-schema#label" "rdfs"
+            // rdfs:domain, whose object is owl/schema-typed — confirms owl:Class and schema:MoveAction
+            // objects resolve to full IRIs, not undefined CURIE strings.
+            let domainTriples =
+                RdfVerificationTests.TriplesWithPred(g, "http://www.w3.org/2000/01/rdf-schema#domain")
+                |> Seq.toList
+
+            Assert.That(domainTriples, Is.Not.Empty, "IGraph has no rdfs:domain triple")
+
+            let domainObjIri =
+                match domainTriples.[0].Object with
+                | :? IUriNode as u -> u.Uri.AbsoluteUri
+                | other ->
+                    Assert.Fail(sprintf "rdfs:domain object is not a URI node: %A" other)
+                    |> ignore
+                    |> string
+
+            Assert.That(
+                domainObjIri,
+                Is.EqualTo "https://schema.org/MoveAction",
+                "rdfs:domain object must resolve to full schema.org IRI, not stay an undefined 'schema:MoveAction' CURIE"
+            )
+
+            let classTriples =
+                RdfVerificationTests.TriplesWithPred(g, "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+                |> Seq.filter (fun t ->
+                    match t.Object with
+                    | :? IUriNode as u -> u.Uri.AbsoluteUri = "http://www.w3.org/2002/07/owl#Class"
+                    | _ -> false)
+                |> Seq.toList
+
+            Assert.That(
+                classTriples,
+                Is.Not.Empty,
+                "No rdf:type triple resolving to full IRI http://www.w3.org/2002/07/owl#Class — owl: prefix undefined"
+            )
+        }
+
+    // ── AT-R-live: live-network expansion against the real schema.org context ────
+    //
+    // Opt-in tier (#394). Expands the served body with the DEFAULT real-HTTP JSON-LD
+    // document loader (no stub) — proves the served @context actually resolves on
+    // the real web, not merely offline via the strict loader above. A thrown
+    // JsonLdProcessorException on egress-down is the correct failure mode; do not
+    // catch it.
+    [<Test>]
+    [<Category("LiveNetwork")>]
+    [<Explicit("requires outbound egress to schema.org")>]
+    member this.``AT-R-live game JSON-LD @context expands against live schema.org``() =
+        task {
+            use! ctx = this.NewContext()
+
+            let! resp =
+                ctx.GetAsync(
+                    "/games/at-r-live",
+                    APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ])
+                )
+
+            Assert.That(resp.Status, Is.EqualTo 200, "GET game ld+json not 200")
+            let! body = resp.TextAsync()
+
+            let opts = JsonLdProcessorOptions()
+
+            opts.DocumentLoader <-
+                Func<Uri, JsonLdLoaderOptions, RemoteDocument>(fun uri o -> DefaultDocumentLoader.LoadJson(uri, o))
+
+            let expanded =
+                JsonLdProcessor.Expand(JToken.Parse body, opts, System.Collections.Generic.List())
+
+            let expandedJson = expanded.ToString()
+
+            Assert.That(
+                expandedJson.Contains "\"https://schema.org/actionStatus\"",
+                Is.True,
+                "Live-expanded JSON-LD must contain full IRI https://schema.org/actionStatus as a key"
+            )
+
+            Assert.That(
+                expandedJson.Contains "\"schema:actionStatus\"",
+                Is.False,
+                "Live-expanded JSON-LD must not contain CURIE 'schema:actionStatus' as a key"
+            )
+        }
+
+    // ── AT-R6-live: ttt vocabulary expansion against all four live external contexts ─
+    //
+    // Opt-in tier (#394 review). Twin of AT-R-live for /tictactoe: proves rdf, rdfs, owl
+    // AND schema all genuinely resolve via live fetch — not merely offline via the strict
+    // loader AT-R6 uses. A thrown JsonLdProcessorException on egress-down is the correct
+    // failure mode; do not catch it.
+    [<Test>]
+    [<Category("LiveNetwork")>]
+    [<Explicit("requires outbound egress to w3.org and schema.org")>]
+    member this.``AT-R6-live ttt vocabulary JSON-LD expands against live external contexts``() =
+        task {
+            use! ctx = this.NewContext()
+
+            let! resp =
+                ctx.GetAsync("/tictactoe", APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ]))
+
+            Assert.That(resp.Status, Is.EqualTo 200, "GET /tictactoe ld+json not 200")
+            let! body = resp.TextAsync()
+
+            // Real RDF triples (not raw Expand() JSON text): rdf:type triples always carry
+            // the full rdf:type predicate regardless of @type-keyword compaction, so this
+            // avoids asserting on a JSON shape that JsonLdProcessor.Expand never produces.
+            use g = RdfVerificationTests.ParseJsonLdLive body
+
+            let assertPredicateResolves (predIri: string) (label: string) =
+                Assert.That(
+                    RdfVerificationTests.TriplesWithPred(g, predIri) |> Seq.isEmpty |> not,
+                    Is.True,
+                    sprintf "Live-parsed IGraph has no triple with predicate %s (%s)" predIri label
+                )
+
+            assertPredicateResolves "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "rdf"
+            assertPredicateResolves "http://www.w3.org/2000/01/rdf-schema#label" "rdfs"
+
+            let domainTriples =
+                RdfVerificationTests.TriplesWithPred(g, "http://www.w3.org/2000/01/rdf-schema#domain")
+                |> Seq.toList
+
+            Assert.That(domainTriples, Is.Not.Empty, "Live-parsed IGraph has no rdfs:domain triple")
+
+            match domainTriples.[0].Object with
+            | :? IUriNode as u ->
+                Assert.That(
+                    u.Uri.AbsoluteUri,
+                    Is.EqualTo "https://schema.org/MoveAction",
+                    "rdfs:domain object must resolve to full schema.org IRI via live fetch"
+                )
+            | other -> Assert.Fail(sprintf "rdfs:domain object is not a URI node: %A" other)
+
+            let classTriples =
+                RdfVerificationTests.TriplesWithPred(g, "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+                |> Seq.filter (fun t ->
+                    match t.Object with
+                    | :? IUriNode as u -> u.Uri.AbsoluteUri = "http://www.w3.org/2002/07/owl#Class"
+                    | _ -> false)
+                |> Seq.toList
+
+            Assert.That(
+                classTriples,
+                Is.Not.Empty,
+                "No rdf:type triple resolving to full IRI http://www.w3.org/2002/07/owl#Class via live fetch"
+            )
         }

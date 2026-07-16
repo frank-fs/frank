@@ -102,6 +102,39 @@ let sampleConfigWithNamespaces =
       JsonLdContext = schemaOrgContext
       GraphFactory = Some buildGraphWithNamespacesAndBaseUri }
 
+/// Build a graph with an external-namespace predicate (schema:, off-origin) and a
+/// local-namespace predicate (ttt:, under origin/base') — #394: the inline @context[0]
+/// object must exclude the external prefix while body compaction still uses it.
+let buildGraphWithExternalAndLocalNamespaces (ctx: HttpContext) : IGraph =
+    let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+    let graph = new Graph()
+    graph.BaseUri <- System.Uri origin
+    graph.NamespaceMap.AddNamespace("schema", UriFactory.Create "https://schema.org/")
+    graph.NamespaceMap.AddNamespace("ttt", UriFactory.Create(origin + "/tictactoe#"))
+    let subject = graph.CreateUriNode(System.Uri(origin + "/games/1"))
+
+    let actionStatusPred =
+        graph.CreateUriNode(System.Uri "https://schema.org/actionStatus")
+
+    let activeStatus =
+        graph.CreateUriNode(System.Uri "https://schema.org/ActiveActionStatus")
+
+    graph.Assert(Triple(subject, actionStatusPred, activeStatus)) |> ignore
+
+    let currentPlayerPred =
+        graph.CreateUriNode(System.Uri(origin + "/tictactoe#currentPlayer"))
+
+    graph.Assert(Triple(subject, currentPlayerPred, graph.CreateLiteralNode "X"))
+    |> ignore
+
+    graph :> IGraph
+
+/// Config for #394 — external (schema:) + local (ttt:) namespace prefixes, both used in triples.
+let sampleConfigWithExternalAndLocalNamespaces =
+    { Graph = buildFixtureGraph ()
+      JsonLdContext = schemaOrgContext
+      GraphFactory = Some buildGraphWithExternalAndLocalNamespaces }
+
 /// TestServer with a LinkedData-config endpoint (/data) AND a plain endpoint (/plain) without config.
 /// Used for MINOR-3: only LinkedData-owned endpoints should 406 for unsupported RDF Accept.
 let startServerWithPlainRoute (config: LinkedDataConfig) =

@@ -336,7 +336,7 @@ let private gameResource =
 
         linkedDataGraphWith
             { Graph = Unchecked.defaultof<IGraph>
-              JsonLdContext = """{"@context":["https://schema.org"]}"""
+              JsonLdContext = """{"@context":["https://schema.org/version/latest/schemaorg-current-https.jsonld"]}"""
               GraphFactory = Some gameGraphFactory }
 
         get gameHandler
@@ -356,7 +356,8 @@ let private tttVocabResource =
 
         linkedDataGraphWith
             { Graph = Unchecked.defaultof<IGraph>
-              JsonLdContext = """{"@context":{}}"""
+              JsonLdContext =
+                """{"@context":["http://www.w3.org/1999/02/22-rdf-syntax-ns#","http://www.w3.org/2000/01/rdf-schema#","http://www.w3.org/2002/07/owl#","https://schema.org/version/latest/schemaorg-current-https.jsonld"]}"""
               GraphFactory = Some loadTttVocabGraph }
 
         get (fun (ctx: HttpContext) ->
