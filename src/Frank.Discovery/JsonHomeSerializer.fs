@@ -1,4 +1,4 @@
-module Frank.Discovery.JsonHomeSerializer
+module internal Frank.Discovery.JsonHomeSerializer
 
 open System.Text
 open System.Text.Json

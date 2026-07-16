@@ -4,8 +4,11 @@ open System
 open System.Reflection
 
 /// Shared assembly-scan logic used by generated-module resolvers
-/// (Frank.Discovery, Frank.LinkedData). ONE implementation, two consumers (rule 8).
-module GeneratedModuleReflection =
+/// (Frank.Discovery, Frank.LinkedData, Frank.Validation, Frank.Provenance). ONE
+/// implementation, four consumers (rule 8). Codegen/interop plumbing — not part
+/// of Frank's public API surface; visible only to the generated-module resolvers
+/// via InternalsVisibleTo (#392).
+module internal GeneratedModuleReflection =
 
     let private isSkippable (asm: Assembly) =
         asm.IsDynamic

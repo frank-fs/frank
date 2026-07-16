@@ -21,4 +21,17 @@
     <ProjectReference Include="../Frank/Frank.fsproj" />
   </ItemGroup>
 
+  <!-- AlpsSerializer / JsonHomeSerializer / GeneratedDiscoveryResolver are codegen/interop
+       plumbing (#392): internal, visible only to Frank.Discovery.Tests and (AlpsSerializer
+       only) Frank.Cli.Core.Tests, which exercises the serializer directly against emitter
+       output (the existing Frank.Cli.Core pattern, generalized to a second consumer). -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Frank.Discovery.Tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Frank.Cli.Core.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>

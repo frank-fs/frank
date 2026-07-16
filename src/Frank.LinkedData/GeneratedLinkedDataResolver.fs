@@ -10,7 +10,7 @@ open Frank.GeneratedModuleReflection
 ///
 /// An F# module compiled to a static class named GeneratedLinkedData with
 /// let-bindings graph and jsonLdContext (exposed as static properties).
-module GeneratedLinkedDataResolver =
+module internal GeneratedLinkedDataResolver =
 
     let private buildConfig (t: Type) : Result<LinkedDataConfig, string> =
         match readStaticProp<IGraph> "graph" t, readStaticProp<string> "jsonLdContext" t with

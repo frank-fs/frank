@@ -5,7 +5,7 @@ open System.Reflection
 open VDS.RDF.Shacl
 open Frank.GeneratedModuleReflection
 
-module GeneratedValidationResolver =
+module internal GeneratedValidationResolver =
 
     let private buildConfig (t: Type) : Result<ValidationConfig, string> =
         match readStaticProp<ShapesGraph> "shapesGraph" t, readStaticProp<string[]> "knownNamespaces" t with

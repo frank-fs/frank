@@ -35,4 +35,12 @@
     <PackageReference Include="dotNetRdf.Core" Version="3.5.1" />
   </ItemGroup>
 
+  <!-- GeneratedProvenanceResolver is codegen/interop plumbing (#392): internal, visible
+       only to Frank.Provenance.Tests (the existing Frank.Cli.Core pattern). -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Frank.Provenance.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>

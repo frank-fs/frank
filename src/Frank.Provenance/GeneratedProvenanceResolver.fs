@@ -5,7 +5,7 @@ open System.Reflection
 open Frank.Semantic
 open Frank.GeneratedModuleReflection
 
-module GeneratedProvenanceResolver =
+module internal GeneratedProvenanceResolver =
 
     let private parseProvClass (name: string) : Result<ProvOClass, string> =
         match name with

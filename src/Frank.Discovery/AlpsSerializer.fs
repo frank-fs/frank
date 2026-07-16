@@ -1,4 +1,4 @@
-module Frank.Discovery.AlpsSerializer
+module internal Frank.Discovery.AlpsSerializer
 
 open System.Text
 open System.Text.Json

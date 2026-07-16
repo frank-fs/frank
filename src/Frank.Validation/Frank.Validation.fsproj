@@ -30,4 +30,12 @@
     <PackageReference Include="dotNetRdf.Shacl" Version="3.5.1" />
   </ItemGroup>
 
+  <!-- GeneratedValidationResolver is codegen/interop plumbing (#392): internal, visible
+       only to Frank.Validation.Tests (the existing Frank.Cli.Core pattern). -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Frank.Validation.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>

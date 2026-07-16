@@ -8,7 +8,7 @@ open Frank.GeneratedModuleReflection
 ///
 /// An F# module compiled to a static class named GeneratedDiscovery with a
 /// let-binding discoveryConfig (exposed as a static property).
-module GeneratedDiscoveryResolver =
+module internal GeneratedDiscoveryResolver =
 
     /// Scan loaded assemblies for a GeneratedDiscovery type and return its
     /// DiscoveryConfig. Fails closed — returns Error with a guidance message if:

@@ -1,0 +1,100 @@
+namespace Frank.Semantic
+
+/// Input type: FCS-extracted field/payload metadata. Populated by Frank.Cli.Core.
+type FieldInfo =
+    { Name: string
+      TypeName: string
+      Attributes: Map<string, string>
+      DocComment: string option }
+
+/// One case of a discriminated union. Payload is [] for a nullary case.
+type CaseInfo =
+    { Name: string
+      Payload: FieldInfo list
+      Attributes: Map<string, string>
+      DocComment: string option }
+
+/// A type is either a product (record) or a sum (union). Preserves the
+/// type → cases → payload tree; never flattened into one field list.
+type TypeShape =
+    | Record of FieldInfo list
+    | Union of CaseInfo list
+
+/// Input type: FCS-extracted type metadata. Populated by Frank.Cli.Core.
+type TypeInfo =
+    { FullName: string
+      Namespace: string
+      LocalName: string
+      Shape: TypeShape
+      Attributes: Map<string, string>
+      DocComment: string option }
+
+/// How a mapping was resolved. B5 serializes these as "convention" | "llm" | "manual".
+type MappingSource =
+    | Convention
+    | Llm
+    | Manual
+
+/// Confidence threshold result. B5 serializes these as "confirmed" | "proposed" | "unresolved" | "excluded".
+/// confirmed = asserted equivalence; proposed = suggestion (not asserted); unresolved = no candidate found; excluded = deliberately no external mapping (decided-absent).
+type MappingStatus =
+    | Confirmed
+    | Proposed
+    | Unresolved
+    | Excluded
+
+/// Resolved mapping for a single field.
+type FieldMapping =
+    { Name: string
+      Iri: string option
+      Confidence: float
+      Source: MappingSource
+      Status: MappingStatus }
+
+/// Resolved mapping for one union case. Payload is [] for a nullary case;
+/// for a payload-carrying case it holds the case's field mappings.
+type CaseMapping =
+    { Name: string
+      Iri: string option
+      Confidence: float
+      Source: MappingSource
+      Status: MappingStatus
+      Payload: FieldMapping list }
+
+/// A mapped type is a product (record fields) or a sum (union cases).
+type MappingShape =
+    | Record of FieldMapping list
+    | Union of CaseMapping list
+
+/// Candidate mapping produced by the convention engine for one TypeInfo.
+/// B5 serializes this shape into the lock file.
+type Mapping =
+    {
+        FSharpType: string
+        Iri: string option
+        Confidence: float
+        Source: MappingSource
+        Status: MappingStatus
+        Alternates: string list
+        /// Explicit return-type IRI (CURIE) for action descriptors (IRI ends in "Action").
+        /// Declared manually in the lock file; never set by the convention engine.
+        Rt: string option
+        Shape: MappingShape
+    }
+
+[<RequireQualifiedAccess>]
+module MappingShape =
+
+    /// All leaf field mappings in a shape (record fields, or every case's payload).
+    val payloadFields: shape: MappingShape -> FieldMapping list
+
+    val caseMappings: shape: MappingShape -> CaseMapping list
+
+    /// Payload/record fields contributed by non-excluded cases (Union) or all
+    /// record fields (Record). Does NOT apply a leaf status filter — callers
+    /// apply their own (resolution keeps non-Excluded; the gate counts undecided).
+    val activePayloadFields: shape: MappingShape -> FieldMapping list
+
+    /// Map every field mapping (record field or case payload field) through f,
+    /// preserving the tree.
+    val mapFields: f: (FieldMapping -> FieldMapping) -> shape: MappingShape -> MappingShape

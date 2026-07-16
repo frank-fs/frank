@@ -8,7 +8,7 @@ open VDS.RDF.Writing
 open Newtonsoft.Json
 open Newtonsoft.Json.Linq
 
-module RdfSerialization =
+module internal RdfSerialization =
 
     let serializeGraphJsonLd (graph: IGraph) : string =
         use store = new TripleStore()
