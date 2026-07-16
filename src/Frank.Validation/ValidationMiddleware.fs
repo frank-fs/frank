@@ -1,6 +1,7 @@
 namespace Frank.Validation
 
 open System
+open System.Collections.Concurrent
 open System.IO
 open System.Text
 open System.Text.Json
@@ -82,11 +83,38 @@ module private HostRelative =
                     Pattern = pattern } ]
             ))
 
-    let validateDynamic (props: (Uri * string * string option) list) (origin: string) (data: IGraph) : Report option =
+    /// Builds (or reuses) the origin-keyed host-relative ShapesGraph. `cache`/`onBuild` are
+    /// owned by the calling ValidationMiddleware instance (#382) so this function stays free of
+    /// module-level mutable state — the caller supplies its caching policy explicitly (Rule 13).
+    /// The `Lazy` value under each dictionary key guarantees `Shapes.toShapesGraph` runs at most
+    /// once per origin, even if two requests race on a brand-new origin simultaneously.
+    let private getOrBuildShapesGraph
+        (cache: ConcurrentDictionary<string, Lazy<VDS.RDF.Shacl.ShapesGraph>>)
+        (onBuild: unit -> unit)
+        (props: (Uri * string * string option) list)
+        (origin: string)
+        : VDS.RDF.Shacl.ShapesGraph =
+        cache
+            .GetOrAdd(
+                origin,
+                (fun o ->
+                    Lazy<VDS.RDF.Shacl.ShapesGraph>(fun () ->
+                        onBuild ()
+                        Shapes.toShapesGraph (resolveProps props o)))
+            )
+            .Value
+
+    let validateDynamic
+        (cache: ConcurrentDictionary<string, Lazy<VDS.RDF.Shacl.ShapesGraph>>)
+        (onBuild: unit -> unit)
+        (props: (Uri * string * string option) list)
+        (origin: string)
+        (data: IGraph)
+        : Report option =
         if props.IsEmpty then
             None
         else
-            use sg = Shapes.toShapesGraph (resolveProps props origin)
+            let sg = getOrBuildShapesGraph cache onBuild props origin
             Some(Validator.validate sg data)
 
 type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logger: ILogger<ValidationMiddleware>) =
@@ -101,6 +129,15 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
         if config.MaxBodyBytes <= 0L then
             invalidArg (nameof config) "ValidationConfig.MaxBodyBytes must be positive"
 
+    /// Host-relative ShapesGraph cache, one entry per distinct request origin. Bounded in
+    /// practice: the host set behind a single app is tiny (issue #382), and entries live for the
+    /// process lifetime of this (singleton, per-pipeline) middleware instance — no manual
+    /// eviction needed.
+    let hostRelativeShapesCache =
+        ConcurrentDictionary<string, Lazy<VDS.RDF.Shacl.ShapesGraph>>()
+
+    let mutable hostRelativeShapesBuildCount = 0
+
     let validateAndRespond (origin: string) (ctx: HttpContext) (data: IGraph) : Task =
         use _ = data
         let staticReport = Validator.validate config.Shapes data
@@ -110,7 +147,12 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
             ValidationRespond.respond422 (JsonLdBody.serializeReportJsonLd staticReport.Normalised) ctx
         else
             let dynReport =
-                HostRelative.validateDynamic config.HostRelativeProperties origin data
+                HostRelative.validateDynamic
+                    hostRelativeShapesCache
+                    (fun () -> System.Threading.Interlocked.Increment(&hostRelativeShapesBuildCount) |> ignore)
+                    config.HostRelativeProperties
+                    origin
+                    data
 
             match dynReport with
             | None ->
@@ -122,6 +164,11 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
             | Some r ->
                 logger.LogDebug("ValidationMiddleware: host-relative shapes reject body, returning 422")
                 ValidationRespond.respond422 (JsonLdBody.serializeReportJsonLd r.Normalised) ctx
+
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of times the
+    /// host-relative ShapesGraph was actually rebuilt — proves build-once-per-origin under
+    /// repeated requests to the same host (issue #382).
+    member internal _.HostRelativeShapesBuildCount = hostRelativeShapesBuildCount
 
     member private _.InvokeCore(ctx: HttpContext, origin: string) : Task =
         if not (JsonLdBody.isLdJson ctx) then

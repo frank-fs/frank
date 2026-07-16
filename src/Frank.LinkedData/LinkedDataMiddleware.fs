@@ -1,7 +1,9 @@
 namespace Frank.LinkedData
 
 open System
+open System.Collections.Concurrent
 open System.IO
+open System.Runtime.CompilerServices
 open System.Text
 open System.Text.Json
 open System.Threading.Tasks
@@ -214,32 +216,29 @@ module private Serializers =
         ctx.Response.ContentType <- "text/plain"
         ctx.Response.WriteAsync(notAcceptableBody)
 
-    let respondTurtle (graph: IGraph) (origin: string) (ctx: HttpContext) : Task =
+    /// When graph.BaseUri is set the writer already emitted @base; avoid duplicating it.
+    let private turtleBody (graph: IGraph) (origin: string) : string =
         let serialized = serializeTurtle graph
-        // When graph.BaseUri is set the writer already emitted @base; avoid duplicating it.
-        let body =
-            if isNull (box graph.BaseUri) then
-                "@base <" + origin + "> .\n" + serialized
-            else
-                serialized
 
+        if isNull (box graph.BaseUri) then
+            "@base <" + origin + "> .\n" + serialized
+        else
+            serialized
+
+    /// Pure per-media-type body builder — deterministic given (mediaType, graph, jsonLdContext,
+    /// origin). Callers decide whether the result is cacheable (static Graph) or must be
+    /// recomputed every call (dynamic GraphFactory) — see LinkedDataMiddleware.ServeRdf (#382).
+    let bodyFor (mediaType: string) (graph: IGraph) (jsonLdContext: string) (origin: string) : string =
+        match mediaType with
+        | "text/turtle" -> turtleBody graph origin
+        | "application/rdf+xml" -> serializeRdfXml graph
+        | "application/ld+json" -> buildJsonLdResponse graph jsonLdContext origin
+        | other -> invalidArg (nameof mediaType) $"unsupported media type: {other}"
+
+    let respondWith (mediaType: string) (body: string) (ctx: HttpContext) : Task =
         Frank.AcceptNegotiation.appendVaryAccept ctx.Response
         ctx.Response.StatusCode <- 200
-        ctx.Response.ContentType <- "text/turtle"
-        ctx.Response.WriteAsync(body)
-
-    let respondRdfXml (graph: IGraph) (ctx: HttpContext) : Task =
-        let body = serializeRdfXml graph
-        Frank.AcceptNegotiation.appendVaryAccept ctx.Response
-        ctx.Response.StatusCode <- 200
-        ctx.Response.ContentType <- "application/rdf+xml"
-        ctx.Response.WriteAsync(body)
-
-    let respondJsonLd (graph: IGraph) (externalContext: string) (base': string) (ctx: HttpContext) : Task =
-        let body = buildJsonLdResponse graph externalContext base'
-        Frank.AcceptNegotiation.appendVaryAccept ctx.Response
-        ctx.Response.StatusCode <- 200
-        ctx.Response.ContentType <- "application/ld+json"
+        ctx.Response.ContentType <- mediaType
         ctx.Response.WriteAsync(body)
 
 /// Content-negotiation middleware serving per-endpoint RDF graphs in multiple
@@ -247,6 +246,53 @@ module private Serializers =
 /// Only fires for GET/HEAD (safe-method guard) on endpoints that carry a
 /// LinkedDataConfig in their metadata. All other requests pass through.
 type LinkedDataMiddleware(next: RequestDelegate, logger: ILogger<LinkedDataMiddleware>) =
+
+    /// Serialized static-graph bodies for the GraphFactory=None branch, keyed by the owning
+    /// LinkedDataConfig instance (endpoints are configured once at startup and live for the
+    /// app's lifetime) then by (origin, mediaType). ConditionalWeakTable ties cache lifetime to
+    /// the config's own lifetime — no manual eviction needed, since the host/mediaType
+    /// combination set behind a single app is tiny in practice (issue #382). The
+    /// GraphFactory=Some branch is genuinely per-request and is NEVER routed through this cache.
+    let staticBodyCache =
+        ConditionalWeakTable<LinkedDataConfig, ConcurrentDictionary<struct (string * string), Lazy<string>>>()
+
+    let mutable staticBodyBuildCount = 0
+
+    let cachedStaticBody
+        (config: LinkedDataConfig)
+        (origin: string)
+        (mediaType: string)
+        (build: unit -> string)
+        : string =
+        let perConfig =
+            staticBodyCache.GetValue(
+                config,
+                ConditionalWeakTable<LinkedDataConfig, ConcurrentDictionary<struct (string * string), Lazy<string>>>
+                    .CreateValueCallback
+                    (fun _ -> ConcurrentDictionary())
+            )
+
+        perConfig
+            .GetOrAdd(
+                struct (origin, mediaType),
+                (fun _ ->
+                    Lazy<string>(fun () ->
+                        System.Threading.Interlocked.Increment(&staticBodyBuildCount) |> ignore
+                        build ()))
+            )
+            .Value
+
+    let computeBody (mediaType: string) (origin: string) (effective: LinkedDataConfig) (ctx: HttpContext) : string =
+        match effective.GraphFactory with
+        | Some factory -> Serializers.bodyFor mediaType (factory ctx) effective.JsonLdContext origin
+        | None ->
+            cachedStaticBody effective origin mediaType (fun () ->
+                Serializers.bodyFor mediaType effective.Graph effective.JsonLdContext origin)
+
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of times a
+    /// static-graph body was actually (re)built — proves build-once-per-(origin,mediaType) for
+    /// the GraphFactory=None branch (issue #382).
+    member internal _.StaticBodyBuildCount = staticBodyBuildCount
 
     member private this.ServeRdf(ctx: HttpContext, mediaType: string, effective: LinkedDataConfig) : Task =
         match Frank.OriginValidation.tryValidateOrigin ctx.Request with
@@ -261,15 +307,11 @@ type LinkedDataMiddleware(next: RequestDelegate, logger: ILogger<LinkedDataMiddl
         | Some origin ->
             logger.LogDebug("LinkedDataMiddleware: serving {MediaType}", mediaType)
 
-            let effectiveGraph =
-                match effective.GraphFactory with
-                | Some factory -> factory ctx
-                | None -> effective.Graph
-
             match mediaType with
-            | "text/turtle" -> Serializers.respondTurtle effectiveGraph origin ctx
-            | "application/rdf+xml" -> Serializers.respondRdfXml effectiveGraph ctx
-            | "application/ld+json" -> Serializers.respondJsonLd effectiveGraph effective.JsonLdContext origin ctx
+            | "text/turtle"
+            | "application/rdf+xml"
+            | "application/ld+json" ->
+                Serializers.respondWith mediaType (computeBody mediaType origin effective ctx) ctx
             | _ -> next.Invoke ctx
 
     member this.InvokeAsync(ctx: HttpContext) : Task =
