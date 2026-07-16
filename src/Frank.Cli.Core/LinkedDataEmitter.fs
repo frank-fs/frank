@@ -101,7 +101,7 @@ let emit (moduleName: string) (registry: VocabularyRegistry) (lock: LockFile) : 
     |> Result.bind (fun model ->
         contextBases model
         |> Result.map (fun ctxBases ->
-            let bases = EmitterShared.declaredOnlyBases lock
+            let bases = EmitterShared.declaredOnlyBases lock model
 
             let onto =
                 { projectOntology model with

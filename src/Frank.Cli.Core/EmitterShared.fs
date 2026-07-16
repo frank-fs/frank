@@ -22,14 +22,30 @@ let computeKnownNamespaces (registry: VocabularyRegistry) : string list =
 
     inScope |> Seq.map (fun u -> u.AbsoluteUri) |> Seq.distinct |> Seq.toList
 
-/// Compute which prefixes are declared-only (in DeclaredPrefixes but not in Vocabularies).
+/// Compute which prefixes are declared-only (in DeclaredPrefixes but not in Vocabularies) AND
+/// actually back the app's own resource identity — i.e. their authority matches at least one
+/// resource's ClassIri or field Iri in the resolved model (#396). A prefix that is declared-only
+/// but never used to identify a mapped resource (e.g. referenced only via seeAlso/equivalentClass,
+/// pointing at a genuinely external vocabulary such as Wikidata) is never classified as owned:
+/// VocabClassifier.isOwnedByAuthority is the single authority check — this only decides which
+/// candidate base URIs to test it against, derived from the produced ResolvedModel.
 /// Their base URIs are returned as a set; matching IRIs will be emitted as relative paths.
-let internal declaredOnlyBases (lock: LockFile) : Set<string> =
-    lock.DeclaredPrefixes
-    |> Map.filter (fun k _ -> not (Map.containsKey k lock.Vocabularies))
-    |> Map.toSeq
-    |> Seq.map snd
-    |> Set.ofSeq
+let internal declaredOnlyBases (lock: LockFile) (model: ResolvedModel) : Set<string> =
+    let candidates =
+        lock.DeclaredPrefixes
+        |> Map.filter (fun k _ -> not (Map.containsKey k lock.Vocabularies))
+        |> Map.toSeq
+        |> Seq.map snd
+        |> Set.ofSeq
+
+    let identityUris =
+        model.Resources
+        |> List.collect (fun r -> (r.ClassIri |> Option.toList) @ (r.Fields |> List.choose (fun f -> f.Iri)))
+
+    candidates
+    |> Set.filter (fun candidateBase ->
+        identityUris
+        |> List.exists (fun u -> VocabClassifier.isOwnedByAuthority candidateBase u.AbsoluteUri))
 
 /// For a declared-only IRI, extract the host-relative path+fragment.
 /// For external vocab IRIs, return the absolute URI unchanged.

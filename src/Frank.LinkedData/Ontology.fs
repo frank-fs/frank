@@ -26,6 +26,11 @@ let private addClass (g: IGraph) (c: ClassDecl) : unit =
     | None -> ()
 
     for s in c.SeeAlso do
+        if not s.IsAbsoluteUri then
+            invalidArg
+                "seeAlso"
+                $"OntologyDecl class '{c.Iri}' declares a relative rdfs:seeAlso Uri '{s.OriginalString}'; SeeAlso targets must be absolute, dereferenceable URIs — Ontology.toGraph never rebases a relative Uri against a runtime host."
+
         Triples.assert3 g subj (Triples.qnameNode g "rdfs:seeAlso") (Triples.uriNode g s.AbsoluteUri)
 
     for p in c.Properties do

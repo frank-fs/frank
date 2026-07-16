@@ -678,6 +678,67 @@ let m3LinkedDataHostRelativeTests =
               Expect.stringContains (unwrapOk src) "UriKind.Relative" "relative URI must use System.Uri(s, UriKind.Relative) constructor"
           } ]
 
+// ── Fixture: #396 non-owned declared-only prefix referenced only via seeAlso ──
+// "external" is declared but never `using`d/fetched (absent from Vocabularies) — same shape as
+// "ttt" — yet it is never used to identify a mapped resource (no ClassIri/field Iri uses it,
+// only Registry.SeeAlso points at it). It must stay absolute, unlike the app's own "ttt" prefix.
+
+let private nonOwnedSeeAlsoLock: LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Integrity = None
+      Vocabularies = Map.empty
+      DeclaredPrefixes =
+        Map.ofList [ "ttt", "https://example.org/tictactoe#"; "external", "http://external.example.net/entity/" ]
+      Mappings =
+        [ { FSharpType = "TicTacToe.Game"
+            Iri = Some "ttt:Game"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Rt = None
+            Shape = MappingShape.Record [] } ] }
+
+let private nonOwnedSeeAlsoRegistry: VocabularyRegistry =
+    { VocabularyRegistry.empty with
+        Prefixes =
+            Map.ofList
+                [ "ttt", Uri("https://example.org/tictactoe#")
+                  "external", Uri("http://external.example.net/entity/") ]
+        SeeAlso = Map.ofList [ "TicTacToe.Game", [ Uri("http://external.example.net/entity/Q210339") ] ] }
+
+[<Tests>]
+let nonOwnedPrefixStaysAbsoluteTests =
+    testList
+        "LinkedDataEmitter — #396 non-owned declared-only prefix stays absolute"
+        [ test "external: seeAlso IRI is emitted absolute, not host-relative" {
+              let src =
+                  LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" nonOwnedSeeAlsoRegistry nonOwnedSeeAlsoLock
+
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+
+              Expect.stringContains
+                  source
+                  "http://external.example.net/entity/Q210339"
+                  "external seeAlso IRI stays absolute"
+
+              Expect.isFalse
+                  (source.Contains "\"/entity/Q210339\"")
+                  "external seeAlso IRI must not be relativized to a host-relative path"
+          }
+
+          test "ttt: class IRI (mapped resource identity) still host-relative alongside a non-owned seeAlso prefix" {
+              let src =
+                  LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" nonOwnedSeeAlsoRegistry nonOwnedSeeAlsoLock
+
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+              Expect.stringContains source "/tictactoe#Game" "ttt:Game stays host-relative"
+              Expect.isFalse (source.Contains "https://example.org/tictactoe#Game") "no absolute example.org for ttt:Game"
+          } ]
+
 [<Tests>]
 let compileGateTierTests =
     testList

@@ -26,6 +26,17 @@ let private enrichedOntology: OntologyDecl =
                   Domain = Uri "https://example.org/Thing" } ] } ]
       ContextBases = [] }
 
+// #396 AC2: a relative SeeAlso Uri (never emitted by a correct codegen path, but constructible
+// by hand, e.g. a future misclassification) must fail loud at graph-construction time — BEFORE
+// Ontology.toGraph ever calls the throwing .AbsoluteUri accessor on it.
+let private relativeSeeAlsoOntology: OntologyDecl =
+    { Classes =
+        [ { Iri = Uri "https://example.org/tictactoe#Game"
+            EquivalentClass = None
+            SeeAlso = [ Uri("/entity/Q210339", UriKind.Relative) ]
+            Properties = [] } ]
+      ContextBases = [] }
+
 [<Tests>]
 let tests =
     testList
@@ -91,4 +102,27 @@ let tests =
               Expect.isNonEmpty
                   (g.GetTriplesWithPredicateObject(rdfType, rdfProperty) |> Seq.toList)
                   "rdf:type rdf:Property triple present"
+          }
+          test "toGraph rejects a relative SeeAlso Uri with ArgumentException naming the offending class (#396 AC2)" {
+              let raised =
+                  try
+                      Ontology.toGraph relativeSeeAlsoOntology |> ignore
+                      None
+                  with ex ->
+                      Some ex
+
+              match raised with
+              | None -> failwith "expected toGraph to raise for a relative SeeAlso Uri"
+              | Some ex ->
+                  Expect.isTrue (ex :? ArgumentException) $"expected ArgumentException, got {ex.GetType().FullName}"
+
+                  Expect.stringContains
+                      ex.Message
+                      "https://example.org/tictactoe#Game"
+                      "exception message identifies the offending class"
+
+                  Expect.stringContains
+                      ex.Message
+                      "seeAlso"
+                      "exception message identifies seeAlso as the offending field"
           } ]

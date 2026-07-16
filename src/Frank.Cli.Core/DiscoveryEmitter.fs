@@ -239,7 +239,7 @@ let emit
     AstRender.validateModuleName moduleName
     |> Result.bind (fun () -> ResolvedModel.build registry lock)
     |> Result.map (fun model ->
-        let bases = EmitterShared.declaredOnlyBases lock
+        let bases = EmitterShared.declaredOnlyBases lock model
         let descriptors, links = projectDiscovery bases model
         assertUniqueIds descriptors
         let hrefVars = computeHrefVars bases model
