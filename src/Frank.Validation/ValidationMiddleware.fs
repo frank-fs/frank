@@ -184,8 +184,9 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
 
                 match JsonLdBody.parseToGraph config.ContextLoader ctx.Request.Body with
                 | Error(:? IOException as ex) ->
-                    // Buffer-limit-exceeded disposes the underlying buffering stream — do not
-                    // attempt to rewind it (the stream is already gone at this point).
+                    // Buffer-limit-exceeded does not dispose the underlying buffering stream —
+                    // rewinding here is safe, same as the other two branches.
+                    ctx.Request.Body.Position <- 0L
                     logger.LogDebug(ex, "ValidationMiddleware: body exceeded MaxBodyBytes limit")
                     do! Frank.RequestBodyBuffer.respond413 ctx
                 | Error ex ->
