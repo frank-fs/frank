@@ -271,7 +271,9 @@ let private buildDiscoveryConfig (classIri: string) : DiscoveryConfig =
             Doc = None
             Href = Some classIri
             Descriptors = []
-            Rt = None } ]
+            Rt = None
+            ClassIri = None
+            RequestClrTypeName = None } ]
       DescribedByLinks = [ sprintf "<%s>; rel=\"describedby\"" classIri ]
       ResourceHrefVars = Map.empty }
 

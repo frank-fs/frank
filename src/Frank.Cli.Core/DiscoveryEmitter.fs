@@ -20,11 +20,21 @@ let private localName (iri: string) : string =
 // ── Descriptor builders ───────────────────────────────────────────────────────
 
 type internal ResolvedDescriptor =
-    { Id: string
-      Href: string option
-      IsAction: bool
-      Rt: string option
-      Children: ResolvedDescriptor list }
+    {
+        Id: string
+        Href: string option
+        IsAction: bool
+        Rt: string option
+        /// Full, un-relativized class IRI (Some for top-level class descriptors only).
+        /// Runtime correlation key for HTTP-method reconciliation (#397) — never emitted
+        /// as-is; carried through to AlpsDescriptor.ClassIri.
+        ClassIri: string option
+        /// Full CLR type name this class maps from (Some for top-level class descriptors
+        /// only). Runtime correlation key (#397) — carried through to
+        /// AlpsDescriptor.RequestClrTypeName.
+        RequestClrTypeName: string option
+        Children: ResolvedDescriptor list
+    }
 
 let private hrefOption (href: string) : string option =
     if String.IsNullOrEmpty href then None else Some href
@@ -39,6 +49,8 @@ let private fieldDescriptor (bases: Set<string>) (f: ResolvedField) : ResolvedDe
           Href = hrefOption (EmitterShared.hrefFor bases absolute)
           IsAction = false
           Rt = None
+          ClassIri = None
+          RequestClrTypeName = None
           Children = [] })
 
 /// Build a leaf case descriptor for a union case.
@@ -49,6 +61,8 @@ let private caseDescriptor (bases: Set<string>) (c: ResolvedCase) : ResolvedDesc
       Href = hrefOption (EmitterShared.hrefFor bases absolute)
       IsAction = false
       Rt = None
+      ClassIri = None
+      RequestClrTypeName = None
       Children = [] }
 
 /// Build child descriptors for a resource: cases for DUs, field IRIs for records.
@@ -61,7 +75,10 @@ let private buildChildren (bases: Set<string>) (r: ResolvedResource) : ResolvedD
 /// Collect all class-level descriptors. Each class descriptor carries its children:
 /// - Union types: confirmed case descriptors (AC1 #17 — outcome terms discoverable).
 /// - Record types: field descriptors with IRIs (AC1 #4 nesting).
-/// A resource with a declared Rt is an unsafe transition (isAction = r.Rt.IsSome).
+/// A resource with a declared Rt is an unsafe transition (isAction = r.Rt.IsSome) —
+/// this codegen-time value is only the FALLBACK; DiscoveryMiddleware reconciles it
+/// against the resource's real registered HTTP method at serve time (#397), using
+/// ClassIri/RequestClrTypeName as correlation keys.
 /// Rt is the href of the declared return-type IRI, set explicitly in the lock file.
 let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource list) : ResolvedDescriptor list =
     resources
@@ -77,6 +94,8 @@ let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource
               Href = hrefOption (EmitterShared.hrefFor bases absolute)
               IsAction = r.Rt.IsSome
               Rt = rt
+              ClassIri = Some absolute
+              RequestClrTypeName = Some r.FSharpType
               Children = buildChildren bases r }))
 
 /// Collect unique `rel="type"` link values for resources that have a ClassIri.
@@ -123,6 +142,42 @@ let private assertUniqueIds (descriptors: ResolvedDescriptor list) : unit =
                 dupsStr
         )
 
+/// Recursively collect every resolvable target for `rt`: each descriptor's own Href and Id.
+let rec private collectResolvableTargets (descriptors: ResolvedDescriptor list) : Set<string> =
+    descriptors
+    |> List.fold
+        (fun acc d ->
+            let acc = Set.add d.Id acc
+            let acc = d.Href |> Option.fold (fun a h -> Set.add h a) acc
+            Set.union acc (collectResolvableTargets d.Children))
+        Set.empty
+
+/// Recursively collect every emitted `rt` value (top-level and nested children).
+let rec private collectRtValues (descriptors: ResolvedDescriptor list) : string list =
+    descriptors
+    |> List.collect (fun d -> (d.Rt |> Option.toList) @ collectRtValues d.Children)
+
+/// Assert that every emitted `rt` value resolves to some descriptor's href or id in the
+/// same document (parallel to assertUniqueIds — a codegen-time ALPS structural invariant).
+/// Throws invalidOp naming the unresolved rt value(s) — catches an `rt` that points at a
+/// class never emitted as its own descriptor (e.g. Excluded), not just a malformed IRI.
+let private assertRtResolves (descriptors: ResolvedDescriptor list) : unit =
+    let resolvable = collectResolvableTargets descriptors
+
+    let unresolved =
+        collectRtValues descriptors
+        |> List.filter (fun rt -> not (Set.contains rt resolvable))
+        |> List.distinct
+
+    if not unresolved.IsEmpty then
+        let unresolvedStr = String.concat ", " unresolved
+
+        invalidOp (
+            sprintf
+                "DiscoveryEmitter: unresolved ALPS 'rt' reference(s): %s. Every emitted rt must match a descriptor's href or id in the same document."
+                unresolvedStr
+        )
+
 /// Pure projection: model → (descriptors, describedBy links). Testable typed output.
 /// declaredOnlyBases: set of base URI strings whose IRIs should be emitted as host-relative paths.
 let internal projectDiscovery
@@ -140,7 +195,9 @@ let rec private descriptorExpr (d: ResolvedDescriptor) =
           "Doc", AstRender.noneExpr
           "Href", AstRender.optionExpr AstRender.strExpr d.Href
           "Descriptors", AstRender.listExpr (d.Children |> List.map descriptorExpr)
-          "Rt", AstRender.optionExpr AstRender.strExpr d.Rt ]
+          "Rt", AstRender.optionExpr AstRender.strExpr d.Rt
+          "ClassIri", AstRender.optionExpr AstRender.strExpr d.ClassIri
+          "RequestClrTypeName", AstRender.optionExpr AstRender.strExpr d.RequestClrTypeName ]
 
 /// Map.ofList [("k1","v1"); ...] for a string*string list.
 let private fieldVarMapExpr (entries: (string * string) list) =
@@ -242,6 +299,7 @@ let emit
         let bases = EmitterShared.declaredOnlyBases lock model
         let descriptors, links = projectDiscovery bases model
         assertUniqueIds descriptors
+        assertRtResolves descriptors
         let hrefVars = computeHrefVars bases model
         let value = configExpr profileUri descriptors links hrefVars
 

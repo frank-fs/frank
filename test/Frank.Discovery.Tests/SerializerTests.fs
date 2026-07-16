@@ -102,13 +102,17 @@ let alpsTests =
                       Doc = Some "doc"
                       Href = Some "https://schema.org/Game"
                       Descriptors = []
-                      Rt = None }
+                      Rt = None
+                      ClassIri = None
+                      RequestClrTypeName = None }
                     { Id = "makeMove"
                       Type = "unsafe"
                       Doc = None
                       Href = None
                       Descriptors = []
-                      Rt = None } ]
+                      Rt = None
+                      ClassIri = None
+                      RequestClrTypeName = None } ]
 
               let json = AlpsSerializer.serialize descriptors
               use doc = JsonDocument.Parse json // throws if invalid
@@ -127,7 +131,9 @@ let alpsTests =
                             Doc = None
                             Href = Some iri
                             Descriptors = []
-                            Rt = None })
+                            Rt = None
+                            ClassIri = None
+                            RequestClrTypeName = None })
 
                   let json = AlpsSerializer.serialize descriptors
                   use _ = JsonDocument.Parse json
@@ -184,7 +190,11 @@ let jsonHomeTests =
               let mutable gameEl = Unchecked.defaultof<JsonElement>
               Expect.isTrue (resourcesEl.TryGetProperty("https://schema.org/Game", &gameEl)) "game resource present"
               let mutable hrefVarsEl = Unchecked.defaultof<JsonElement>
-              Expect.isTrue (gameEl.TryGetProperty("href-vars", &hrefVarsEl)) "href-vars present on href-template resource"
+
+              Expect.isTrue
+                  (gameEl.TryGetProperty("href-vars", &hrefVarsEl))
+                  "href-vars present on href-template resource"
+
               let mutable idEl = Unchecked.defaultof<JsonElement>
               Expect.isTrue (hrefVarsEl.TryGetProperty("id", &idEl)) "href-vars contains 'id' key"
               let idValue = idEl.GetString()
@@ -245,4 +255,8 @@ let jsonHomeTests =
               Expect.isTrue (gameEl.TryGetProperty("href-vars", &hrefVarsEl)) "href-vars present when all vars resolved"
               let mutable idEl = Unchecked.defaultof<System.Text.Json.JsonElement>
               hrefVarsEl.TryGetProperty("id", &idEl) |> ignore
-              Expect.equal (idEl.GetString()) "https://schema.org/identifier" "id maps to schema:identifier (no empty string)" ]
+
+              Expect.equal
+                  (idEl.GetString())
+                  "https://schema.org/identifier"
+                  "id maps to schema:identifier (no empty string)" ]

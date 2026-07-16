@@ -1,16 +1,30 @@
 namespace Frank.Discovery
 
-/// One ALPS descriptor entry. `Type` is "semantic" for data descriptors or
-/// "unsafe" for action descriptors (e.g. schema:MoveAction). `Descriptors` holds
-/// nested field/input descriptors (AC1: field-shape nesting). `Rt` is the return
-/// type IRI for action descriptors. Per-role state/transition nesting is Track A.
+/// One ALPS descriptor entry. `Type` is the codegen-time fallback (semantic/unsafe
+/// from lock-file Rt presence); DiscoveryMiddleware reconciles it against the real
+/// registered HTTP method at serve time (#397) using `ClassIri`/`RequestClrTypeName`
+/// as correlation keys — neither is part of the ALPS wire format (AlpsSerializer
+/// writes only id/type/href/doc/rt/descriptor). `Descriptors` holds nested field/input
+/// descriptors (AC1: field-shape nesting). `Rt` is the return type IRI for action
+/// descriptors. Per-role state/transition nesting is Track A.
 type AlpsDescriptor =
     { Id: string
       Type: string
       Doc: string option
       Href: string option
       Descriptors: AlpsDescriptor list
-      Rt: string option }
+      Rt: string option
+      /// The full, un-relativized class IRI this descriptor represents (only Some for
+      /// top-level class descriptors). Correlation key: matched against live endpoints'
+      /// ResourceRelationMetadata.Relation to derive the real HTTP method (#397).
+      ClassIri: string option
+      /// The full CLR type name (ResolvedResource.FSharpType) this descriptor's class
+      /// maps from (only Some for top-level class descriptors). Correlation key: matched
+      /// against live endpoints' IAcceptsMetadata.RequestType.FullName — the precise,
+      /// per-verb signal for action/request-body descriptors sharing a route with other
+      /// methods (#397; e.g. POST /games/{id} accepting MoveRequest on a route that also
+      /// serves GET for Game).
+      RequestClrTypeName: string option }
 
 /// One JSON Home resource directory entry. Relation is a vocabulary IRI.
 /// HrefVars maps each URI-template variable name to its absolute meaning IRI

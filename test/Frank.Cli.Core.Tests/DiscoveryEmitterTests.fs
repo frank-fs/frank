@@ -842,7 +842,9 @@ let nestingTests =
                     Doc = None
                     Href = Some "/ttt#square"
                     Descriptors = []
-                    Rt = None }
+                    Rt = None
+                    ClassIri = None
+                    RequestClrTypeName = None }
 
               let action: Frank.Discovery.AlpsDescriptor =
                   { Id = "MoveAction"
@@ -850,7 +852,9 @@ let nestingTests =
                     Doc = None
                     Href = Some "https://schema.org/MoveAction"
                     Descriptors = [ nested ]
-                    Rt = Some "https://schema.org/Game" }
+                    Rt = Some "https://schema.org/Game"
+                    ClassIri = None
+                    RequestClrTypeName = None }
 
               let json = Frank.Discovery.AlpsSerializer.serialize [ action ]
               use doc = System.Text.Json.JsonDocument.Parse json
@@ -888,7 +892,9 @@ let nestingTests =
                     Doc = None
                     Href = Some "https://schema.org/Game"
                     Descriptors = []
-                    Rt = None }
+                    Rt = None
+                    ClassIri = None
+                    RequestClrTypeName = None }
 
               let json = Frank.Discovery.AlpsSerializer.serialize [ leaf ]
               use doc = System.Text.Json.JsonDocument.Parse json
@@ -1530,6 +1536,199 @@ let collisionHrefVarTests =
                   agentOccurrences
                   2
                   "schema:agent appears in MoveAction ALPS descriptor child + MoveAction ResourceHrefVars only (not polluted into Game)"
+          } ]
+
+// ── #397 AC2: rt resolvability is a codegen-time build gate ─────────────────
+// Parallel to #11's assertUniqueIds — an emitted `rt` must match some descriptor's
+// href/id in the same document. The bare-IRI match "worked" only by coincidence
+// (never asserted); this makes it a structural invariant, caught at codegen time.
+
+[<Tests>]
+let rtResolvabilityGateTests =
+    testList
+        "DiscoveryEmitter — #397 AC2: rt resolvability build-gated"
+        [ test "unresolvable rt (no descriptor with matching href/id) fails the build with a clear message" {
+              let lock: LockFile =
+                  { SchemaVersion = 1
+                    Generated = DateTimeOffset.UtcNow
+                    Integrity = None
+                    Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
+                    DeclaredPrefixes = Map.empty
+                    Mappings =
+                      [ { FSharpType = "App.MoveRequest"
+                          Iri = Some "schema:MoveAction"
+                          Confidence = 1.0
+                          Source = Manual
+                          Status = Confirmed
+                          Alternates = []
+                          Rt = Some "schema:Nonexistent"
+                          Shape = MappingShape.Record [] } ] }
+
+              let ex =
+                  try
+                      DiscoveryEmitter.emit "App.Generated" "/alps" schemaRegistry lock |> ignore
+                      None
+                  with :? InvalidOperationException as e ->
+                      Some e
+
+              match ex with
+              | None -> failwith "unresolvable rt must raise an exception at codegen time"
+              | Some e ->
+                  Expect.stringContains e.Message "rt" "exception message names the unresolved rt problem"
+
+                  Expect.stringContains
+                      e.Message
+                      "https://schema.org/Nonexistent"
+                      "exception message names the specific unresolved rt value"
+          }
+
+          test "TicTacToe fixture's rt (MoveAction -> Game) resolves cleanly — no throw" {
+              let result =
+                  DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry ticTacToeLock
+
+              Expect.isOk result "a resolvable rt must not raise or fail codegen"
+          }
+
+          test "declared-only prefix lock's rt (MoveRequest -> Game, ex: prefix) resolves cleanly — no throw" {
+              let result =
+                  DiscoveryEmitter.emit "Ex.Generated" "/alps" VocabularyRegistry.empty exDeclaredOnlyLock
+
+              Expect.isOk result "declared-only prefix rt resolution must not throw"
+          }
+
+          test "rt pointing at an excluded (never-emitted) mapping fails the build" {
+              // Game is Excluded, so it never becomes a descriptor — MoveRequest's rt to
+              // schema:Game must be unresolvable even though 'schema:Game' is a valid IRI.
+              let lock: LockFile =
+                  { SchemaVersion = 1
+                    Generated = DateTimeOffset.UtcNow
+                    Integrity = None
+                    Vocabularies = Map.ofList [ "schema", schemaVocabEntry ]
+                    DeclaredPrefixes = Map.empty
+                    Mappings =
+                      [ { FSharpType = "App.Game"
+                          Iri = Some "schema:Game"
+                          Confidence = 1.0
+                          Source = Manual
+                          Status = Excluded
+                          Alternates = []
+                          Rt = None
+                          Shape = MappingShape.Record [] }
+                        { FSharpType = "App.MoveRequest"
+                          Iri = Some "schema:MoveAction"
+                          Confidence = 1.0
+                          Source = Manual
+                          Status = Confirmed
+                          Alternates = []
+                          Rt = Some "schema:Game"
+                          Shape = MappingShape.Record [] } ] }
+
+              Expect.throws
+                  (fun () -> DiscoveryEmitter.emit "App.Generated" "/alps" schemaRegistry lock |> ignore)
+                  "rt pointing at an excluded/never-emitted mapping must raise an exception"
+          } ]
+
+// ── #397: ClassIri / RequestClrTypeName correlation keys populated for reconciliation ──
+// DiscoveryMiddleware reconciles Type against real HTTP methods at serve time; it needs
+// these two fields on every top-level class descriptor (never on nested field/case
+// children) to correlate against ResourceRelationMetadata/IAcceptsMetadata.
+
+[<Tests>]
+let correlationKeyTests =
+    testList
+        "DiscoveryEmitter — #397 ClassIri/RequestClrTypeName correlation keys"
+        [ test "top-level class descriptor carries ClassIri = full absolute class IRI" {
+              let model =
+                  ResolvedModel.build schemaRegistry ticTacToeLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery Set.empty model
+              let game = descriptors |> List.find (fun d -> d.Id = "Game")
+              let moveAction = descriptors |> List.find (fun d -> d.Id = "MoveAction")
+              Expect.equal game.ClassIri (Some "https://schema.org/Game") "Game.ClassIri is the full absolute IRI"
+
+              Expect.equal
+                  moveAction.ClassIri
+                  (Some "https://schema.org/MoveAction")
+                  "MoveAction.ClassIri is the full absolute IRI"
+          }
+
+          test "top-level class descriptor carries RequestClrTypeName = the mapping's FSharpType" {
+              let model =
+                  ResolvedModel.build schemaRegistry ticTacToeLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery Set.empty model
+              let game = descriptors |> List.find (fun d -> d.Id = "Game")
+              let moveAction = descriptors |> List.find (fun d -> d.Id = "MoveAction")
+
+              Expect.equal game.RequestClrTypeName (Some "TicTacToe.Game") "Game.RequestClrTypeName is the FSharpType"
+
+              Expect.equal
+                  moveAction.RequestClrTypeName
+                  (Some "TicTacToe.Move")
+                  "MoveAction.RequestClrTypeName is the FSharpType"
+          }
+
+          test "ClassIri for a declared-only prefix class is the full absolute IRI, NOT host-relative" {
+              // Href IS relativized for declared-only prefixes (ALPS wire format); ClassIri
+              // must stay absolute — it correlates against the live endpoint's Relation, which
+              // is always the raw ClassIri.AbsoluteUri (SemanticModelEmitter.iri never relativizes).
+              let bases = Set.ofList [ "https://example.org/ex#" ]
+
+              let model =
+                  ResolvedModel.build VocabularyRegistry.empty exDeclaredOnlyLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery bases model
+              let game = descriptors |> List.find (fun d -> d.Id = "Game")
+              Expect.equal game.ClassIri (Some "https://example.org/ex#Game") "ClassIri stays absolute"
+              Expect.notEqual game.Href game.ClassIri "Href (relativized) differs from ClassIri (absolute)"
+          }
+
+          test "nested field/case descriptors carry no ClassIri or RequestClrTypeName" {
+              let model =
+                  ResolvedModel.build schemaRegistry ticTacToeLock
+                  |> function
+                      | Ok m -> m
+                      | Error e -> failwith e
+
+              let descriptors, _ = DiscoveryEmitter.projectDiscovery Set.empty model
+              let moveAction = descriptors |> List.find (fun d -> d.Id = "MoveAction")
+
+              for child in moveAction.Children do
+                  Expect.isNone child.ClassIri $"child '{child.Id}' must not carry ClassIri"
+                  Expect.isNone child.RequestClrTypeName $"child '{child.Id}' must not carry RequestClrTypeName"
+          }
+
+          test "emitted source contains ClassIri and RequestClrTypeName fields" {
+              let src =
+                  DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry ticTacToeLock
+
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+              Expect.stringContains source "ClassIri" "ClassIri field present in emitted source"
+              Expect.stringContains source "RequestClrTypeName" "RequestClrTypeName field present in emitted source"
+              Expect.stringContains source "\"TicTacToe.Move\"" "MoveAction's FSharpType literal present"
+          }
+
+          test
+              "compile gate: emitted source with ClassIri/RequestClrTypeName still compiles against Frank.Discovery types" {
+              let src =
+                  DiscoveryEmitter.emit "Probe2.GeneratedDiscovery" "/alps/tictactoe" schemaRegistry ticTacToeLock
+                  |> function
+                      | Ok s -> s
+                      | Error e -> failwith $"Expected Ok but got Error: {e}"
+
+              let assemblies = [ typeof<Frank.Discovery.DiscoveryConfig>.Assembly ]
+              let diagnostics = FcsTypecheck.typecheckAgainstRealAssemblies src assemblies
+              Expect.isEmpty diagnostics $"emitted Discovery module compiles cleanly; errors: {diagnostics}"
           } ]
 
 [<Tests>]

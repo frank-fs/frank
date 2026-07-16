@@ -3,6 +3,7 @@ module Frank.Discovery.DiscoveryMiddleware
 open System
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Http.Metadata
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.Routing.Template
 open Microsoft.Extensions.Logging
@@ -67,6 +68,111 @@ let homeResourcesFromEndpoints
           HrefVars = varMeanings })
     |> Seq.toList
 
+// ── #397: ALPS Type reconciliation against real registered HTTP methods ──────
+// Codegen (DiscoveryEmitter) bakes a Type fallback from lock-file Rt presence — it
+// cannot see the app's actual `resource { get/post/... }` registrations. Here, where
+// the ALPS profile is served, the real EndpointDataSource IS available (already
+// constructor-injected, same as JSON Home's homeResourcesFromEndpoints above) — so
+// the served Type is reconciled against ground truth, never left to a lock-file guess.
+
+/// Real HTTP methods per relation IRI, from live endpoints' ResourceRelationMetadata +
+/// HttpMethodMetadata. Coarse correlation key: one `resource { relation X; ... }` block
+/// stamps the SAME relation on every verb it registers, so a route serving both GET and
+/// POST under one relation (#390) yields a multi-method set here.
+let internal methodsByRelation (dataSource: EndpointDataSource) : Map<string, Set<string>> =
+    dataSource.Endpoints
+    |> Seq.choose (fun ep ->
+        match ep with
+        | :? RouteEndpoint ->
+            let relBox = ep.Metadata.GetMetadata<ResourceRelationMetadata>() |> box
+
+            if relBox = null then
+                None
+            else
+                let relMeta = relBox |> unbox<ResourceRelationMetadata>
+
+                match ep.Metadata.GetMetadata<HttpMethodMetadata>() with
+                | null -> None
+                | methodMeta -> Some(relMeta.Relation, methodMeta.HttpMethods |> Set.ofSeq)
+        | _ -> None)
+    |> Seq.groupBy fst
+    |> Seq.map (fun (relation, entries) -> relation, entries |> Seq.collect snd |> Set.ofSeq)
+    |> Map.ofSeq
+
+/// Real HTTP methods per accepted request CLR type full name, from live endpoints'
+/// IAcceptsMetadata + HttpMethodMetadata. Precise correlation key: Frank.OpenApi's
+/// `accepts` operation is stamped only on the endpoint whose own HttpMethodMetadata
+/// matches (ResourceBuilderExtensions.addHandlerDefinition), so this disambiguates an
+/// action's real method even when its route also serves other verbs (e.g. POST
+/// /games/{id} accepting MoveRequest on a route that also serves GET for Game).
+let internal methodsByRequestType (dataSource: EndpointDataSource) : Map<string, Set<string>> =
+    dataSource.Endpoints
+    |> Seq.choose (fun ep ->
+        match ep with
+        | :? RouteEndpoint ->
+            let acceptsBox = ep.Metadata.GetMetadata<IAcceptsMetadata>() |> box
+
+            if acceptsBox = null then
+                None
+            else
+                let accepts = acceptsBox |> unbox<IAcceptsMetadata>
+
+                if isNull accepts.RequestType then
+                    None
+                else
+                    match ep.Metadata.GetMetadata<HttpMethodMetadata>() with
+                    | null -> None
+                    | methodMeta -> Some(accepts.RequestType.FullName, methodMeta.HttpMethods |> Set.ofSeq)
+        | _ -> None)
+    |> Seq.groupBy fst
+    |> Seq.map (fun (typeName, entries) -> typeName, entries |> Seq.collect snd |> Set.ofSeq)
+    |> Map.ofSeq
+
+/// ALPS §2.2 transition semantics from a resource's real registered HTTP method(s).
+/// GET present (however else the route is used) is safe; exactly {PUT} or {DELETE} is
+/// idempotent; exactly {POST} is unsafe. Anything else (no live match, or an otherwise
+/// ambiguous multi-write verb combination) returns None — the codegen-emitted Type is
+/// left as the fallback, never guessed.
+let internal alpsTypeForMethods (methods: Set<string>) : string option =
+    if Set.contains "GET" methods then
+        Some "safe"
+    elif methods = Set.singleton "PUT" || methods = Set.singleton "DELETE" then
+        Some "idempotent"
+    elif methods = Set.singleton "POST" then
+        Some "unsafe"
+    else
+        None
+
+/// Reconcile codegen-emitted ALPS Type against real registered HTTP methods (#397).
+/// Tries the precise per-verb signal first (RequestClrTypeName via IAcceptsMetadata —
+/// disambiguates an action sharing a route with other verbs), then falls back to the
+/// coarser per-route signal (ClassIri via ResourceRelationMetadata). A descriptor with
+/// neither signal resolvable (e.g. a pure embedded/outcome type never itself routed)
+/// keeps its codegen default untouched.
+let internal reconcileAlpsTypes
+    (methodsByRel: Map<string, Set<string>>)
+    (methodsByType: Map<string, Set<string>>)
+    (descriptors: AlpsDescriptor list)
+    : AlpsDescriptor list =
+    let rec reconcile (d: AlpsDescriptor) =
+        let byType =
+            d.RequestClrTypeName
+            |> Option.bind (fun t -> Map.tryFind t methodsByType)
+            |> Option.bind alpsTypeForMethods
+
+        let byRelation =
+            d.ClassIri
+            |> Option.bind (fun c -> Map.tryFind c methodsByRel)
+            |> Option.bind alpsTypeForMethods
+
+        let resolved = byType |> Option.orElse byRelation
+
+        { d with
+            Type = resolved |> Option.defaultValue d.Type
+            Descriptors = d.Descriptors |> List.map reconcile }
+
+    descriptors |> List.map reconcile
+
 /// Static discovery for the application:
 ///  - OPTIONS → `Allow` (methods from matching endpoints + HEAD + OPTIONS) + `Link rel="describedby"`
 ///  - GET ProfileUri → ALPS profile (application/alps+json)
@@ -107,6 +213,15 @@ type DiscoveryMiddleware
                 rs.Head)
 
     let cachedHomeResources = lazy (buildHomeResources ())
+
+    // #397: reconciled once, same lifetime/rationale as cachedHomeResources — the
+    // endpoint set is fixed after startup.
+    let cachedAlpsDescriptors =
+        lazy
+            (reconcileAlpsTypes
+                (methodsByRelation endpointDataSource)
+                (methodsByRequestType endpointDataSource)
+                config.AlpsDescriptors)
 
     let methodsForPath (requestPath: string) =
         let pathString = PathString(requestPath)
@@ -172,7 +287,7 @@ type DiscoveryMiddleware
             handleOptions ctx
         elif isGet && path = config.ProfileUri then
             ctx.Response.ContentType <- "application/alps+json"
-            ctx.Response.WriteAsync(AlpsSerializer.serialize config.AlpsDescriptors)
+            ctx.Response.WriteAsync(AlpsSerializer.serialize cachedAlpsDescriptors.Value)
         elif isGet && path = config.HomeRoute && acceptsJsonHome ctx then
             ctx.Response.Headers.Append("Vary", "Accept")
             ctx.Response.ContentType <- "application/json-home"

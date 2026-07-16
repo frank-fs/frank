@@ -3,6 +3,7 @@ module Frank.Discovery.Tests.TestHelpers
 open System
 open System.Net.Http
 open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Http.Metadata
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
@@ -79,13 +80,17 @@ let sampleConfig =
             Doc = None
             Href = Some "https://schema.org/Game"
             Descriptors = []
-            Rt = None }
+            Rt = None
+            ClassIri = Some "https://schema.org/Game"
+            RequestClrTypeName = None }
           { Id = "agent"
             Type = "semantic"
             Doc = None
             Href = Some "https://schema.org/agent"
             Descriptors = []
-            Rt = None } ]
+            Rt = None
+            ClassIri = None
+            RequestClrTypeName = None } ]
       DescribedByLinks = [ "<https://schema.org/Game>; rel=\"describedby\"" ]
       ResourceHrefVars = Map.ofList [ "https://schema.org/Game", Map.ofList [ "id", "https://schema.org/identifier" ] ] }
 
@@ -163,6 +168,47 @@ let startDuplicateRelationServerWithLogCapture (config: DiscoveryConfig) =
 
     app.StartAsync().GetAwaiter().GetResult()
     provider, app
+
+/// #397: fixture request-body type for AcceptsMetadata-correlation tests (stands in
+/// for a generated MoveRequest-style type).
+type MoveRequestFixture = { Position: string }
+
+/// Spin a TestServer with GET /games/{id} (relation=Game), PUT and DELETE /widgets/{id}
+/// (single-method relations), and POST /games/{id} carrying IAcceptsMetadata for
+/// MoveRequestFixture on the SAME route as the GET (#390 multi-verb) — the AC1 fixture
+/// for #397's HTTP-method reconciliation.
+let startAlpsTypeServer (config: DiscoveryConfig) =
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddSingleton(config) |> ignore
+    builder.Services.AddRouting() |> ignore
+    let app = builder.Build()
+    app.UseRouting() |> ignore
+    app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
+
+    app
+        .MapMethods("/games/{id}", [| "GET" |], System.Func<string>(fun () -> "game"))
+        .WithMetadata({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
+    |> ignore
+
+    app
+        .MapMethods("/games/{id}", [| "POST" |], System.Func<string>(fun () -> "moved"))
+        .WithMetadata({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
+        .WithMetadata(AcceptsMetadata([| "application/json" |], typeof<MoveRequestFixture>, false) :> IAcceptsMetadata)
+    |> ignore
+
+    app
+        .MapMethods("/widgets/{id}", [| "PUT" |], System.Func<string>(fun () -> "updated"))
+        .WithMetadata({ Relation = "https://schema.org/Widget" }: ResourceRelationMetadata)
+    |> ignore
+
+    app
+        .MapMethods("/gadgets/{id}", [| "DELETE" |], System.Func<string>(fun () -> "removed"))
+        .WithMetadata({ Relation = "https://schema.org/Gadget" }: ResourceRelationMetadata)
+    |> ignore
+
+    app.StartAsync().GetAwaiter().GetResult()
+    app
 
 /// Spin a TestServer with discovery middleware AND a /tictactoe vocabulary route.
 /// Used by the dereference acceptance test (item #6).

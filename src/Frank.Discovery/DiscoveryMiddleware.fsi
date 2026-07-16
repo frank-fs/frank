@@ -16,6 +16,37 @@ open Microsoft.Extensions.Logging
 val homeResourcesFromEndpoints:
     resourceHrefVars: Map<string, Map<string, string>> -> dataSource: EndpointDataSource -> JsonHomeResource list
 
+/// Real HTTP methods per relation IRI, from live endpoints' ResourceRelationMetadata +
+/// HttpMethodMetadata. Coarse correlation key: one `resource { relation X; ... }` block
+/// stamps the SAME relation on every verb it registers, so a route serving both GET and
+/// POST under one relation (#390) yields a multi-method set here.
+val internal methodsByRelation: dataSource: EndpointDataSource -> Map<string, Set<string>>
+
+/// Real HTTP methods per accepted request CLR type full name, from live endpoints'
+/// IAcceptsMetadata + HttpMethodMetadata. Precise correlation key: Frank.OpenApi's
+/// `accepts` operation is stamped only on the endpoint whose own HttpMethodMetadata
+/// matches, so this disambiguates an action's real method even when its route also
+/// serves other verbs (#397).
+val internal methodsByRequestType: dataSource: EndpointDataSource -> Map<string, Set<string>>
+
+/// ALPS §2.2 transition semantics from a resource's real registered HTTP method(s).
+/// GET present (however else the route is used) is safe; exactly {PUT} or {DELETE} is
+/// idempotent; exactly {POST} is unsafe. Anything else (no live match, or an otherwise
+/// ambiguous multi-write verb combination) returns None — the codegen-emitted Type is
+/// left as the fallback, never guessed (#397).
+val internal alpsTypeForMethods: methods: Set<string> -> string option
+
+/// Reconcile codegen-emitted ALPS Type against real registered HTTP methods (#397).
+/// Tries the precise per-verb signal first (RequestClrTypeName via IAcceptsMetadata),
+/// then falls back to the coarser per-route signal (ClassIri via
+/// ResourceRelationMetadata). A descriptor with neither signal resolvable keeps its
+/// codegen default untouched.
+val internal reconcileAlpsTypes:
+    methodsByRel: Map<string, Set<string>> ->
+    methodsByType: Map<string, Set<string>> ->
+    descriptors: AlpsDescriptor list ->
+        AlpsDescriptor list
+
 /// Static discovery for the application:
 ///  - OPTIONS → `Allow` (methods from matching endpoints + HEAD + OPTIONS) + `Link rel="describedby"`
 ///  - GET ProfileUri → ALPS profile (application/alps+json)

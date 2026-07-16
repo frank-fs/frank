@@ -202,8 +202,12 @@ let private tttVocabConfig =
                   Doc = None
                   Href = Some "/tictactoe#square"
                   Descriptors = []
-                  Rt = None } ]
-            Rt = Some "https://schema.org/Game" } ]
+                  Rt = None
+                  ClassIri = None
+                  RequestClrTypeName = None } ]
+            Rt = Some "https://schema.org/Game"
+            ClassIri = None
+            RequestClrTypeName = None } ]
       DescribedByLinks = []
       ResourceHrefVars = Map.empty }
 
@@ -264,3 +268,151 @@ let dereferenceTests =
               use client = app.GetTestClient()
               let resp = client.GetAsync("/tictactoe").GetAwaiter().GetResult()
               Expect.equal (int resp.StatusCode) 200 "200 — term definition served at /tictactoe" ]
+
+// ── #397 AC1: served ALPS Type reflects the real registered HTTP method ──────
+// startAlpsTypeServer (TestHelpers.fs) registers: GET+POST /games/{id} (relation=Game,
+// POST also carries IAcceptsMetadata for MoveRequestFixture), PUT /widgets/{id}
+// (relation=Widget), DELETE /gadgets/{id} (relation=Gadget). No live endpoint exists
+// for ActionStatusType — its codegen default must survive untouched.
+
+let private alpsTypeConfig =
+    { ProfileUri = "/alps/test"
+      HomeRoute = "/"
+      AlpsDescriptors =
+        [ { Id = "Game"
+            // Codegen default is deliberately WRONG ("unsafe", as the old Rt-based
+            // heuristic would emit) — reconciliation must override it to "safe" from
+            // the live GET, proving Type is never left to the lock-file guess (#397).
+            Type = "unsafe"
+            Doc = None
+            Href = Some "https://schema.org/Game"
+            Descriptors = []
+            Rt = None
+            ClassIri = Some "https://schema.org/Game"
+            RequestClrTypeName = None }
+          { Id = "MoveAction"
+            Type = "unsafe"
+            Doc = None
+            Href = Some "https://schema.org/MoveAction"
+            Descriptors = []
+            Rt = Some "https://schema.org/Game"
+            // No live endpoint carries Relation="https://schema.org/MoveAction" — the
+            // route-level correlation alone can't find this. Only the precise
+            // RequestClrTypeName (IAcceptsMetadata) signal resolves it.
+            ClassIri = None
+            RequestClrTypeName = Some typeof<MoveRequestFixture>.FullName }
+          { Id = "Widget"
+            Type = "semantic"
+            Doc = None
+            Href = Some "https://schema.org/Widget"
+            Descriptors = []
+            Rt = None
+            ClassIri = Some "https://schema.org/Widget"
+            RequestClrTypeName = None }
+          { Id = "Gadget"
+            Type = "semantic"
+            Doc = None
+            Href = Some "https://schema.org/Gadget"
+            Descriptors = []
+            Rt = None
+            ClassIri = Some "https://schema.org/Gadget"
+            RequestClrTypeName = None }
+          { Id = "ActionStatusType"
+            Type = "semantic"
+            Doc = None
+            Href = Some "https://schema.org/ActionStatusType"
+            Descriptors = []
+            Rt = None
+            // Never itself routed (a pure embedded outcome type) — no live endpoint
+            // will ever match this ClassIri. Codegen default must survive untouched.
+            ClassIri = Some "https://schema.org/ActionStatusType"
+            RequestClrTypeName = None } ]
+      DescribedByLinks = []
+      ResourceHrefVars = Map.empty }
+
+let private alpsTypeOf (descId: string) (alpsBody: string) : string =
+    use doc = System.Text.Json.JsonDocument.Parse alpsBody
+    let descriptors = doc.RootElement.GetProperty("alps").GetProperty("descriptor")
+
+    descriptors.EnumerateArray()
+    |> Seq.tryPick (fun d ->
+        let mutable idEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+        let mutable typeEl = Unchecked.defaultof<System.Text.Json.JsonElement>
+
+        if
+            d.TryGetProperty("id", &idEl)
+            && idEl.GetString() = descId
+            && d.TryGetProperty("type", &typeEl)
+        then
+            Some(typeEl.GetString())
+        else
+            None)
+    |> Option.defaultWith (fun () -> failwith $"descriptor '{descId}' not found in ALPS body")
+
+[<Tests>]
+let alpsTypeReconciliationTests =
+    testList
+        "DiscoveryMiddleware — #397 AC1: served ALPS Type from real HTTP methods"
+        [ testCase "GET-only route (via relation) -> served Type is safe, overriding a wrong codegen default"
+          <| fun _ ->
+              use app = startAlpsTypeServer alpsTypeConfig
+              use client = app.GetTestClient()
+              let resp = client.GetAsync("/alps/test").GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "200"
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+
+              Expect.equal
+                  (alpsTypeOf "Game" body)
+                  "safe"
+                  "Game must be served as safe (real GET), not the wrong codegen unsafe default"
+
+          testCase "POST route sharing the Game relation (via IAcceptsMetadata) -> served Type is unsafe"
+          <| fun _ ->
+              use app = startAlpsTypeServer alpsTypeConfig
+              use client = app.GetTestClient()
+              let resp = client.GetAsync("/alps/test").GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+
+              Expect.equal
+                  (alpsTypeOf "MoveAction" body)
+                  "unsafe"
+                  "MoveAction must be unsafe — resolved via the real POST endpoint's IAcceptsMetadata, not relation (no live relation exists for MoveAction)"
+
+          testCase "PUT-only route -> served Type is idempotent"
+          <| fun _ ->
+              use app = startAlpsTypeServer alpsTypeConfig
+              use client = app.GetTestClient()
+              let resp = client.GetAsync("/alps/test").GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              Expect.equal (alpsTypeOf "Widget" body) "idempotent" "Widget (PUT) must be idempotent"
+
+          testCase "DELETE-only route -> served Type is idempotent"
+          <| fun _ ->
+              use app = startAlpsTypeServer alpsTypeConfig
+              use client = app.GetTestClient()
+              let resp = client.GetAsync("/alps/test").GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              Expect.equal (alpsTypeOf "Gadget" body) "idempotent" "Gadget (DELETE) must be idempotent"
+
+          testCase "class never itself routed -> codegen default Type survives untouched"
+          <| fun _ ->
+              use app = startAlpsTypeServer alpsTypeConfig
+              use client = app.GetTestClient()
+              let resp = client.GetAsync("/alps/test").GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+
+              Expect.equal
+                  (alpsTypeOf "ActionStatusType" body)
+                  "semantic"
+                  "ActionStatusType has no live endpoint — codegen default (semantic) is untouched"
+
+          testCase
+              "OPTIONS/Allow on the multi-verb Game route still reports both GET and POST (unaffected by ALPS reconciliation)"
+          <| fun _ ->
+              use app = startAlpsTypeServer alpsTypeConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Options, "/games/abc")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+              let allow = allowValues resp
+              Expect.contains allow "GET" "Allow still includes GET"
+              Expect.contains allow "POST" "Allow still includes POST" ]

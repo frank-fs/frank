@@ -18,7 +18,9 @@ type GeneratedDiscovery private () =
                 Doc = None
                 Href = Some "https://schema.org/Thing"
                 Descriptors = []
-                Rt = None } ]
+                Rt = None
+                ClassIri = None
+                RequestClrTypeName = None } ]
           DescribedByLinks = []
           ResourceHrefVars = Map.empty }
 

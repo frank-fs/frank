@@ -12,6 +12,7 @@
     <Compile Include="TestHelpers.fs" />
     <Compile Include="SerializerTests.fs" />
     <Compile Include="MiddlewareTests.fs" />
+    <Compile Include="AlpsTypeReconciliationTests.fs" />
     <Compile Include="RelationTests.fs" />
     <Compile Include="ResolverTests.fs" />
     <Compile Include="ValidatorTests.fs" />

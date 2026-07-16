@@ -7,6 +7,8 @@ type internal ResolvedDescriptor =
       Href: string option
       IsAction: bool
       Rt: string option
+      ClassIri: string option
+      RequestClrTypeName: string option
       Children: ResolvedDescriptor list }
 
 /// Pure projection: model → (descriptors, describedBy links). Testable typed output.
