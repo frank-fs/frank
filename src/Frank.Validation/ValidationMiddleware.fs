@@ -7,6 +7,7 @@ open System.Text
 open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Http.Features
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.Primitives
 open Microsoft.Net.Http.Headers
@@ -25,12 +26,6 @@ module private JsonLdBody =
         | true, parsed -> parsed.MediaType.Equals("application/ld+json", StringComparison.OrdinalIgnoreCase)
         | _ -> false
 
-    let readBody (ctx: HttpContext) : Task<string> =
-        task {
-            use reader = new StreamReader(ctx.Request.Body, Encoding.UTF8, leaveOpen = true)
-            return! reader.ReadToEndAsync()
-        }
-
     let mergeGraphs (store: TripleStore) : IGraph =
         let merged = new Graph() :> IGraph
 
@@ -39,14 +34,18 @@ module private JsonLdBody =
 
         merged
 
-    let parseToGraph (loader: JsonLdDocumentLoader) (body: string) : Result<IGraph, exn> =
+    /// Parses ld+json directly from the (already-buffered, seekable) request body stream —
+    /// avoids allocating an intermediate string sized to body length. Caller MUST rewind
+    /// the stream to position 0 AFTER this returns (not before) so the downstream handler
+    /// still sees the full original body.
+    let parseToGraph (loader: JsonLdDocumentLoader) (stream: Stream) : Result<IGraph, exn> =
         let options = JsonLdProcessorOptions()
         options.DocumentLoader <- loader
         let parser = JsonLdParser(options)
 
         try
             use store = new TripleStore()
-            use reader = new StringReader(body)
+            use reader = new StreamReader(stream, Encoding.UTF8, leaveOpen = true)
             parser.Load(store :> ITripleStore, reader)
             Ok(mergeGraphs store)
         with ex ->
@@ -177,26 +176,25 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
             task {
                 Frank.RequestBodyBuffer.enable config.MaxBodyBytes ctx.Request
 
-                let! bodyOpt =
-                    task {
-                        try
-                            let! body = JsonLdBody.readBody ctx
-                            return Some body
-                        with :? IOException as ex ->
-                            logger.LogDebug(ex, "ValidationMiddleware: body exceeded MaxBodyBytes limit")
-                            return None
-                    }
+                // JsonLdParser.Load reads the TextReader synchronously (no async API in
+                // dotNetRdf) — Kestrel/TestServer disallow synchronous body reads by default.
+                match ctx.Features.Get<IHttpBodyControlFeature>() with
+                | null -> ()
+                | feature -> feature.AllowSynchronousIO <- true
 
-                match bodyOpt with
-                | None -> do! Frank.RequestBodyBuffer.respond413 ctx
-                | Some body ->
+                match JsonLdBody.parseToGraph config.ContextLoader ctx.Request.Body with
+                | Error(:? IOException as ex) ->
+                    // Buffer-limit-exceeded disposes the underlying buffering stream — do not
+                    // attempt to rewind it (the stream is already gone at this point).
+                    logger.LogDebug(ex, "ValidationMiddleware: body exceeded MaxBodyBytes limit")
+                    do! Frank.RequestBodyBuffer.respond413 ctx
+                | Error ex ->
                     ctx.Request.Body.Position <- 0L
-
-                    match JsonLdBody.parseToGraph config.ContextLoader body with
-                    | Error ex ->
-                        logger.LogDebug(ex, "ValidationMiddleware: failed to parse ld+json body")
-                        do! ValidationRespond.respond400 ex.Message ctx
-                    | Ok data -> do! validateAndRespond origin ctx data
+                    logger.LogDebug(ex, "ValidationMiddleware: failed to parse ld+json body")
+                    do! ValidationRespond.respond400 ex.Message ctx
+                | Ok data ->
+                    ctx.Request.Body.Position <- 0L
+                    do! validateAndRespond origin ctx data
             }
 
     member this.InvokeAsync(ctx: HttpContext) : Task =
