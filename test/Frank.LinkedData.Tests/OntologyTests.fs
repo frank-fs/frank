@@ -92,6 +92,17 @@ let private captureException (f: unit -> unit) : exn option =
     with ex ->
         Some ex
 
+/// Run `action`, assert it raises ArgumentException whose message contains every fragment in
+/// `expectedFragments`. Shared skeleton for the #396 relative-Uri precondition tests.
+let private assertRejectsRelative (action: unit -> unit) (expectedFragments: string list) : unit =
+    match captureException action with
+    | None -> failwith "expected an exception to be raised for a relative Uri"
+    | Some ex ->
+        Expect.isTrue (ex :? ArgumentException) $"expected ArgumentException, got {ex.GetType().FullName}"
+
+        for fragment in expectedFragments do
+            Expect.stringContains ex.Message fragment $"exception message should contain '{fragment}'"
+
 [<Tests>]
 let tests =
     testList
@@ -159,106 +170,32 @@ let tests =
                   "rdf:type rdf:Property triple present"
           }
           test "toGraph rejects a relative SeeAlso Uri with ArgumentException naming the offending class (#396 AC2)" {
-              let raised =
-                  captureException (fun () -> Ontology.toGraph relativeSeeAlsoOntology |> ignore)
-
-              match raised with
-              | None -> failwith "expected toGraph to raise for a relative SeeAlso Uri"
-              | Some ex ->
-                  Expect.isTrue (ex :? ArgumentException) $"expected ArgumentException, got {ex.GetType().FullName}"
-
-                  Expect.stringContains
-                      ex.Message
-                      "https://example.org/tictactoe#Game"
-                      "exception message identifies the offending class"
-
-                  Expect.stringContains
-                      ex.Message
-                      "seeAlso"
-                      "exception message identifies seeAlso as the offending field"
+              assertRejectsRelative
+                  (fun () -> Ontology.toGraph relativeSeeAlsoOntology |> ignore)
+                  [ "https://example.org/tictactoe#Game"; "seeAlso" ]
           }
           test "toGraph rejects a relative ClassDecl.Iri with ArgumentException (#396 fold-in)" {
-              let raised =
-                  captureException (fun () -> Ontology.toGraph relativeClassIriOntology |> ignore)
-
-              match raised with
-              | None -> failwith "expected toGraph to raise for a relative ClassDecl.Iri"
-              | Some ex ->
-                  Expect.isTrue (ex :? ArgumentException) $"expected ArgumentException, got {ex.GetType().FullName}"
-
-                  Expect.stringContains
-                      ex.Message
-                      "/tictactoe#Game"
-                      "exception message identifies the offending relative class Iri"
+              assertRejectsRelative
+                  (fun () -> Ontology.toGraph relativeClassIriOntology |> ignore)
+                  [ "/tictactoe#Game" ]
           }
           test "toGraph rejects a relative PropertyDecl.Iri with ArgumentException (#396 fold-in)" {
-              let raised =
-                  captureException (fun () -> Ontology.toGraph relativePropertyIriOntology |> ignore)
-
-              match raised with
-              | None -> failwith "expected toGraph to raise for a relative PropertyDecl.Iri"
-              | Some ex ->
-                  Expect.isTrue (ex :? ArgumentException) $"expected ArgumentException, got {ex.GetType().FullName}"
-
-                  Expect.stringContains
-                      ex.Message
-                      "https://schema.org/MoveAction"
-                      "exception message identifies the owning class"
-
-                  Expect.stringContains
-                      ex.Message
-                      "/tictactoe#square"
-                      "exception message identifies the offending relative property Iri"
+              assertRejectsRelative
+                  (fun () -> Ontology.toGraph relativePropertyIriOntology |> ignore)
+                  [ "https://schema.org/MoveAction"; "/tictactoe#square" ]
           }
           test "toGraph rejects a relative EquivalentClass Uri with ArgumentException (#396 sweep)" {
-              let raised =
-                  captureException (fun () -> Ontology.toGraph relativeEquivalentClassOntology |> ignore)
-
-              match raised with
-              | None -> failwith "expected toGraph to raise for a relative EquivalentClass Uri"
-              | Some ex ->
-                  Expect.isTrue (ex :? ArgumentException) $"expected ArgumentException, got {ex.GetType().FullName}"
-
-                  Expect.stringContains
-                      ex.Message
-                      "https://schema.org/MoveAction"
-                      "exception message identifies the owning class"
-
-                  Expect.stringContains
-                      ex.Message
-                      "/tictactoe#Action"
-                      "exception message identifies the offending relative EquivalentClass Uri"
+              assertRejectsRelative
+                  (fun () -> Ontology.toGraph relativeEquivalentClassOntology |> ignore)
+                  [ "https://schema.org/MoveAction"; "/tictactoe#Action" ]
           }
           test "toGraph rejects a relative PropertyDecl.Domain Uri with ArgumentException (#396 sweep)" {
-              let raised =
-                  captureException (fun () -> Ontology.toGraph relativeDomainOntology |> ignore)
-
-              match raised with
-              | None -> failwith "expected toGraph to raise for a relative PropertyDecl.Domain Uri"
-              | Some ex ->
-                  Expect.isTrue (ex :? ArgumentException) $"expected ArgumentException, got {ex.GetType().FullName}"
-
-                  Expect.stringContains
-                      ex.Message
-                      "https://schema.org/MoveAction"
-                      "exception message identifies the owning class"
-
-                  Expect.stringContains
-                      ex.Message
-                      "/tictactoe#Action"
-                      "exception message identifies the offending relative Domain Uri"
+              assertRejectsRelative
+                  (fun () -> Ontology.toGraph relativeDomainOntology |> ignore)
+                  [ "https://schema.org/MoveAction"; "/tictactoe#Action" ]
           }
           test "toJsonLdContext rejects a relative ContextBases Uri with ArgumentException (#396 sweep)" {
-              let raised =
-                  captureException (fun () -> Ontology.toJsonLdContext relativeContextBasesOntology |> ignore)
-
-              match raised with
-              | None -> failwith "expected toJsonLdContext to raise for a relative ContextBases Uri"
-              | Some ex ->
-                  Expect.isTrue (ex :? ArgumentException) $"expected ArgumentException, got {ex.GetType().FullName}"
-
-                  Expect.stringContains
-                      ex.Message
-                      "/tictactoe#"
-                      "exception message identifies the offending relative ContextBases Uri"
+              assertRejectsRelative
+                  (fun () -> Ontology.toJsonLdContext relativeContextBasesOntology |> ignore)
+                  [ "/tictactoe#" ]
           } ]

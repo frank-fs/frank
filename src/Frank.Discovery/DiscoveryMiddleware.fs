@@ -9,6 +9,15 @@ open Microsoft.AspNetCore.Routing.Template
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.Primitives
 
+/// Filter an EndpointDataSource down to its RouteEndpoints — the one-time cast/filter
+/// step shared by every endpoint-metadata scan in this file.
+let private scanRouteEndpoints (dataSource: EndpointDataSource) : RouteEndpoint seq =
+    dataSource.Endpoints
+    |> Seq.choose (fun ep ->
+        match ep with
+        | :? RouteEndpoint as re -> Some re
+        | _ -> None)
+
 /// Build JSON Home resource entries from live endpoints.
 /// Endpoints carrying ResourceRelationMetadata contribute to one merged entry per
 /// (Relation, Href) pair — a resource with both GET and POST produces a single entry
@@ -33,21 +42,18 @@ let homeResourcesFromEndpoints
         else
             methods
 
-    dataSource.Endpoints
-    |> Seq.choose (fun ep ->
-        match ep with
-        | :? RouteEndpoint as re ->
-            let relBox = ep.Metadata.GetMetadata<ResourceRelationMetadata>() |> box
+    scanRouteEndpoints dataSource
+    |> Seq.choose (fun re ->
+        // ResourceRelationMetadata is an F# record — it doesn't support the `null`
+        // pattern directly, so box it first (mirrors the `null` match idiom below).
+        match re.Metadata.GetMetadata<ResourceRelationMetadata>() |> box with
+        | null -> None
+        | relBox ->
+            let relMeta = unbox<ResourceRelationMetadata> relBox
 
-            if relBox = null then
-                None
-            else
-                let relMeta = relBox |> unbox<ResourceRelationMetadata>
-
-                match ep.Metadata.GetMetadata<HttpMethodMetadata>() with
-                | null -> None
-                | methodMeta -> Some(relMeta.Relation, re.RoutePattern.RawText, methodMeta.HttpMethods |> Seq.toList)
-        | _ -> None)
+            match re.Metadata.GetMetadata<HttpMethodMetadata>() with
+            | null -> None
+            | methodMeta -> Some(relMeta.Relation, re.RoutePattern.RawText, methodMeta.HttpMethods |> Seq.toList))
     |> Seq.groupBy (fun (relation, href, _) -> (relation, href))
     |> Seq.map (fun ((relation, href), entries) ->
         let allMethods =
@@ -80,21 +86,17 @@ let homeResourcesFromEndpoints
 /// stamps the SAME relation on every verb it registers, so a route serving both GET and
 /// POST under one relation (#390) yields a multi-method set here.
 let internal methodsByRelation (dataSource: EndpointDataSource) : Map<string, Set<string>> =
-    dataSource.Endpoints
-    |> Seq.choose (fun ep ->
-        match ep with
-        | :? RouteEndpoint ->
-            let relBox = ep.Metadata.GetMetadata<ResourceRelationMetadata>() |> box
+    scanRouteEndpoints dataSource
+    |> Seq.choose (fun re ->
+        // ResourceRelationMetadata is an F# record — box it first, as above.
+        match re.Metadata.GetMetadata<ResourceRelationMetadata>() |> box with
+        | null -> None
+        | relBox ->
+            let relMeta = unbox<ResourceRelationMetadata> relBox
 
-            if relBox = null then
-                None
-            else
-                let relMeta = relBox |> unbox<ResourceRelationMetadata>
-
-                match ep.Metadata.GetMetadata<HttpMethodMetadata>() with
-                | null -> None
-                | methodMeta -> Some(relMeta.Relation, methodMeta.HttpMethods |> Set.ofSeq)
-        | _ -> None)
+            match re.Metadata.GetMetadata<HttpMethodMetadata>() with
+            | null -> None
+            | methodMeta -> Some(relMeta.Relation, methodMeta.HttpMethods |> Set.ofSeq))
     |> Seq.groupBy fst
     |> Seq.map (fun (relation, entries) -> relation, entries |> Seq.collect snd |> Set.ofSeq)
     |> Map.ofSeq
@@ -106,24 +108,17 @@ let internal methodsByRelation (dataSource: EndpointDataSource) : Map<string, Se
 /// action's real method even when its route also serves other verbs (e.g. POST
 /// /games/{id} accepting MoveRequest on a route that also serves GET for Game).
 let internal methodsByRequestType (dataSource: EndpointDataSource) : Map<string, Set<string>> =
-    dataSource.Endpoints
-    |> Seq.choose (fun ep ->
-        match ep with
-        | :? RouteEndpoint ->
-            let acceptsBox = ep.Metadata.GetMetadata<IAcceptsMetadata>() |> box
-
-            if acceptsBox = null then
+    scanRouteEndpoints dataSource
+    |> Seq.choose (fun re ->
+        match re.Metadata.GetMetadata<IAcceptsMetadata>() with
+        | null -> None
+        | accepts ->
+            if isNull accepts.RequestType then
                 None
             else
-                let accepts = acceptsBox |> unbox<IAcceptsMetadata>
-
-                if isNull accepts.RequestType then
-                    None
-                else
-                    match ep.Metadata.GetMetadata<HttpMethodMetadata>() with
-                    | null -> None
-                    | methodMeta -> Some(accepts.RequestType.FullName, methodMeta.HttpMethods |> Set.ofSeq)
-        | _ -> None)
+                match re.Metadata.GetMetadata<HttpMethodMetadata>() with
+                | null -> None
+                | methodMeta -> Some(accepts.RequestType.FullName, methodMeta.HttpMethods |> Set.ofSeq))
     |> Seq.groupBy fst
     |> Seq.map (fun (typeName, entries) -> typeName, entries |> Seq.collect snd |> Set.ofSeq)
     |> Map.ofSeq

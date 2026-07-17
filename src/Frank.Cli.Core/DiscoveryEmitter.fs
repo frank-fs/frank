@@ -119,9 +119,18 @@ let private collectDescribedByLinks (bases: Set<string>) (resources: ResolvedRes
 
 // ── Pure projection ───────────────────────────────────────────────────────────
 
+/// Recursively collect one field (per descriptor, top-level and nested children) across
+/// a descriptor tree — the shared tree-walk shape behind collectAllIds/collectHrefs/collectRtValues.
+let rec private collectField
+    (extract: ResolvedDescriptor -> string list)
+    (descriptors: ResolvedDescriptor list)
+    : string list =
+    descriptors
+    |> List.collect (fun d -> extract d @ collectField extract d.Children)
+
 /// Recursively collect all descriptor IDs (top-level and nested children).
-let rec private collectAllIds (descriptors: ResolvedDescriptor list) : string list =
-    descriptors |> List.collect (fun d -> d.Id :: collectAllIds d.Children)
+let private collectAllIds: ResolvedDescriptor list -> string list =
+    collectField (fun d -> [ d.Id ])
 
 /// Assert that all descriptor IDs in the projected list are unique (ALPS §3.1).
 /// Throws invalidOp naming the first duplicate — this is a codegen-time invariant.
@@ -142,20 +151,17 @@ let private assertUniqueIds (descriptors: ResolvedDescriptor list) : unit =
                 dupsStr
         )
 
+/// Recursively collect every descriptor's own Href (top-level and nested children).
+let private collectHrefs: ResolvedDescriptor list -> string list =
+    collectField (fun d -> d.Href |> Option.toList)
+
 /// Recursively collect every resolvable target for `rt`: each descriptor's own Href and Id.
-let rec private collectResolvableTargets (descriptors: ResolvedDescriptor list) : Set<string> =
-    descriptors
-    |> List.fold
-        (fun acc d ->
-            let acc = Set.add d.Id acc
-            let acc = d.Href |> Option.fold (fun a h -> Set.add h a) acc
-            Set.union acc (collectResolvableTargets d.Children))
-        Set.empty
+let private collectResolvableTargets (descriptors: ResolvedDescriptor list) : Set<string> =
+    Set.ofList (collectAllIds descriptors @ collectHrefs descriptors)
 
 /// Recursively collect every emitted `rt` value (top-level and nested children).
-let rec private collectRtValues (descriptors: ResolvedDescriptor list) : string list =
-    descriptors
-    |> List.collect (fun d -> (d.Rt |> Option.toList) @ collectRtValues d.Children)
+let private collectRtValues: ResolvedDescriptor list -> string list =
+    collectField (fun d -> d.Rt |> Option.toList)
 
 /// Assert that every emitted `rt` value resolves to some descriptor's href or id in the
 /// same document (parallel to assertUniqueIds — a codegen-time ALPS structural invariant).

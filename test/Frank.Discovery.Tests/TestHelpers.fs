@@ -31,17 +31,29 @@ type CapturingLoggerProvider() =
 
         member _.Dispose() = ()
 
-/// Spin a TestServer with the discovery middleware in front of a couple of
-/// routed endpoints. The GET /games/{id} endpoint carries ResourceRelationMetadata
-/// so the middleware can build the JSON Home directory at runtime.
-let startServer (config: DiscoveryConfig) =
+/// Build a WebApplication wired for discovery-middleware testing: TestServer, routing,
+/// DiscoveryConfig registered, DiscoveryMiddleware in the pipeline. `configureBuilder`
+/// (when given) runs before `Build()` — e.g. to register a logging provider. Callers add
+/// their own routes on the returned (unstarted) app.
+let private buildDiscoveryApp
+    (configureBuilder: (WebApplicationBuilder -> unit) option)
+    (config: DiscoveryConfig)
+    : WebApplication =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(config) |> ignore
     builder.Services.AddRouting() |> ignore
+    configureBuilder |> Option.iter (fun f -> f builder)
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
+    app
+
+/// Spin a TestServer with the discovery middleware in front of a couple of
+/// routed endpoints. The GET /games/{id} endpoint carries ResourceRelationMetadata
+/// so the middleware can build the JSON Home directory at runtime.
+let startServer (config: DiscoveryConfig) =
+    let app = buildDiscoveryApp None config
 
     app
         .MapMethods("/games/{id}", [| "GET" |], System.Func<string>(fun () -> "game"))
@@ -97,13 +109,7 @@ let sampleConfig =
 /// Spin a TestServer where /games/{id} handles both GET and POST under the same
 /// ResourceRelationMetadata. Used by the multi-verb merge test (#390).
 let startMultiVerbServer (config: DiscoveryConfig) =
-    let builder = WebApplication.CreateBuilder()
-    builder.WebHost.UseTestServer() |> ignore
-    builder.Services.AddSingleton(config) |> ignore
-    builder.Services.AddRouting() |> ignore
-    let app = builder.Build()
-    app.UseRouting() |> ignore
-    app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
+    let app = buildDiscoveryApp None config
 
     app
         .MapMethods("/games/{id}", [| "GET" |], System.Func<string>(fun () -> "game"))
@@ -121,13 +127,7 @@ let startMultiVerbServer (config: DiscoveryConfig) =
 /// Spin a TestServer where two DIFFERENT hrefs share the SAME relation IRI.
 /// Used by the duplicate-key guard test (#390 F4).
 let startDuplicateRelationServer (config: DiscoveryConfig) =
-    let builder = WebApplication.CreateBuilder()
-    builder.WebHost.UseTestServer() |> ignore
-    builder.Services.AddSingleton(config) |> ignore
-    builder.Services.AddRouting() |> ignore
-    let app = builder.Build()
-    app.UseRouting() |> ignore
-    app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
+    let app = buildDiscoveryApp None config
 
     app
         .MapMethods("/games/{id}", [| "GET" |], System.Func<string>(fun () -> "game"))
@@ -147,14 +147,9 @@ let startDuplicateRelationServer (config: DiscoveryConfig) =
 /// already registered, so the test can assert the warning was emitted.
 let startDuplicateRelationServerWithLogCapture (config: DiscoveryConfig) =
     let provider = new CapturingLoggerProvider()
-    let builder = WebApplication.CreateBuilder()
-    builder.WebHost.UseTestServer() |> ignore
-    builder.Services.AddSingleton(config) |> ignore
-    builder.Services.AddRouting() |> ignore
-    builder.Logging.AddProvider(provider) |> ignore
-    let app = builder.Build()
-    app.UseRouting() |> ignore
-    app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
+
+    let app =
+        buildDiscoveryApp (Some(fun b -> b.Logging.AddProvider(provider) |> ignore)) config
 
     app
         .MapMethods("/games/{id}", [| "GET" |], System.Func<string>(fun () -> "game"))
@@ -178,13 +173,7 @@ type MoveRequestFixture = { Position: string }
 /// MoveRequestFixture on the SAME route as the GET (#390 multi-verb) — the AC1 fixture
 /// for #397's HTTP-method reconciliation.
 let startAlpsTypeServer (config: DiscoveryConfig) =
-    let builder = WebApplication.CreateBuilder()
-    builder.WebHost.UseTestServer() |> ignore
-    builder.Services.AddSingleton(config) |> ignore
-    builder.Services.AddRouting() |> ignore
-    let app = builder.Build()
-    app.UseRouting() |> ignore
-    app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
+    let app = buildDiscoveryApp None config
 
     app
         .MapMethods("/games/{id}", [| "GET" |], System.Func<string>(fun () -> "game"))
@@ -213,13 +202,7 @@ let startAlpsTypeServer (config: DiscoveryConfig) =
 /// Spin a TestServer with discovery middleware AND a /tictactoe vocabulary route.
 /// Used by the dereference acceptance test (item #6).
 let startVocabServer (config: DiscoveryConfig) =
-    let builder = WebApplication.CreateBuilder()
-    builder.WebHost.UseTestServer() |> ignore
-    builder.Services.AddSingleton(config) |> ignore
-    builder.Services.AddRouting() |> ignore
-    let app = builder.Build()
-    app.UseRouting() |> ignore
-    app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
+    let app = buildDiscoveryApp None config
 
     app.MapGet("/tictactoe", System.Func<string>(fun () -> "ttt:square a rdfs:Class ."))
     |> ignore

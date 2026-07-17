@@ -40,7 +40,10 @@ module VocabClassifier =
     // Normalize a URI's authority to a canonical form for ownership comparison.
     // Invariants: lowercased scheme+host, default port dropped, www. prefix stripped,
     // http and https treated as equivalent (content-based authority, not transport).
-    let private normalizeAuthority (uriStr: string) : string option =
+    // Public (not private): callers that classify many URIs against a fixed set of
+    // candidates can precompute normalized authorities once instead of paying
+    // isOwnedByAuthority's re-normalization cost on every comparison (see EmitterShared.declaredOnlyBases).
+    let normalizeAuthority (uriStr: string) : string option =
         match Uri.TryCreate(uriStr, UriKind.Absolute) with
         | false, _ -> None
         | true, u ->

@@ -32,6 +32,12 @@ module VocabClassifier =
 
     open LockFile
 
+    /// Normalize a URI's authority to a canonical form for ownership comparison
+    /// (lowercased scheme+host, default port dropped, www. stripped, http/https equivalent).
+    /// Exposed so callers classifying many URIs against a fixed candidate set can
+    /// precompute normalized authorities once (see Frank.Cli.Core.EmitterShared.declaredOnlyBases).
+    val normalizeAuthority: uriStr: string -> string option
+
     /// True iff vocabUri is owned by appBaseUri.
     /// Owned = same authority (scheme+host normalized: http↔https, www.↔apex).
     /// Explicit Owned field in VocabularyEntry is the recorded fact;

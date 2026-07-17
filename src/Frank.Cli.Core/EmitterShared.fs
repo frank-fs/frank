@@ -42,10 +42,19 @@ let internal declaredOnlyBases (lock: LockFile) (model: ResolvedModel) : Set<str
         model.Resources
         |> List.collect (fun r -> (r.ClassIri |> Option.toList) @ (r.Fields |> List.choose (fun f -> f.Iri)))
 
+    // Precompute each identity URI's normalized authority once, so membership testing
+    // per candidateBase below is O(1) instead of re-normalizing every (candidate, identity)
+    // pair via isOwnedByAuthority — see VocabClassifier.normalizeAuthority.
+    let identityAuthorities =
+        identityUris
+        |> List.choose (fun u -> VocabClassifier.normalizeAuthority u.AbsoluteUri)
+        |> Set.ofList
+
     candidates
     |> Set.filter (fun candidateBase ->
-        identityUris
-        |> List.exists (fun u -> VocabClassifier.isOwnedByAuthority candidateBase u.AbsoluteUri))
+        match VocabClassifier.normalizeAuthority candidateBase with
+        | Some authority -> Set.contains authority identityAuthorities
+        | None -> false)
 
 /// For a declared-only IRI, extract the host-relative path+fragment.
 /// For external vocab IRIs, return the absolute URI unchanged.
