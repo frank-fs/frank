@@ -562,6 +562,8 @@ type RdfVerificationTests() =
     member this.``AT-R7 /vocabulary ttt:square resolves to the real origin, never example.org``() =
         task {
             use! ctx = this.NewContext()
+            let originBase = Server.Url().TrimEnd('/')
+            let squareIri = originBase + "/tictactoe#square"
 
             let! turtleResp =
                 ctx.GetAsync("/vocabulary", APIRequestContextOptions(Headers = dict [ "Accept", "text/turtle" ]))
@@ -573,6 +575,15 @@ type RdfVerificationTests() =
                 turtleBody.Contains "example.org",
                 Is.False,
                 "Turtle body must never contain example.org (#396 round 5)"
+            )
+
+            // Not just absence of example.org — the real server origin must actually be present,
+            // exactly, as ttt:square's subject IRI (weak-assertion false-green otherwise: a
+            // graphFor emitting some other garbage host would still pass an absence-only check).
+            Assert.That(
+                turtleBody.Contains squareIri,
+                Is.True,
+                sprintf "Turtle body must contain the real-origin ttt:square IRI '%s', got: %s" squareIri turtleBody
             )
 
             let! ldJsonResp =
@@ -603,12 +614,13 @@ type RdfVerificationTests() =
                     | :? IUriNode as u when u.Uri.AbsoluteUri.EndsWith "tictactoe#square" -> Some u.Uri.AbsoluteUri
                     | _ -> None)
 
-            Assert.That(squareSubjects, Is.Not.Empty, "No ttt:square subject found in parsed graph")
-
+            // Exact match against the real server origin (mirrors AT-R2's originBase/squareIri
+            // pattern) — an absence-only check would still pass if graphFor emitted a different
+            // garbage host or an empty authority instead of the real origin.
             Assert.That(
-                squareSubjects |> List.forall (fun iri -> not (iri.Contains "example.org")),
-                Is.True,
-                sprintf "ttt:square subject IRI must be under the real request origin, got: %A" squareSubjects
+                squareSubjects,
+                Is.EqualTo [ squareIri ],
+                sprintf "ttt:square subject IRI must be exactly the real request origin, got: %A" squareSubjects
             )
         }
 
