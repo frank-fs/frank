@@ -620,12 +620,11 @@ let contextBasesTypedTests =
 
 // ── Fixture: declared-only ttt: prefix (not in Vocabularies) ─────────────────
 // ttt: is declared in DeclaredPrefixes only (the app's own owned vocab). The
-// ontology/graph/jsonLdContext built from this record are module-level values
-// evaluated once at load time, before any HTTP request exists — there is no live
-// request origin to resolve a host-relative Uri against, and Ontology.toGraph
-// requires absolute Uris. So even the app's own declared-only prefix IRIs must be
-// emitted absolute here (#396 round 4 — previously host-relativized, which crashed
-// the moment GeneratedLinkedData.graph was actually forced).
+// ontology is a module-level value, but graph/jsonLdContext are now emitted as
+// graphFor/jsonLdContextFor FUNCTIONS parameterized by a baseUri (#396 round 5) — so
+// the app's own declared-only prefix IRIs are emitted host-relative in `ontology`
+// (never baking in a codegen-time placeholder domain), and rebased against the real
+// deployed origin only when graphFor/jsonLdContextFor is actually called with one.
 
 let private tttDeclaredOnlyLinkedDataLock: LockFile =
     { SchemaVersion = 1
@@ -650,10 +649,10 @@ let private tttDeclaredOnlyLinkedDataLock: LockFile =
                       Status = Confirmed } ] } ] }
 
 [<Tests>]
-let ownedPrefixStaysAbsoluteTests =
+let ownedPrefixHostRelativeTests =
     testList
-        "LinkedDataEmitter — #396 round 4: declared-only (owned) prefix stays absolute in generated ontology"
-        [ test "ttt: class IRI is absolute in generated ontology (not host-relative)" {
+        "LinkedDataEmitter — #396 round 5: declared-only (owned) prefix emits host-relative in generated ontology"
+        [ test "ttt: class IRI is host-relative in generated ontology (never bakes in example.org)" {
               let src =
                   LinkedDataEmitter.emit
                       "TicTacToe.GeneratedLinkedData"
@@ -665,11 +664,13 @@ let ownedPrefixStaysAbsoluteTests =
 
               Expect.stringContains
                   source
-                  "System.Uri \"https://example.org/tictactoe#Game\""
-                  "ttt:Game must be the absolute System.Uri literal, not host-relative"
+                  "System.Uri (\"/tictactoe#Game\", System.UriKind.Relative)"
+                  "ttt:Game must be the host-relative System.Uri literal"
+
+              Expect.isFalse (source.Contains "example.org") "example.org never appears in generated source"
           }
 
-          test "ttt: property IRI is absolute in generated ontology (not host-relative)" {
+          test "ttt: property IRI is host-relative in generated ontology (never bakes in example.org)" {
               let src =
                   LinkedDataEmitter.emit
                       "TicTacToe.GeneratedLinkedData"
@@ -681,8 +682,8 @@ let ownedPrefixStaysAbsoluteTests =
 
               Expect.stringContains
                   source
-                  "System.Uri \"https://example.org/tictactoe#identifier\""
-                  "ttt:identifier must be the absolute System.Uri literal, not host-relative"
+                  "System.Uri (\"/tictactoe#identifier\", System.UriKind.Relative)"
+                  "ttt:identifier must be the host-relative System.Uri literal"
           }
 
           test "schema.org terms in external vocab lock stay absolute (unchanged)" {
@@ -695,7 +696,7 @@ let ownedPrefixStaysAbsoluteTests =
               Expect.stringContains source "https://schema.org/identifier" "schema:identifier stays absolute"
           }
 
-          test "emitted source never uses UriKind.Relative constructor" {
+          test "graphFor/jsonLdContextFor are emitted as functions taking a baseUri parameter" {
               let src =
                   LinkedDataEmitter.emit
                       "TicTacToe.GeneratedLinkedData"
@@ -703,10 +704,17 @@ let ownedPrefixStaysAbsoluteTests =
                       tttDeclaredOnlyLinkedDataLock
 
               Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
 
-              Expect.isFalse
-                  ((unwrapOk src).Contains "UriKind.Relative")
-                  "no relative URI construction — GeneratedLinkedData.graph/jsonLdContext are built once at module load, with no live request origin to resolve against"
+              Expect.stringContains
+                  source
+                  "let graphFor (baseUri: System.Uri) : VDS.RDF.IGraph"
+                  "graphFor takes a baseUri parameter"
+
+              Expect.stringContains
+                  source
+                  "let jsonLdContextFor (baseUri: System.Uri) : string"
+                  "jsonLdContextFor takes a baseUri parameter"
           } ]
 
 // ── Fixture: #396 non-owned declared-only prefix referenced only via seeAlso ──
@@ -763,7 +771,7 @@ let nonOwnedPrefixStaysAbsoluteTests =
           }
 
           test
-              "ttt: class IRI (mapped resource identity) also absolute alongside a non-owned seeAlso prefix (#396 round 4)" {
+              "ttt: class IRI (mapped resource identity) is host-relative alongside a non-owned seeAlso prefix (#396 round 5)" {
               let src =
                   LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" nonOwnedSeeAlsoRegistry nonOwnedSeeAlsoLock
 
@@ -772,8 +780,10 @@ let nonOwnedPrefixStaysAbsoluteTests =
 
               Expect.stringContains
                   source
-                  "System.Uri \"https://example.org/tictactoe#Game\""
-                  "ttt:Game must be the absolute System.Uri literal, not host-relative"
+                  "System.Uri (\"/tictactoe#Game\", System.UriKind.Relative)"
+                  "ttt:Game (mapped resource identity) must be the host-relative System.Uri literal"
+
+              Expect.isFalse (source.Contains "example.org") "example.org never appears in generated source"
           } ]
 
 [<Tests>]
@@ -808,24 +818,31 @@ let private linkedDataReferencedAssemblies =
       typeof<Frank.LinkedData.LinkedDataConfig>.Assembly
       typeof<VDS.RDF.IGraph>.Assembly ]
 
-let private forceStaticMember (asm: Reflection.Assembly) (typeName: string) (memberName: string) : obj =
+/// Invoke a compiled module's static graphFor/jsonLdContextFor(baseUri: Uri) method by
+/// reflection — the same call shape a real consumer (Program.fs, per request) uses.
+let private invokeBaseUriMethod
+    (asm: Reflection.Assembly)
+    (typeName: string)
+    (methodName: string)
+    (baseUri: Uri)
+    : obj =
     let ty =
         match asm.GetType(typeName) with
         | null -> failwith $"type '{typeName}' not found in compiled assembly"
         | t -> t
 
-    let prop =
-        ty.GetProperty(memberName, Reflection.BindingFlags.Public ||| Reflection.BindingFlags.Static)
+    let m =
+        ty.GetMethod(methodName, Reflection.BindingFlags.Public ||| Reflection.BindingFlags.Static)
 
-    match prop with
-    | null -> failwith $"static member '{memberName}' not found on '{typeName}'"
-    | p -> p.GetValue(null)
+    match m with
+    | null -> failwith $"static method '{methodName}' not found on '{typeName}'"
+    | mi -> mi.Invoke(null, [| box baseUri |])
 
 [<Tests>]
 let landmineDefusedTests =
     testList
-        "LinkedDataEmitter — #396 round 4: GeneratedLinkedData.graph does not throw when forced"
-        [ test "own-vocab (declared-only ttt:) module: forcing .graph does not throw invalidArg" {
+        "LinkedDataEmitter — #396 round 5: GeneratedLinkedData.graphFor/jsonLdContextFor rebase against a real baseUri, never example.org"
+        [ test "own-vocab (declared-only ttt:) module: graphFor(realBaseUri) does not throw and contains no example.org" {
               let src =
                   LinkedDataEmitter.emit
                       "TicTacToe.GeneratedLinkedData"
@@ -834,14 +851,27 @@ let landmineDefusedTests =
                   |> okOrFail
 
               let asm = FcsTypecheck.compileAndLoadAssembly src linkedDataReferencedAssemblies
+              let realBaseUri = Uri "https://realhost.example"
 
               let graph =
-                  forceStaticMember asm "TicTacToe.GeneratedLinkedData" "graph" :?> VDS.RDF.IGraph
+                  invokeBaseUriMethod asm "TicTacToe.GeneratedLinkedData" "graphFor" realBaseUri :?> VDS.RDF.IGraph
 
               Expect.isGreaterThan graph.Triples.Count 0 "graph has triples for the ttt:Game class"
+
+              let node =
+                  graph.GetUriNode(VDS.RDF.UriFactory.Create "https://realhost.example/tictactoe#Game")
+
+              Expect.isNotNull node "ttt:Game rebased to the real baseUri"
+
+              let anyExampleOrg =
+                  graph.Triples
+                  |> Seq.exists (fun t -> t.Subject.ToString().Contains("example.org"))
+
+              Expect.isFalse anyExampleOrg "no example.org anywhere in the rebased graph"
           }
 
-          test "own-vocab (declared-only ttt:) module: forcing .jsonLdContext does not throw invalidArg" {
+          test
+              "own-vocab (declared-only ttt:) module: jsonLdContextFor(realBaseUri) does not throw and contains no example.org" {
               let src =
                   LinkedDataEmitter.emit
                       "TicTacToe.GeneratedLinkedData"
@@ -850,22 +880,60 @@ let landmineDefusedTests =
                   |> okOrFail
 
               let asm = FcsTypecheck.compileAndLoadAssembly src linkedDataReferencedAssemblies
+              let realBaseUri = Uri "https://realhost.example"
 
               let jsonLdContext =
-                  forceStaticMember asm "TicTacToe.GeneratedLinkedData" "jsonLdContext" :?> string
+                  invokeBaseUriMethod asm "TicTacToe.GeneratedLinkedData" "jsonLdContextFor" realBaseUri :?> string
 
-              Expect.isNotEmpty jsonLdContext "jsonLdContext evaluates without throwing"
+              Expect.isNotEmpty jsonLdContext "jsonLdContextFor evaluates without throwing"
+              Expect.isFalse (jsonLdContext.Contains "example.org") "no example.org in jsonLdContext"
           }
 
-          test "external-vocab (schema:) module: forcing .graph does not throw" {
+          test "external-vocab (schema:) module: graphFor(realBaseUri) does not throw; schema.org stays absolute" {
               let src =
                   LinkedDataEmitter.emit "Probe.GeneratedLinkedData" schemaRegistry ticTacToeLock
                   |> okOrFail
 
               let asm = FcsTypecheck.compileAndLoadAssembly src linkedDataReferencedAssemblies
+              let realBaseUri = Uri "https://realhost.example"
 
               let graph =
-                  forceStaticMember asm "Probe.GeneratedLinkedData" "graph" :?> VDS.RDF.IGraph
+                  invokeBaseUriMethod asm "Probe.GeneratedLinkedData" "graphFor" realBaseUri :?> VDS.RDF.IGraph
 
               Expect.isGreaterThan graph.Triples.Count 0 "graph has triples for schema:Game/MoveAction"
+
+              let node = graph.GetUriNode(VDS.RDF.UriFactory.Create "https://schema.org/Game")
+              Expect.isNotNull node "schema:Game stays absolute, unrebased, regardless of baseUri"
+          }
+
+          test
+              "supplying a different baseUri to the same own-vocab module rebases to that origin (proves it's a real call-time parameter, not baked in)" {
+              let src =
+                  LinkedDataEmitter.emit
+                      "TicTacToe.GeneratedLinkedData"
+                      VocabularyRegistry.empty
+                      tttDeclaredOnlyLinkedDataLock
+                  |> okOrFail
+
+              let asm = FcsTypecheck.compileAndLoadAssembly src linkedDataReferencedAssemblies
+
+              let graphA =
+                  invokeBaseUriMethod asm "TicTacToe.GeneratedLinkedData" "graphFor" (Uri "https://host-a.example")
+                  :?> VDS.RDF.IGraph
+
+              let graphB =
+                  invokeBaseUriMethod asm "TicTacToe.GeneratedLinkedData" "graphFor" (Uri "https://host-b.example")
+                  :?> VDS.RDF.IGraph
+
+              Expect.isNotNull
+                  (graphA.GetUriNode(VDS.RDF.UriFactory.Create "https://host-a.example/tictactoe#Game"))
+                  "graphFor rebases against host-a"
+
+              Expect.isNotNull
+                  (graphB.GetUriNode(VDS.RDF.UriFactory.Create "https://host-b.example/tictactoe#Game"))
+                  "graphFor rebases against host-b"
+
+              Expect.isNull
+                  (graphA.GetUriNode(VDS.RDF.UriFactory.Create "https://host-b.example/tictactoe#Game"))
+                  "host-a's graph does not contain host-b's IRI"
           } ]

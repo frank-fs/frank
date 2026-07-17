@@ -45,39 +45,53 @@ let internal projectOntology (model: ResolvedModel) : OntologyDecl =
 
 // ── AstRender helpers ────────────────────────────────────────────────────────
 
-/// Emit a System.Uri expression in absolute form. The ontology/graph/jsonLdContext
-/// built from this record are module-level values evaluated once at load time,
-/// before any HTTP request exists — there is no live request origin to resolve a
-/// relative Uri against, and Ontology.toGraph/toJsonLdContext require absolute Uris
-/// (#396). A vocabulary's own base URI is fixed by declaration, so the absolute
-/// form is the correct emission for every field, owned prefix or not (#396 round 4).
-let private uriExprFor (u: Uri) =
-    AstRender.appExpr "System.Uri" (AstRender.strExpr u.AbsoluteUri)
+/// Emit a System.Uri expression. `bases` are the app's own declared-only prefix base URIs
+/// (EmitterShared.declaredOnlyBases) — a Uri whose authority matches one is rendered
+/// host-relative (path+fragment only, e.g. "/tictactoe#square"), deferring resolution to a
+/// real deployed origin supplied at call time via Ontology.toGraph/toJsonLdContext's baseUri
+/// parameter (#396 round 5). Every other Uri (genuinely external vocab — schema.org, Wikidata)
+/// is rendered absolute, unchanged (#396 round 4).
+/// The relative form must pass System.UriKind.Relative explicitly: the single-arg Uri(string)
+/// constructor's UriKind.RelativeOrAbsolute inference treats a leading '/' as a Unix absolute
+/// file path on this platform (e.g. "/tictactoe#Game" → file:///tictactoe%23Game), not a
+/// relative Uri — silently defeating the rebasing step in Ontology.toGraph/toJsonLdContext.
+let private uriExprFor (bases: Set<string>) (u: Uri) =
+    let href = EmitterShared.hrefFor bases u.AbsoluteUri
 
-let private uriField (name: string) (u: Uri) = name, uriExprFor u
+    if href = u.AbsoluteUri then
+        AstRender.appExpr "System.Uri" (AstRender.strExpr href)
+    else
+        AstRender.appExpr
+            "System.Uri"
+            (AstRender.parenExpr (
+                AstRender.tupleExpr [ AstRender.strExpr href; AstRender.rawExpr "System.UriKind.Relative" ]
+            ))
 
-let private renderUriOpt (u: Uri) = AstRender.parenExpr (uriExprFor u)
+let private uriField (bases: Set<string>) (name: string) (u: Uri) = name, uriExprFor bases u
 
-let private optUriField (name: string) (u: Uri option) =
-    name, AstRender.optionExpr renderUriOpt u
+let private renderUriOpt (bases: Set<string>) (u: Uri) =
+    AstRender.parenExpr (uriExprFor bases u)
 
-let private uriListField (name: string) (us: Uri list) =
-    name, AstRender.listExpr (us |> List.map uriExprFor)
+let private optUriField (bases: Set<string>) (name: string) (u: Uri option) =
+    name, AstRender.optionExpr (renderUriOpt bases) u
 
-let private propExpr (p: PropertyDecl) =
-    AstRender.recordExpr [ uriField "Iri" p.Iri; uriField "Domain" p.Domain ]
+let private uriListField (bases: Set<string>) (name: string) (us: Uri list) =
+    name, AstRender.listExpr (us |> List.map (uriExprFor bases))
 
-let private classExpr (c: ClassDecl) =
+let private propExpr (bases: Set<string>) (p: PropertyDecl) =
+    AstRender.recordExpr [ uriField bases "Iri" p.Iri; uriField bases "Domain" p.Domain ]
+
+let private classExpr (bases: Set<string>) (c: ClassDecl) =
     AstRender.recordExpr
-        [ uriField "Iri" c.Iri
-          optUriField "EquivalentClass" c.EquivalentClass
-          uriListField "SeeAlso" c.SeeAlso
-          "Properties", AstRender.listExpr (c.Properties |> List.map propExpr) ]
+        [ uriField bases "Iri" c.Iri
+          optUriField bases "EquivalentClass" c.EquivalentClass
+          uriListField bases "SeeAlso" c.SeeAlso
+          "Properties", AstRender.listExpr (c.Properties |> List.map (propExpr bases)) ]
 
-let private ontologyExpr (onto: OntologyDecl) =
+let private ontologyExpr (bases: Set<string>) (onto: OntologyDecl) =
     AstRender.recordExpr
-        [ "Classes", AstRender.listExpr (onto.Classes |> List.map classExpr)
-          uriListField "ContextBases" onto.ContextBases ]
+        [ "Classes", AstRender.listExpr (onto.Classes |> List.map (classExpr bases))
+          uriListField bases "ContextBases" onto.ContextBases ]
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
@@ -99,16 +113,25 @@ let emit (moduleName: string) (registry: VocabularyRegistry) (lock: LockFile) : 
                 { projectOntology model with
                     ContextBases = ctxBases }
 
+            let bases = EmitterShared.declaredOnlyBases lock model
+
+            let someBaseUri =
+                AstRender.parenExpr (AstRender.someExpr (AstRender.rawExpr "baseUri"))
+
             let decls =
-                [ AstRender.valueDecl "ontology" "OntologyDecl" (ontologyExpr onto)
-                  AstRender.valueDecl
-                      "graph"
+                [ AstRender.valueDecl "ontology" "OntologyDecl" (ontologyExpr bases onto)
+                  AstRender.funcDecl
+                      "graphFor"
+                      "baseUri"
+                      "System.Uri"
                       "VDS.RDF.IGraph"
-                      (AstRender.appExpr "Ontology.toGraph" (AstRender.rawExpr "ontology"))
-                  AstRender.valueDecl
-                      "jsonLdContext"
+                      (AstRender.appExprN "Ontology.toGraph" [ someBaseUri; AstRender.rawExpr "ontology" ])
+                  AstRender.funcDecl
+                      "jsonLdContextFor"
+                      "baseUri"
+                      "System.Uri"
                       "string"
-                      (AstRender.appExpr "Ontology.toJsonLdContext" (AstRender.rawExpr "ontology")) ]
+                      (AstRender.appExprN "Ontology.toJsonLdContext" [ someBaseUri; AstRender.rawExpr "ontology" ]) ]
 
             AstRender.formatModule
                 moduleName

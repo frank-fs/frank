@@ -8,23 +8,39 @@ let private rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 let private rdfs = "http://www.w3.org/2000/01/rdf-schema#"
 let private owl = "http://www.w3.org/2002/07/owl#"
 
-/// Precondition: `u` must be an absolute, dereferenceable URI. Ontology never rebases a relative
-/// Uri against a runtime host, so a relative Uri reaching this point is a codegen
-/// misclassification — fail loud here, before the throwing .AbsoluteUri accessor, naming the
-/// offending field and its owning class when there is one (#396). `classIri` is None for call
-/// sites with no single owning class, e.g. toJsonLdContext's ContextBases.
-let private assertAbsolute (paramName: string) (fieldLabel: string) (classIri: Uri option) (u: Uri) : unit =
-    if not u.IsAbsoluteUri then
-        let owner =
-            match classIri with
-            | Some c -> $"OntologyDecl class '{c}'"
-            | None -> "OntologyDecl"
+/// Resolve `u` to an absolute Uri.
+/// - Already absolute (an external vocab IRI, or an owned IRI already resolved): returned
+///   unchanged — an external vocab Uri is never rebased against `baseUri`, even when supplied.
+/// - Relative (the app's own declared-only prefix, emitted host-relative by LinkedDataEmitter):
+///   rebased against `baseUri` when supplied (#396 round 5 — resolves the real deployed origin
+///   at call time, not a codegen-time placeholder).
+/// - Relative with no `baseUri` supplied: a codegen misclassification (or a caller with no live
+///   origin to rebase against) — fail loud here, before the throwing .AbsoluteUri accessor,
+///   naming the offending field and its owning class when there is one (#396). `classIri` is
+///   None for call sites with no single owning class, e.g. toJsonLdContext's ContextBases.
+let private resolveAbsolute
+    (baseUri: Uri option)
+    (paramName: string)
+    (fieldLabel: string)
+    (classIri: Uri option)
+    (u: Uri)
+    : Uri =
+    if u.IsAbsoluteUri then
+        u
+    else
+        match baseUri with
+        | Some b -> Uri(b, u)
+        | None ->
+            let owner =
+                match classIri with
+                | Some c -> $"OntologyDecl class '{c}'"
+                | None -> "OntologyDecl"
 
-        invalidArg
-            paramName
-            $"{owner} declares a relative {fieldLabel} Uri '{u.OriginalString}'; {fieldLabel} must be an absolute, dereferenceable URI — Ontology never rebases a relative Uri against a runtime host."
+            invalidArg
+                paramName
+                $"{owner} declares a relative {fieldLabel} Uri '{u.OriginalString}'; {fieldLabel} must be an absolute, dereferenceable URI, or a baseUri must be supplied to rebase it — Ontology.toGraph/toJsonLdContext received no baseUri."
 
-let private addClass (g: IGraph) (c: ClassDecl) : unit =
+let private addClass (g: IGraph) (baseUri: Uri option) (c: ClassDecl) : unit =
     if
         not (
             g.NamespaceMap.HasNamespace "rdf"
@@ -34,44 +50,55 @@ let private addClass (g: IGraph) (c: ClassDecl) : unit =
     then
         invalidOp "addClass requires rdf/rdfs/owl namespaces registered on the graph"
 
-    assertAbsolute "classIri" "Iri" (Some c.Iri) c.Iri
-    let subj = Triples.uriNode g c.Iri.AbsoluteUri
+    let classAbs = resolveAbsolute baseUri "classIri" "Iri" (Some c.Iri) c.Iri
+    let subj = Triples.uriNode g classAbs.AbsoluteUri
     Triples.assert3 g subj (Triples.qnameNode g "rdf:type") (Triples.qnameNode g "owl:Class")
 
     match c.EquivalentClass with
     | Some e ->
-        assertAbsolute "equivalentClass" "owl:equivalentClass" (Some c.Iri) e
-        Triples.assert3 g subj (Triples.qnameNode g "owl:equivalentClass") (Triples.uriNode g e.AbsoluteUri)
+        let eAbs =
+            resolveAbsolute baseUri "equivalentClass" "owl:equivalentClass" (Some c.Iri) e
+
+        Triples.assert3 g subj (Triples.qnameNode g "owl:equivalentClass") (Triples.uriNode g eAbs.AbsoluteUri)
     | None -> ()
 
     for s in c.SeeAlso do
-        assertAbsolute "seeAlso" "rdfs:seeAlso" (Some c.Iri) s
-        Triples.assert3 g subj (Triples.qnameNode g "rdfs:seeAlso") (Triples.uriNode g s.AbsoluteUri)
+        let sAbs = resolveAbsolute baseUri "seeAlso" "rdfs:seeAlso" (Some c.Iri) s
+        Triples.assert3 g subj (Triples.qnameNode g "rdfs:seeAlso") (Triples.uriNode g sAbs.AbsoluteUri)
 
     for p in c.Properties do
-        assertAbsolute "propertyIri" "PropertyDecl.Iri" (Some c.Iri) p.Iri
-        assertAbsolute "domain" "PropertyDecl.Domain" (Some c.Iri) p.Domain
-        let pNode = Triples.uriNode g p.Iri.AbsoluteUri
-        Triples.assert3 g pNode (Triples.qnameNode g "rdf:type") (Triples.qnameNode g "rdf:Property")
-        Triples.assert3 g pNode (Triples.qnameNode g "rdfs:domain") (Triples.uriNode g p.Domain.AbsoluteUri)
+        let pAbs =
+            resolveAbsolute baseUri "propertyIri" "PropertyDecl.Iri" (Some c.Iri) p.Iri
 
-let toGraph (ontology: OntologyDecl) : IGraph =
+        let dAbs =
+            resolveAbsolute baseUri "domain" "PropertyDecl.Domain" (Some c.Iri) p.Domain
+
+        let pNode = Triples.uriNode g pAbs.AbsoluteUri
+        Triples.assert3 g pNode (Triples.qnameNode g "rdf:type") (Triples.qnameNode g "rdf:Property")
+        Triples.assert3 g pNode (Triples.qnameNode g "rdfs:domain") (Triples.uriNode g dAbs.AbsoluteUri)
+
+/// `baseUri`: when Some, rebases any relative (owned, not-yet-resolved) Uri in `ontology`
+/// against it — the real deployed origin at call time (#396 round 5). External vocab Uris
+/// (already absolute) are always passed through unchanged, regardless of `baseUri`. When None,
+/// a relative Uri fails loud instead of rebasing (see resolveAbsolute).
+let toGraph (baseUri: Uri option) (ontology: OntologyDecl) : IGraph =
     let g = new Graph() :> IGraph
     g.NamespaceMap.AddNamespace("rdf", UriFactory.Create rdf)
     g.NamespaceMap.AddNamespace("rdfs", UriFactory.Create rdfs)
     g.NamespaceMap.AddNamespace("owl", UriFactory.Create owl)
 
     for c in ontology.Classes do
-        addClass g c
+        addClass g baseUri c
 
     g
 
-let toJsonLdContext (ontology: OntologyDecl) : string =
+/// See toGraph for `baseUri` semantics.
+let toJsonLdContext (baseUri: Uri option) (ontology: OntologyDecl) : string =
     let items =
         ontology.ContextBases
         |> List.map (fun u ->
-            assertAbsolute "contextBases" "ContextBases" None u
-            "\"" + u.AbsoluteUri.TrimEnd('/') + "\"")
+            let uAbs = resolveAbsolute baseUri "contextBases" "ContextBases" None u
+            "\"" + uAbs.AbsoluteUri.TrimEnd('/') + "\"")
         |> String.concat ","
 
     "{\"@context\":[" + items + "]}"

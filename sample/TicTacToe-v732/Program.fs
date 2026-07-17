@@ -369,6 +369,40 @@ let private tttVocabResource =
             })
     }
 
+/// Per-request factory for the app's declared-vocabulary-mapping ontology (every
+/// resource→vocab class/property mapping declared in Vocabulary.fs), rebased against the
+/// real request origin — genuine, HTTP-reachable use of the generated
+/// GeneratedLinkedData.graphFor function, proving it resolves the app's own (ttt:) terms
+/// against the real deployed host and never bakes in a codegen-time placeholder (#396 round 5).
+let private appVocabularyGraphFactory (ctx: HttpContext) : IGraph =
+    let origin = Uri $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+    TicTacToe.GeneratedLinkedData.graphFor origin
+
+let private appVocabularyResource =
+    resource "/vocabulary" {
+        name "AppVocabulary"
+
+        linkedDataGraphWith
+            { Graph = Unchecked.defaultof<IGraph>
+              // Hand-curated, not GeneratedLinkedData.jsonLdContextFor: Ontology.toGraph always
+              // registers rdf/rdfs/owl namespaces on the graph (see Ontology.fs), but
+              // LinkedDataEmitter.contextBases only covers prefixes the app marks `using` (here,
+              // just schema) — so jsonLdContextFor's own output omits rdf/rdfs/owl document
+              // coverage. Mirrors tttVocabResource's context below, which covers the same four
+              // namespaces for the same reason.
+              JsonLdContext =
+                """{"@context":["http://www.w3.org/1999/02/22-rdf-syntax-ns#","http://www.w3.org/2000/01/rdf-schema#","http://www.w3.org/2002/07/owl#","https://schema.org/version/latest/schemaorg-current-https.jsonld"]}"""
+              GraphFactory = Some appVocabularyGraphFactory }
+
+        get (fun (ctx: HttpContext) ->
+            task {
+                let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+                let graph = appVocabularyGraphFactory ctx
+                ctx.Response.ContentType <- "text/turtle"
+                do! ctx.Response.WriteAsync(buildTurtleBody origin graph)
+            })
+    }
+
 [<EntryPoint>]
 let main args =
     webHost args {
@@ -379,6 +413,7 @@ let main args =
         resource homeResource
         resource gameResource
         resource tttVocabResource
+        resource appVocabularyResource
     }
 
     0

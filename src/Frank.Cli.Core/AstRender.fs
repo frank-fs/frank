@@ -101,6 +101,11 @@ let rawExpr (s: string) : WidgetBuilder<Expr> = ConstantExpr s
 /// A function application: <func> <arg>, e.g. appExpr "System.Uri" (strExpr "x") → System.Uri "x"
 let appExpr (func: string) (arg: WidgetBuilder<Expr>) : WidgetBuilder<Expr> = AppExpr(func, arg)
 
+/// A curried multi-argument function application: <func> <arg1> <arg2> ...,
+/// e.g. appExprN "f" [ a; b ] → f a b. Each arg renders as its own token/group — wrap an
+/// arg needing its own parens (e.g. `Some x`) in parenExpr before passing it in.
+let appExprN (func: string) (args: WidgetBuilder<Expr> list) : WidgetBuilder<Expr> = AppExpr(func, args)
+
 /// Wraps an expression in parentheses: (<expr>).
 let parenExpr (e: WidgetBuilder<Expr>) : WidgetBuilder<Expr> = ParenExpr e
 
@@ -141,6 +146,17 @@ let unionDecl (name: string) (cases: string list) : ModuleDeclItem =
 /// A plain typed value binding as a module declaration: let <name>: <typeName> = <value>
 let valueDecl (name: string) (typeName: string) (value: WidgetBuilder<Expr>) : ModuleDeclItem =
     BindingDecl(Value(name, value, typeName))
+
+/// A single-parameter function declaration with an arbitrary body expression:
+/// let <name> (<paramName>: <paramType>) : <returnType> = <body>
+let funcDecl
+    (name: string)
+    (paramName: string)
+    (paramType: string)
+    (returnType: string)
+    (body: WidgetBuilder<Expr>)
+    : ModuleDeclItem =
+    BindingDecl(Function(name, [ ParenPat(ParameterPat(paramName, paramType)) ], body, returnType))
 
 /// A match expression: match <subject> with | pat -> e ...
 let matchExprClauses (subject: string) (clauses: (string * WidgetBuilder<Expr>) list) : WidgetBuilder<Expr> =

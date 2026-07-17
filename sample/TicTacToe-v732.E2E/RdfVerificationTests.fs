@@ -551,6 +551,67 @@ type RdfVerificationTests() =
             )
         }
 
+    // ── AT-R7: /vocabulary — GeneratedLinkedData.graphFor genuinely wired at request time ──
+    //
+    // #396 round 5: GeneratedLinkedData.graphFor/jsonLdContextFor were dead code baking a fake
+    // example.org placeholder into an unused module. /vocabulary wires graphFor into a real,
+    // per-request HTTP endpoint (Frank.LinkedData.LinkedDataConfig.GraphFactory). Proves the
+    // served ttt:square term resolves against the REAL request origin, never example.org, in
+    // both text/turtle and application/ld+json.
+    [<Test>]
+    member this.``AT-R7 /vocabulary ttt:square resolves to the real origin, never example.org``() =
+        task {
+            use! ctx = this.NewContext()
+
+            let! turtleResp =
+                ctx.GetAsync("/vocabulary", APIRequestContextOptions(Headers = dict [ "Accept", "text/turtle" ]))
+
+            Assert.That(turtleResp.Status, Is.EqualTo 200, "GET /vocabulary text/turtle not 200")
+            let! turtleBody = turtleResp.TextAsync()
+
+            Assert.That(
+                turtleBody.Contains "example.org",
+                Is.False,
+                "Turtle body must never contain example.org (#396 round 5)"
+            )
+
+            let! ldJsonResp =
+                ctx.GetAsync(
+                    "/vocabulary",
+                    APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ])
+                )
+
+            Assert.That(ldJsonResp.Status, Is.EqualTo 200, "GET /vocabulary ld+json not 200")
+            let! ldJsonBody = ldJsonResp.TextAsync()
+
+            Assert.That(
+                ldJsonBody.Contains "example.org",
+                Is.False,
+                "ld+json body must never contain example.org (#396 round 5)"
+            )
+
+            use g = RdfVerificationTests.ParseJsonLd ldJsonBody
+
+            let domainTriples =
+                RdfVerificationTests.TriplesWithPred(g, "http://www.w3.org/2000/01/rdf-schema#domain")
+                |> Seq.toList
+
+            let squareSubjects =
+                domainTriples
+                |> List.choose (fun t ->
+                    match t.Subject with
+                    | :? IUriNode as u when u.Uri.AbsoluteUri.EndsWith "tictactoe#square" -> Some u.Uri.AbsoluteUri
+                    | _ -> None)
+
+            Assert.That(squareSubjects, Is.Not.Empty, "No ttt:square subject found in parsed graph")
+
+            Assert.That(
+                squareSubjects |> List.forall (fun iri -> not (iri.Contains "example.org")),
+                Is.True,
+                sprintf "ttt:square subject IRI must be under the real request origin, got: %A" squareSubjects
+            )
+        }
+
     // ── AT-R-live: live-network expansion against the real schema.org context ────
     //
     // Opt-in tier (#394). Expands the served body with the DEFAULT real-HTTP JSON-LD

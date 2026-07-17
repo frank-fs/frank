@@ -55,6 +55,11 @@ val rawExpr: s: string -> WidgetBuilder<Expr>
 /// A function application: <func> <arg>, e.g. appExpr "System.Uri" (strExpr "x") → System.Uri "x"
 val appExpr: func: string -> arg: WidgetBuilder<Expr> -> WidgetBuilder<Expr>
 
+/// A curried multi-argument function application: <func> <arg1> <arg2> ...,
+/// e.g. appExprN "f" [ a; b ] → f a b. Each arg renders as its own token/group — wrap an
+/// arg needing its own parens (e.g. `Some x`) in parenExpr before passing it in.
+val appExprN: func: string -> args: WidgetBuilder<Expr> list -> WidgetBuilder<Expr>
+
 /// Wraps an expression in parentheses: (<expr>).
 val parenExpr: e: WidgetBuilder<Expr> -> WidgetBuilder<Expr>
 
@@ -84,6 +89,16 @@ val unionDecl: name: string -> cases: string list -> ModuleDeclItem
 
 /// A plain typed value binding as a module declaration: let <name>: <typeName> = <value>
 val valueDecl: name: string -> typeName: string -> value: WidgetBuilder<Expr> -> ModuleDeclItem
+
+/// A single-parameter function declaration with an arbitrary body expression:
+/// let <name> (<paramName>: <paramType>) : <returnType> = <body>
+val funcDecl:
+    name: string ->
+    paramName: string ->
+    paramType: string ->
+    returnType: string ->
+    body: WidgetBuilder<Expr> ->
+        ModuleDeclItem
 
 /// A match expression: match <subject> with | pat -> e ...
 val matchExprClauses: subject: string -> clauses: (string * WidgetBuilder<Expr>) list -> WidgetBuilder<Expr>

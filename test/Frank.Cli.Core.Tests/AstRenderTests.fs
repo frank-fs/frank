@@ -197,4 +197,37 @@ let astRenderTests =
 
               Expect.stringContains src "RecordShape (Uri \"https://schema.org/MoveAction\"," "tupled ctor application"
               Expect.stringContains src "[ 1; Some XsdInteger ]" "int + Some-enum in list"
+          }
+
+          test "appExprN renders a curried multi-argument application: f (Some x) y" {
+              let body =
+                  AstRender.appExprN
+                      "Ontology.toGraph"
+                      [ AstRender.parenExpr (AstRender.someExpr (AstRender.rawExpr "baseUri"))
+                        AstRender.rawExpr "ontology" ]
+
+              let src =
+                  AstRender.formatModule "T.M" None [] [ AstRender.valueDecl "x" "IGraph" body ]
+
+              Expect.stringContains src "Ontology.toGraph (Some baseUri) ontology" "curried two-arg application"
+          }
+
+          test "funcDecl renders a single-parameter function with an arbitrary body" {
+              let body =
+                  AstRender.appExprN
+                      "Ontology.toGraph"
+                      [ AstRender.parenExpr (AstRender.someExpr (AstRender.rawExpr "baseUri"))
+                        AstRender.rawExpr "ontology" ]
+
+              let decl =
+                  AstRender.funcDecl "graphFor" "baseUri" "System.Uri" "VDS.RDF.IGraph" body
+
+              let src = AstRender.formatModule "T.GeneratedLinkedData" None [] [ decl ]
+
+              Expect.stringContains
+                  src
+                  "let graphFor (baseUri: System.Uri) : VDS.RDF.IGraph ="
+                  "function signature with typed parameter and return type"
+
+              Expect.stringContains src "Ontology.toGraph (Some baseUri) ontology" "function body"
           } ]
