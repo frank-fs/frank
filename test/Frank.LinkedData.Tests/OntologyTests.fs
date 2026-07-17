@@ -59,6 +59,31 @@ let private relativePropertyIriOntology: OntologyDecl =
                   Domain = Uri "https://schema.org/MoveAction" } ] } ]
       ContextBases = [] }
 
+// #396 second fold-in: sweep the 3 remaining unguarded .AbsoluteUri call sites — EquivalentClass,
+// PropertyDecl.Domain (both in addClass), and toJsonLdContext's ContextBases (a different function
+// entirely, with no single owning class).
+let private relativeEquivalentClassOntology: OntologyDecl =
+    { Classes =
+        [ { Iri = Uri "https://schema.org/MoveAction"
+            EquivalentClass = Some(Uri("/tictactoe#Action", UriKind.Relative))
+            SeeAlso = []
+            Properties = [] } ]
+      ContextBases = [] }
+
+let private relativeDomainOntology: OntologyDecl =
+    { Classes =
+        [ { Iri = Uri "https://schema.org/MoveAction"
+            EquivalentClass = None
+            SeeAlso = []
+            Properties =
+              [ { Iri = Uri "https://schema.org/square"
+                  Domain = Uri("/tictactoe#Action", UriKind.Relative) } ] } ]
+      ContextBases = [] }
+
+let private relativeContextBasesOntology: OntologyDecl =
+    { Classes = []
+      ContextBases = [ Uri("/tictactoe#", UriKind.Relative) ] }
+
 /// Run `f`, returning the exception it raises (if any). Shared by the #396 precondition tests.
 let private captureException (f: unit -> unit) : exn option =
     try
@@ -184,4 +209,56 @@ let tests =
                       ex.Message
                       "/tictactoe#square"
                       "exception message identifies the offending relative property Iri"
+          }
+          test "toGraph rejects a relative EquivalentClass Uri with ArgumentException (#396 sweep)" {
+              let raised =
+                  captureException (fun () -> Ontology.toGraph relativeEquivalentClassOntology |> ignore)
+
+              match raised with
+              | None -> failwith "expected toGraph to raise for a relative EquivalentClass Uri"
+              | Some ex ->
+                  Expect.isTrue (ex :? ArgumentException) $"expected ArgumentException, got {ex.GetType().FullName}"
+
+                  Expect.stringContains
+                      ex.Message
+                      "https://schema.org/MoveAction"
+                      "exception message identifies the owning class"
+
+                  Expect.stringContains
+                      ex.Message
+                      "/tictactoe#Action"
+                      "exception message identifies the offending relative EquivalentClass Uri"
+          }
+          test "toGraph rejects a relative PropertyDecl.Domain Uri with ArgumentException (#396 sweep)" {
+              let raised =
+                  captureException (fun () -> Ontology.toGraph relativeDomainOntology |> ignore)
+
+              match raised with
+              | None -> failwith "expected toGraph to raise for a relative PropertyDecl.Domain Uri"
+              | Some ex ->
+                  Expect.isTrue (ex :? ArgumentException) $"expected ArgumentException, got {ex.GetType().FullName}"
+
+                  Expect.stringContains
+                      ex.Message
+                      "https://schema.org/MoveAction"
+                      "exception message identifies the owning class"
+
+                  Expect.stringContains
+                      ex.Message
+                      "/tictactoe#Action"
+                      "exception message identifies the offending relative Domain Uri"
+          }
+          test "toJsonLdContext rejects a relative ContextBases Uri with ArgumentException (#396 sweep)" {
+              let raised =
+                  captureException (fun () -> Ontology.toJsonLdContext relativeContextBasesOntology |> ignore)
+
+              match raised with
+              | None -> failwith "expected toJsonLdContext to raise for a relative ContextBases Uri"
+              | Some ex ->
+                  Expect.isTrue (ex :? ArgumentException) $"expected ArgumentException, got {ex.GetType().FullName}"
+
+                  Expect.stringContains
+                      ex.Message
+                      "/tictactoe#"
+                      "exception message identifies the offending relative ContextBases Uri"
           } ]
