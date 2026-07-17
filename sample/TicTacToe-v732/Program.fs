@@ -378,20 +378,29 @@ let private appVocabularyGraphFactory (ctx: HttpContext) : IGraph =
     let origin = Uri $"{ctx.Request.Scheme}://{ctx.Request.Host}"
     TicTacToe.GeneratedLinkedData.graphFor origin
 
+/// GeneratedLinkedData.jsonLdContextFor's own output now genuinely covers rdf/rdfs/owl
+/// (Ontology.toJsonLdContext always lists them, #396 round 6), so the prior hand-curated
+/// @context string is no longer needed.
+///
+/// LinkedDataConfig.JsonLdContext is a fixed string (no per-request factory, unlike
+/// GraphFactory), so this is computed once. jsonLdContextFor's baseUri only rebases RELATIVE
+/// ContextBases entries — and ContextBases is built exclusively from `using` (external vocab)
+/// prefixes (LinkedDataEmitter.contextBases), which are always already-absolute IRIs
+/// (schema.org here), never the app's own relative ones. So, unlike graphFor (round 5),
+/// jsonLdContextFor's baseUri is architecturally unused for any app's genuinely external
+/// context; the ".invalid" sentinel below would surface loudly (an obviously-wrong host in the
+/// served @context) were that invariant ever broken by a future `using` prefix resolving to a
+/// relative Uri.
+let private appVocabularyJsonLdContext =
+    TicTacToe.GeneratedLinkedData.jsonLdContextFor (Uri "http://placeholder.invalid")
+
 let private appVocabularyResource =
     resource "/vocabulary" {
         name "AppVocabulary"
 
         linkedDataGraphWith
             { Graph = Unchecked.defaultof<IGraph>
-              // Hand-curated, not GeneratedLinkedData.jsonLdContextFor: Ontology.toGraph always
-              // registers rdf/rdfs/owl namespaces on the graph (see Ontology.fs), but
-              // LinkedDataEmitter.contextBases only covers prefixes the app marks `using` (here,
-              // just schema) — so jsonLdContextFor's own output omits rdf/rdfs/owl document
-              // coverage. Mirrors tttVocabResource's context below, which covers the same four
-              // namespaces for the same reason.
-              JsonLdContext =
-                """{"@context":["http://www.w3.org/1999/02/22-rdf-syntax-ns#","http://www.w3.org/2000/01/rdf-schema#","http://www.w3.org/2002/07/owl#","https://schema.org/version/latest/schemaorg-current-https.jsonld"]}"""
+              JsonLdContext = appVocabularyJsonLdContext
               GraphFactory = Some appVocabularyGraphFactory }
 
         get (fun (ctx: HttpContext) ->

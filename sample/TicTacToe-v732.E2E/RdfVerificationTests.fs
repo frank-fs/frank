@@ -45,6 +45,13 @@ type RdfVerificationTests() =
 
             match uri.ToString() with
             | s when s = canonicalSchemaOrgContextUrl -> stub """{"@context":{"schema":"https://schema.org/"}}"""
+            // /vocabulary's @context (GeneratedLinkedData.jsonLdContextFor, #396 round 6) lists
+            // the bare schema.org base IRI (LinkedDataEmitter.contextBases's `using "schema"`
+            // ContextBases entry, trailing slash trimmed in the served string) — distinct from
+            // /games' hand-curated canonical versioned URL above. System.Uri's own AbsoluteUri
+            // reinstates the trailing slash for an authority-only URI, so the loader sees
+            // "https://schema.org/", not the served "https://schema.org" text.
+            | "https://schema.org/" -> stub """{"@context":{"schema":"https://schema.org/"}}"""
             | "http://www.w3.org/1999/02/22-rdf-syntax-ns#" ->
                 stub """{"@context":{"rdf":"http://www.w3.org/1999/02/22-rdf-syntax-ns#"}}"""
             | "http://www.w3.org/2000/01/rdf-schema#" ->

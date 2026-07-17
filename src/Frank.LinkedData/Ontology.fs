@@ -92,13 +92,21 @@ let toGraph (baseUri: Uri option) (ontology: OntologyDecl) : IGraph =
 
     g
 
-/// See toGraph for `baseUri` semantics.
+/// See toGraph for `baseUri` semantics. `rdf`/`rdfs`/`owl` are always listed first — toGraph
+/// unconditionally registers all three namespaces on the graph regardless of `ontology.Classes`
+/// (see toGraph above), so toJsonLdContext must expose matching external-document coverage for
+/// every triple addClass can emit (rdf:type, owl:Class, owl:equivalentClass, rdfs:seeAlso,
+/// rdf:Property, rdfs:domain) or a real JSON-LD consumer cannot compact them (#396 round 6).
 let toJsonLdContext (baseUri: Uri option) (ontology: OntologyDecl) : string =
-    let items =
+    let contextBaseItems =
         ontology.ContextBases
         |> List.map (fun u ->
             let uAbs = resolveAbsolute baseUri "contextBases" "ContextBases" None u
-            "\"" + uAbs.AbsoluteUri.TrimEnd('/') + "\"")
+            uAbs.AbsoluteUri.TrimEnd('/'))
+
+    let items =
+        ([ rdf; rdfs; owl ] @ contextBaseItems)
+        |> List.map (fun s -> "\"" + s + "\"")
         |> String.concat ","
 
     "{\"@context\":[" + items + "]}"

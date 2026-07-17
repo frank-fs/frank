@@ -5,6 +5,9 @@ open Expecto
 open Frank.Semantic
 open Frank.LinkedData
 open VDS.RDF
+open VDS.RDF.JsonLd
+open VDS.RDF.Writing
+open Newtonsoft.Json.Linq
 
 let private sampleOntology: OntologyDecl =
     { Classes =
@@ -85,6 +88,51 @@ let private relativeDomainOntology: OntologyDecl =
 let private relativeContextBasesOntology: OntologyDecl =
     { Classes = []
       ContextBases = [ Uri("/tictactoe#", UriKind.Relative) ] }
+
+// #396 round 6: toGraph's addClass unconditionally emits rdf:type/owl:Class for every class and,
+// when a class has ≥1 property, rdfs:domain/rdf:Property too — but toJsonLdContext's @context
+// previously covered ONLY ContextBases (the app's `using` prefixes), never rdf/rdfs/owl, leaving
+// those compact IRIs undefined for any real JSON-LD consumer of jsonLdContextFor's own output
+// (worked around by hand-curating the sample's /vocabulary @context instead of fixing the source).
+let private round6ClassOntology: OntologyDecl =
+    { Classes =
+        [ { Iri = Uri "https://example.org/tictactoe#Game"
+            EquivalentClass = None
+            SeeAlso = []
+            Properties =
+              [ { Iri = Uri "https://example.org/tictactoe#position"
+                  Domain = Uri "https://example.org/tictactoe#Game" } ] } ]
+      ContextBases = [] }
+
+/// Serialize a graph to expanded JSON-LD (full IRIs, no @context) — mirrors
+/// Frank.Semantic.RdfSerialization.serializeGraphJsonLd, not visible cross-project here.
+let private expandedJsonLd (g: IGraph) : string =
+    use store = new TripleStore()
+    store.Add(g) |> ignore
+    let sb = Text.StringBuilder()
+    use sw = new IO.StringWriter(sb)
+    let writer = JsonLdWriter()
+    writer.Save(store :> ITripleStore, sw :> IO.TextWriter)
+    sb.ToString()
+
+/// Offline stub loader for the fixed rdf/rdfs/owl namespace documents — mirrors
+/// TicTacToe.E2E.RdfVerificationTests's strictLoader (#394 pattern): never touches the network,
+/// throws on any other URI so a genuinely missing @context entry fails the test loudly.
+let private rdfNamespaceStubLoader: Func<Uri, JsonLdLoaderOptions, RemoteDocument> =
+    Func<Uri, JsonLdLoaderOptions, RemoteDocument>(fun uri _ ->
+        let stub (contextJson: string) =
+            let doc = RemoteDocument()
+            doc.Document <- JObject.Parse contextJson
+            doc.DocumentUrl <- uri
+            doc
+
+        match uri.ToString() with
+        | "http://www.w3.org/1999/02/22-rdf-syntax-ns#" ->
+            stub """{"@context":{"rdf":"http://www.w3.org/1999/02/22-rdf-syntax-ns#"}}"""
+        | "http://www.w3.org/2000/01/rdf-schema#" ->
+            stub """{"@context":{"rdfs":"http://www.w3.org/2000/01/rdf-schema#"}}"""
+        | "http://www.w3.org/2002/07/owl#" -> stub """{"@context":{"owl":"http://www.w3.org/2002/07/owl#"}}"""
+        | s -> invalidOp $"rdfNamespaceStubLoader: no stub for URI '{s}'")
 
 /// Run `f`, returning the exception it raises (if any). Shared by the #396 precondition tests.
 let private captureException (f: unit -> unit) : exn option =
@@ -293,4 +341,54 @@ let tests =
 
               Expect.stringContains ctx "\"https://schema.org\"" "external base IRI untouched by baseUri"
               Expect.isFalse (ctx.Contains "realhost.example") "external base is never rebased"
+          }
+
+          // #396 round 6: a real JsonLdProcessor, using ONLY toJsonLdContext's own served
+          // @context (via an offline document-loader stub, never string-matching the context's
+          // raw text), must be able to compact toGraph's rdf:type/owl:Class and rdfs:domain
+          // triples down to CURIEs — proving the two functions' outputs are genuinely consistent,
+          // not merely that the context text happens to mention "rdf".
+          test
+              "toJsonLdContext's rdf/rdfs/owl coverage lets a real JSON-LD processor compact toGraph's triples (#396 round 6)" {
+              let g = Ontology.toGraph None round6ClassOntology
+              let expanded = JToken.Parse(expandedJsonLd g)
+              let ctx = Ontology.toJsonLdContext None round6ClassOntology
+              let ctxToken = JToken.Parse(JObject.Parse(ctx).["@context"].ToString())
+
+              let opts = JsonLdProcessorOptions()
+              opts.DocumentLoader <- rdfNamespaceStubLoader
+
+              let compacted = JsonLdProcessor.Compact(expanded, ctxToken, opts)
+              let compactedJson = compacted.ToString()
+
+              // rdf:type itself always compacts to the JSON-LD keyword "@type" per spec,
+              // regardless of context — not a substantive proof of "rdf" resolving. Instead
+              // assert compaction of plain IRI VALUES/predicates against each prefix, which
+              // genuinely requires that prefix be defined in the active context.
+              Expect.stringContains
+                  compactedJson
+                  "\"rdf:Property\""
+                  "rdf: prefix must be genuinely resolvable from toJsonLdContext's own @context, compacting the rdf:Property value"
+
+              Expect.isFalse
+                  (compactedJson.Contains "http://www.w3.org/1999/02/22-rdf-syntax-ns#Property")
+                  "rdf:Property value must not survive as an uncompacted full IRI"
+
+              Expect.stringContains
+                  compactedJson
+                  "\"owl:Class\""
+                  "owl: prefix must be genuinely resolvable from toJsonLdContext's own @context, compacting the owl:Class value"
+
+              Expect.isFalse
+                  (compactedJson.Contains "http://www.w3.org/2002/07/owl#Class")
+                  "owl:Class value must not survive as an uncompacted full IRI"
+
+              Expect.stringContains
+                  compactedJson
+                  "\"rdfs:domain\""
+                  "rdfs: prefix must be genuinely resolvable from toJsonLdContext's own @context, compacting the rdfs:domain predicate"
+
+              Expect.isFalse
+                  (compactedJson.Contains "http://www.w3.org/2000/01/rdf-schema#domain")
+                  "rdfs:domain predicate must not survive as an uncompacted full IRI"
           } ]
