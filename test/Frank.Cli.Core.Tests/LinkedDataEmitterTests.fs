@@ -619,8 +619,13 @@ let contextBasesTypedTests =
           } ]
 
 // ── Fixture: declared-only ttt: prefix (not in Vocabularies) ─────────────────
-// This is the M3 test fixture: ttt: is declared in DeclaredPrefixes only,
-// so all ttt: IRIs must be host-relativized in the generated ontology.
+// ttt: is declared in DeclaredPrefixes only (the app's own owned vocab). The
+// ontology/graph/jsonLdContext built from this record are module-level values
+// evaluated once at load time, before any HTTP request exists — there is no live
+// request origin to resolve a host-relative Uri against, and Ontology.toGraph
+// requires absolute Uris. So even the app's own declared-only prefix IRIs must be
+// emitted absolute here (#396 round 4 — previously host-relativized, which crashed
+// the moment GeneratedLinkedData.graph was actually forced).
 
 let private tttDeclaredOnlyLinkedDataLock: LockFile =
     { SchemaVersion = 1
@@ -645,26 +650,10 @@ let private tttDeclaredOnlyLinkedDataLock: LockFile =
                       Status = Confirmed } ] } ] }
 
 [<Tests>]
-let m3LinkedDataHostRelativeTests =
+let ownedPrefixStaysAbsoluteTests =
     testList
-        "LinkedDataEmitter — M3: declared-only prefix host-relativized in generated ontology"
-        [ test "ttt: class IRI is host-relative in generated ontology (no example.org)" {
-              let src =
-                  LinkedDataEmitter.emit
-                      "TicTacToe.GeneratedLinkedData"
-                      VocabularyRegistry.empty
-                      tttDeclaredOnlyLinkedDataLock
-
-              Expect.isOk src "emit should succeed"
-              let source = unwrapOk src
-              Expect.stringContains source "/tictactoe#Game" "ttt:Game must be host-relative /tictactoe#Game"
-
-              Expect.isFalse
-                  (source.Contains "https://example.org/tictactoe#Game")
-                  "no absolute example.org for ttt:Game"
-          }
-
-          test "ttt: property IRI is host-relative in generated ontology (no example.org)" {
+        "LinkedDataEmitter — #396 round 4: declared-only (owned) prefix stays absolute in generated ontology"
+        [ test "ttt: class IRI is absolute in generated ontology (not host-relative)" {
               let src =
                   LinkedDataEmitter.emit
                       "TicTacToe.GeneratedLinkedData"
@@ -676,15 +665,27 @@ let m3LinkedDataHostRelativeTests =
 
               Expect.stringContains
                   source
-                  "/tictactoe#identifier"
-                  "ttt:identifier must be host-relative /tictactoe#identifier"
-
-              Expect.isFalse
-                  (source.Contains "https://example.org/tictactoe#identifier")
-                  "no absolute example.org for ttt:identifier"
+                  "System.Uri \"https://example.org/tictactoe#Game\""
+                  "ttt:Game must be the absolute System.Uri literal, not host-relative"
           }
 
-          test "schema.org terms in external vocab lock stay absolute (not relativized)" {
+          test "ttt: property IRI is absolute in generated ontology (not host-relative)" {
+              let src =
+                  LinkedDataEmitter.emit
+                      "TicTacToe.GeneratedLinkedData"
+                      VocabularyRegistry.empty
+                      tttDeclaredOnlyLinkedDataLock
+
+              Expect.isOk src "emit should succeed"
+              let source = unwrapOk src
+
+              Expect.stringContains
+                  source
+                  "System.Uri \"https://example.org/tictactoe#identifier\""
+                  "ttt:identifier must be the absolute System.Uri literal, not host-relative"
+          }
+
+          test "schema.org terms in external vocab lock stay absolute (unchanged)" {
               let src =
                   LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" schemaRegistry ticTacToeLock
 
@@ -694,7 +695,7 @@ let m3LinkedDataHostRelativeTests =
               Expect.stringContains source "https://schema.org/identifier" "schema:identifier stays absolute"
           }
 
-          test "emitted source with host-relative ttt: URIs uses UriKind.Relative constructor" {
+          test "emitted source never uses UriKind.Relative constructor" {
               let src =
                   LinkedDataEmitter.emit
                       "TicTacToe.GeneratedLinkedData"
@@ -703,10 +704,9 @@ let m3LinkedDataHostRelativeTests =
 
               Expect.isOk src "emit should succeed"
 
-              Expect.stringContains
-                  (unwrapOk src)
-                  "UriKind.Relative"
-                  "relative URI must use System.Uri(s, UriKind.Relative) constructor"
+              Expect.isFalse
+                  ((unwrapOk src).Contains "UriKind.Relative")
+                  "no relative URI construction — GeneratedLinkedData.graph/jsonLdContext are built once at module load, with no live request origin to resolve against"
           } ]
 
 // ── Fixture: #396 non-owned declared-only prefix referenced only via seeAlso ──
@@ -762,17 +762,18 @@ let nonOwnedPrefixStaysAbsoluteTests =
                   "external seeAlso IRI must not be relativized to a host-relative path"
           }
 
-          test "ttt: class IRI (mapped resource identity) still host-relative alongside a non-owned seeAlso prefix" {
+          test
+              "ttt: class IRI (mapped resource identity) also absolute alongside a non-owned seeAlso prefix (#396 round 4)" {
               let src =
                   LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" nonOwnedSeeAlsoRegistry nonOwnedSeeAlsoLock
 
               Expect.isOk src "emit should succeed"
               let source = unwrapOk src
-              Expect.stringContains source "/tictactoe#Game" "ttt:Game stays host-relative"
 
-              Expect.isFalse
-                  (source.Contains "https://example.org/tictactoe#Game")
-                  "no absolute example.org for ttt:Game"
+              Expect.stringContains
+                  source
+                  "System.Uri \"https://example.org/tictactoe#Game\""
+                  "ttt:Game must be the absolute System.Uri literal, not host-relative"
           } ]
 
 [<Tests>]
@@ -791,4 +792,80 @@ let compileGateTierTests =
 
               let diagnostics = FcsTypecheck.typecheckAgainstRealAssemblies src assemblies
               Expect.isEmpty diagnostics $"emitted LinkedData module compiles cleanly; errors: {diagnostics}"
+          } ]
+
+// ── #396 round 4: force evaluation, not just typecheck ───────────────────────
+// typecheckAgainstRealAssemblies (above) only proves the emitted source compiles —
+// it never runs the module's top-level `let graph = Ontology.toGraph ontology`
+// initializer, so it could not have caught the landmine: a relative Uri that
+// typechecks fine but throws invalidArg the moment `graph` is actually forced.
+// These tests compile to a real assembly, load it, and force `graph`/`jsonLdContext`
+// via reflection — the same trigger a consumer doing `GeneratedLinkedData.graph.Triples.Count`
+// would hit.
+
+let private linkedDataReferencedAssemblies =
+    [ typeof<Frank.Semantic.OntologyDecl>.Assembly
+      typeof<Frank.LinkedData.LinkedDataConfig>.Assembly
+      typeof<VDS.RDF.IGraph>.Assembly ]
+
+let private forceStaticMember (asm: Reflection.Assembly) (typeName: string) (memberName: string) : obj =
+    let ty =
+        match asm.GetType(typeName) with
+        | null -> failwith $"type '{typeName}' not found in compiled assembly"
+        | t -> t
+
+    let prop =
+        ty.GetProperty(memberName, Reflection.BindingFlags.Public ||| Reflection.BindingFlags.Static)
+
+    match prop with
+    | null -> failwith $"static member '{memberName}' not found on '{typeName}'"
+    | p -> p.GetValue(null)
+
+[<Tests>]
+let landmineDefusedTests =
+    testList
+        "LinkedDataEmitter — #396 round 4: GeneratedLinkedData.graph does not throw when forced"
+        [ test "own-vocab (declared-only ttt:) module: forcing .graph does not throw invalidArg" {
+              let src =
+                  LinkedDataEmitter.emit
+                      "TicTacToe.GeneratedLinkedData"
+                      VocabularyRegistry.empty
+                      tttDeclaredOnlyLinkedDataLock
+                  |> okOrFail
+
+              let asm = FcsTypecheck.compileAndLoadAssembly src linkedDataReferencedAssemblies
+
+              let graph =
+                  forceStaticMember asm "TicTacToe.GeneratedLinkedData" "graph" :?> VDS.RDF.IGraph
+
+              Expect.isGreaterThan graph.Triples.Count 0 "graph has triples for the ttt:Game class"
+          }
+
+          test "own-vocab (declared-only ttt:) module: forcing .jsonLdContext does not throw invalidArg" {
+              let src =
+                  LinkedDataEmitter.emit
+                      "TicTacToe.GeneratedLinkedData"
+                      VocabularyRegistry.empty
+                      tttDeclaredOnlyLinkedDataLock
+                  |> okOrFail
+
+              let asm = FcsTypecheck.compileAndLoadAssembly src linkedDataReferencedAssemblies
+
+              let jsonLdContext =
+                  forceStaticMember asm "TicTacToe.GeneratedLinkedData" "jsonLdContext" :?> string
+
+              Expect.isNotEmpty jsonLdContext "jsonLdContext evaluates without throwing"
+          }
+
+          test "external-vocab (schema:) module: forcing .graph does not throw" {
+              let src =
+                  LinkedDataEmitter.emit "Probe.GeneratedLinkedData" schemaRegistry ticTacToeLock
+                  |> okOrFail
+
+              let asm = FcsTypecheck.compileAndLoadAssembly src linkedDataReferencedAssemblies
+
+              let graph =
+                  forceStaticMember asm "Probe.GeneratedLinkedData" "graph" :?> VDS.RDF.IGraph
+
+              Expect.isGreaterThan graph.Triples.Count 0 "graph has triples for schema:Game/MoveAction"
           } ]

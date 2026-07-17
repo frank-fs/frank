@@ -45,45 +45,39 @@ let internal projectOntology (model: ResolvedModel) : OntologyDecl =
 
 // ── AstRender helpers ────────────────────────────────────────────────────────
 
-/// Emit a System.Uri expression: absolute form for external vocab IRIs,
-/// relative form (with System.UriKind.Relative) for declared-only prefix IRIs.
-let private uriExprFor (bases: Set<string>) (u: Uri) =
-    let href = EmitterShared.hrefFor bases u.AbsoluteUri
+/// Emit a System.Uri expression in absolute form. The ontology/graph/jsonLdContext
+/// built from this record are module-level values evaluated once at load time,
+/// before any HTTP request exists — there is no live request origin to resolve a
+/// relative Uri against, and Ontology.toGraph/toJsonLdContext require absolute Uris
+/// (#396). A vocabulary's own base URI is fixed by declaration, so the absolute
+/// form is the correct emission for every field, owned prefix or not (#396 round 4).
+let private uriExprFor (u: Uri) =
+    AstRender.appExpr "System.Uri" (AstRender.strExpr u.AbsoluteUri)
 
-    if href = u.AbsoluteUri then
-        AstRender.appExpr "System.Uri" (AstRender.strExpr href)
-    else
-        AstRender.appExpr
-            "System.Uri"
-            (AstRender.parenExpr (
-                AstRender.tupleExpr [ AstRender.strExpr href; AstRender.rawExpr "System.UriKind.Relative" ]
-            ))
+let private uriField (name: string) (u: Uri) = name, uriExprFor u
 
-let private uriField (bases: Set<string>) (name: string) (u: Uri) = name, uriExprFor bases u
+let private renderUriOpt (u: Uri) = AstRender.parenExpr (uriExprFor u)
 
-let private renderUriOpt (bases: Set<string>) (u: Uri) =
-    AstRender.parenExpr (uriExprFor bases u)
+let private optUriField (name: string) (u: Uri option) =
+    name, AstRender.optionExpr renderUriOpt u
 
-let private optUriField (bases: Set<string>) (name: string) (u: Uri option) =
-    name, AstRender.optionExpr (renderUriOpt bases) u
+let private uriListField (name: string) (us: Uri list) =
+    name, AstRender.listExpr (us |> List.map uriExprFor)
 
-let private uriListField (bases: Set<string>) (name: string) (us: Uri list) =
-    name, AstRender.listExpr (us |> List.map (uriExprFor bases))
+let private propExpr (p: PropertyDecl) =
+    AstRender.recordExpr [ uriField "Iri" p.Iri; uriField "Domain" p.Domain ]
 
-let private propExpr (bases: Set<string>) (p: PropertyDecl) =
-    AstRender.recordExpr [ uriField bases "Iri" p.Iri; uriField bases "Domain" p.Domain ]
-
-let private classExpr (bases: Set<string>) (c: ClassDecl) =
+let private classExpr (c: ClassDecl) =
     AstRender.recordExpr
-        [ uriField bases "Iri" c.Iri
-          optUriField bases "EquivalentClass" c.EquivalentClass
-          uriListField bases "SeeAlso" c.SeeAlso
-          "Properties", AstRender.listExpr (c.Properties |> List.map (propExpr bases)) ]
+        [ uriField "Iri" c.Iri
+          optUriField "EquivalentClass" c.EquivalentClass
+          uriListField "SeeAlso" c.SeeAlso
+          "Properties", AstRender.listExpr (c.Properties |> List.map propExpr) ]
 
-let private ontologyExpr (bases: Set<string>) (onto: OntologyDecl) =
+let private ontologyExpr (onto: OntologyDecl) =
     AstRender.recordExpr
-        [ "Classes", AstRender.listExpr (onto.Classes |> List.map (classExpr bases))
-          uriListField bases "ContextBases" onto.ContextBases ]
+        [ "Classes", AstRender.listExpr (onto.Classes |> List.map classExpr)
+          uriListField "ContextBases" onto.ContextBases ]
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
@@ -101,14 +95,12 @@ let emit (moduleName: string) (registry: VocabularyRegistry) (lock: LockFile) : 
     |> Result.bind (fun model ->
         contextBases model
         |> Result.map (fun ctxBases ->
-            let bases = EmitterShared.declaredOnlyBases lock model
-
             let onto =
                 { projectOntology model with
                     ContextBases = ctxBases }
 
             let decls =
-                [ AstRender.valueDecl "ontology" "OntologyDecl" (ontologyExpr bases onto)
+                [ AstRender.valueDecl "ontology" "OntologyDecl" (ontologyExpr onto)
                   AstRender.valueDecl
                       "graph"
                       "VDS.RDF.IGraph"
