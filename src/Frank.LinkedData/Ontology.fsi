@@ -10,5 +10,8 @@ open Frank.Semantic
 /// a relative Uri fails loud with ArgumentException instead of rebasing.
 val toGraph: baseUri: Uri option -> ontology: OntologyDecl -> IGraph
 
-/// See toGraph for `baseUri` semantics.
+/// `baseUri` is accepted for signature parity with toGraph/graphFor but is never used to rebase
+/// `ontology.ContextBases` — every entry must already be absolute (ContextBases is built
+/// exclusively from `using`, i.e. genuinely external, vocab prefixes) and fails loud with
+/// ArgumentException otherwise, regardless of whether `baseUri` is Some or None (#396 round 7).
 val toJsonLdContext: baseUri: Uri option -> ontology: OntologyDecl -> string

@@ -327,12 +327,20 @@ let tests =
               Expect.isNull rebasedInstead "external Uri is never rebased against baseUri"
           }
 
-          test "toJsonLdContext rebases a relative ContextBases Uri against a supplied baseUri" {
-              let ctx =
-                  Ontology.toJsonLdContext (Some(Uri "https://realhost.example")) relativeContextBasesOntology
-
-              Expect.stringContains ctx "\"https://realhost.example/tictactoe#\"" "context base rebased"
-              Expect.isFalse (ctx.Contains "example.org") "no example.org in rebased jsonLdContext"
+          // #396 round 7: ContextBases is built exclusively from `using` (external vocab)
+          // prefixes (LinkedDataEmitter.contextBases) — architecturally always already-absolute,
+          // never the app's own relative ones. Unlike ClassIri/EquivalentClass/SeeAlso/
+          // PropertyIri/Domain (legitimately relative for owned classes, rebased against
+          // baseUri), a relative ContextBases entry is always a bug and must fail loud —
+          // regardless of whether a baseUri happens to be supplied, so a caller's sentinel
+          // baseUri (e.g. the sample's ".invalid" placeholder) can never silently paper over a
+          // broken ContextBases entry by rebasing it into a garbage-but-valid-looking URI.
+          test "toJsonLdContext rejects a relative ContextBases Uri even when baseUri is supplied (#396 round 7)" {
+              assertRejectsRelative
+                  (fun () ->
+                      Ontology.toJsonLdContext (Some(Uri "https://realhost.example")) relativeContextBasesOntology
+                      |> ignore)
+                  [ "/tictactoe#" ]
           }
 
           test "toJsonLdContext leaves an absolute ContextBases Uri unchanged despite baseUri being supplied" {

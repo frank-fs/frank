@@ -383,14 +383,15 @@ let private appVocabularyGraphFactory (ctx: HttpContext) : IGraph =
 /// @context string is no longer needed.
 ///
 /// LinkedDataConfig.JsonLdContext is a fixed string (no per-request factory, unlike
-/// GraphFactory), so this is computed once. jsonLdContextFor's baseUri only rebases RELATIVE
-/// ContextBases entries — and ContextBases is built exclusively from `using` (external vocab)
-/// prefixes (LinkedDataEmitter.contextBases), which are always already-absolute IRIs
-/// (schema.org here), never the app's own relative ones. So, unlike graphFor (round 5),
-/// jsonLdContextFor's baseUri is architecturally unused for any app's genuinely external
-/// context; the ".invalid" sentinel below would surface loudly (an obviously-wrong host in the
-/// served @context) were that invariant ever broken by a future `using` prefix resolving to a
-/// relative Uri.
+/// GraphFactory), so this is computed once. jsonLdContextFor's baseUri is never used to rebase
+/// ContextBases entries — Ontology.toJsonLdContext asserts every one absolute up front
+/// (assertAbsolute), regardless of whether baseUri is Some or None (#396 round 7), because
+/// ContextBases is built exclusively from `using` (external vocab) prefixes
+/// (LinkedDataEmitter.contextBases), which must always already be absolute IRIs (schema.org
+/// here), never the app's own relative ones. So the ".invalid" sentinel below is provably inert:
+/// were ContextBases ever to carry a relative entry, jsonLdContextFor would throw
+/// ArgumentException at this very module-load call — not silently rebase into a
+/// garbage-but-valid-looking URI served in the response.
 let private appVocabularyJsonLdContext =
     TicTacToe.GeneratedLinkedData.jsonLdContextFor (Uri "http://placeholder.invalid")
 

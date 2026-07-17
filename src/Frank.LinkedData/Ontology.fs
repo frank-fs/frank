@@ -40,6 +40,21 @@ let private resolveAbsolute
                 paramName
                 $"{owner} declares a relative {fieldLabel} Uri '{u.OriginalString}'; {fieldLabel} must be an absolute, dereferenceable URI, or a baseUri must be supplied to rebase it — Ontology.toGraph/toJsonLdContext received no baseUri."
 
+/// Assert `u` is absolute — unlike resolveAbsolute, NEVER rebases against a baseUri, regardless
+/// of whether one is supplied. ContextBases is built exclusively from `using` (external vocab)
+/// prefixes (LinkedDataEmitter.contextBases), which must always already be absolute,
+/// dereferenceable URIs — never the app's own relative ones (those live on ClassDecl.Iri and
+/// friends, which resolveAbsolute legitimately rebases). A relative ContextBases entry is always
+/// a bug: fail loud here rather than let it silently rebase into a garbage-but-valid-looking URI
+/// whenever a caller happens to supply a baseUri for unrelated reasons (#396 round 7).
+let private assertAbsolute (paramName: string) (fieldLabel: string) (u: Uri) : Uri =
+    if u.IsAbsoluteUri then
+        u
+    else
+        invalidArg
+            paramName
+            $"OntologyDecl declares a relative {fieldLabel} Uri '{u.OriginalString}'; {fieldLabel} must be an absolute, dereferenceable URI — ContextBases entries are never rebased against a baseUri."
+
 let private addClass (g: IGraph) (baseUri: Uri option) (c: ClassDecl) : unit =
     if
         not (
@@ -92,16 +107,21 @@ let toGraph (baseUri: Uri option) (ontology: OntologyDecl) : IGraph =
 
     g
 
-/// See toGraph for `baseUri` semantics. `rdf`/`rdfs`/`owl` are always listed first — toGraph
-/// unconditionally registers all three namespaces on the graph regardless of `ontology.Classes`
-/// (see toGraph above), so toJsonLdContext must expose matching external-document coverage for
-/// every triple addClass can emit (rdf:type, owl:Class, owl:equivalentClass, rdfs:seeAlso,
-/// rdf:Property, rdfs:domain) or a real JSON-LD consumer cannot compact them (#396 round 6).
+/// `rdf`/`rdfs`/`owl` are always listed first — toGraph unconditionally registers all three
+/// namespaces on the graph regardless of `ontology.Classes` (see toGraph above), so
+/// toJsonLdContext must expose matching external-document coverage for every triple addClass can
+/// emit (rdf:type, owl:Class, owl:equivalentClass, rdfs:seeAlso, rdf:Property, rdfs:domain) or a
+/// real JSON-LD consumer cannot compact them (#396 round 6). Unlike toGraph, `baseUri` is
+/// accepted only for signature parity — it is NEVER used to rebase `ontology.ContextBases`
+/// entries, even when Some. Every ContextBases entry is instead asserted absolute up front
+/// (assertAbsolute), because ContextBases is built exclusively from `using` (genuinely external
+/// vocab) prefixes, which must always already be absolute — a relative entry is always a bug and
+/// fails loud with ArgumentException regardless of `baseUri` (#396 round 7).
 let toJsonLdContext (baseUri: Uri option) (ontology: OntologyDecl) : string =
     let contextBaseItems =
         ontology.ContextBases
         |> List.map (fun u ->
-            let uAbs = resolveAbsolute baseUri "contextBases" "ContextBases" None u
+            let uAbs = assertAbsolute "contextBases" "ContextBases" u
             uAbs.AbsoluteUri.TrimEnd('/'))
 
     let items =
