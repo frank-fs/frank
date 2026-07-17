@@ -649,23 +649,45 @@ let m3LinkedDataHostRelativeTests =
     testList
         "LinkedDataEmitter — M3: declared-only prefix host-relativized in generated ontology"
         [ test "ttt: class IRI is host-relative in generated ontology (no example.org)" {
-              let src = LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" VocabularyRegistry.empty tttDeclaredOnlyLinkedDataLock
+              let src =
+                  LinkedDataEmitter.emit
+                      "TicTacToe.GeneratedLinkedData"
+                      VocabularyRegistry.empty
+                      tttDeclaredOnlyLinkedDataLock
+
               Expect.isOk src "emit should succeed"
               let source = unwrapOk src
               Expect.stringContains source "/tictactoe#Game" "ttt:Game must be host-relative /tictactoe#Game"
-              Expect.isFalse (source.Contains "https://example.org/tictactoe#Game") "no absolute example.org for ttt:Game"
+
+              Expect.isFalse
+                  (source.Contains "https://example.org/tictactoe#Game")
+                  "no absolute example.org for ttt:Game"
           }
 
           test "ttt: property IRI is host-relative in generated ontology (no example.org)" {
-              let src = LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" VocabularyRegistry.empty tttDeclaredOnlyLinkedDataLock
+              let src =
+                  LinkedDataEmitter.emit
+                      "TicTacToe.GeneratedLinkedData"
+                      VocabularyRegistry.empty
+                      tttDeclaredOnlyLinkedDataLock
+
               Expect.isOk src "emit should succeed"
               let source = unwrapOk src
-              Expect.stringContains source "/tictactoe#identifier" "ttt:identifier must be host-relative /tictactoe#identifier"
-              Expect.isFalse (source.Contains "https://example.org/tictactoe#identifier") "no absolute example.org for ttt:identifier"
+
+              Expect.stringContains
+                  source
+                  "/tictactoe#identifier"
+                  "ttt:identifier must be host-relative /tictactoe#identifier"
+
+              Expect.isFalse
+                  (source.Contains "https://example.org/tictactoe#identifier")
+                  "no absolute example.org for ttt:identifier"
           }
 
           test "schema.org terms in external vocab lock stay absolute (not relativized)" {
-              let src = LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" schemaRegistry ticTacToeLock
+              let src =
+                  LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" schemaRegistry ticTacToeLock
+
               Expect.isOk src "emit should succeed"
               let source = unwrapOk src
               Expect.stringContains source "https://schema.org/Game" "schema:Game stays absolute"
@@ -673,9 +695,18 @@ let m3LinkedDataHostRelativeTests =
           }
 
           test "emitted source with host-relative ttt: URIs uses UriKind.Relative constructor" {
-              let src = LinkedDataEmitter.emit "TicTacToe.GeneratedLinkedData" VocabularyRegistry.empty tttDeclaredOnlyLinkedDataLock
+              let src =
+                  LinkedDataEmitter.emit
+                      "TicTacToe.GeneratedLinkedData"
+                      VocabularyRegistry.empty
+                      tttDeclaredOnlyLinkedDataLock
+
               Expect.isOk src "emit should succeed"
-              Expect.stringContains (unwrapOk src) "UriKind.Relative" "relative URI must use System.Uri(s, UriKind.Relative) constructor"
+
+              Expect.stringContains
+                  (unwrapOk src)
+                  "UriKind.Relative"
+                  "relative URI must use System.Uri(s, UriKind.Relative) constructor"
           } ]
 
 // ── Fixture: #396 non-owned declared-only prefix referenced only via seeAlso ──
@@ -689,7 +720,9 @@ let private nonOwnedSeeAlsoLock: LockFile =
       Integrity = None
       Vocabularies = Map.empty
       DeclaredPrefixes =
-        Map.ofList [ "ttt", "https://example.org/tictactoe#"; "external", "http://external.example.net/entity/" ]
+        Map.ofList
+            [ "ttt", "https://example.org/tictactoe#"
+              "external", "http://external.example.net/entity/" ]
       Mappings =
         [ { FSharpType = "TicTacToe.Game"
             Iri = Some "ttt:Game"
@@ -736,7 +769,10 @@ let nonOwnedPrefixStaysAbsoluteTests =
               Expect.isOk src "emit should succeed"
               let source = unwrapOk src
               Expect.stringContains source "/tictactoe#Game" "ttt:Game stays host-relative"
-              Expect.isFalse (source.Contains "https://example.org/tictactoe#Game") "no absolute example.org for ttt:Game"
+
+              Expect.isFalse
+                  (source.Contains "https://example.org/tictactoe#Game")
+                  "no absolute example.org for ttt:Game"
           } ]
 
 [<Tests>]

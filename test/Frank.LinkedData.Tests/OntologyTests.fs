@@ -37,6 +37,36 @@ let private relativeSeeAlsoOntology: OntologyDecl =
             Properties = [] } ]
       ContextBases = [] }
 
+// #396 fold-in: the same unguarded .AbsoluteUri defect exists on ClassDecl.Iri and
+// PropertyDecl.Iri — exactly the shape LinkedDataEmitter legitimately produces for the app's
+// own declared-only prefix (e.g. ttt:square emitted as UriKind.Relative). Both must fail loud
+// at graph-construction time, not crash deep inside .AbsoluteUri.
+let private relativeClassIriOntology: OntologyDecl =
+    { Classes =
+        [ { Iri = Uri("/tictactoe#Game", UriKind.Relative)
+            EquivalentClass = None
+            SeeAlso = []
+            Properties = [] } ]
+      ContextBases = [] }
+
+let private relativePropertyIriOntology: OntologyDecl =
+    { Classes =
+        [ { Iri = Uri "https://schema.org/MoveAction"
+            EquivalentClass = None
+            SeeAlso = []
+            Properties =
+              [ { Iri = Uri("/tictactoe#square", UriKind.Relative)
+                  Domain = Uri "https://schema.org/MoveAction" } ] } ]
+      ContextBases = [] }
+
+/// Run `f`, returning the exception it raises (if any). Shared by the #396 precondition tests.
+let private captureException (f: unit -> unit) : exn option =
+    try
+        f ()
+        None
+    with ex ->
+        Some ex
+
 [<Tests>]
 let tests =
     testList
@@ -105,11 +135,7 @@ let tests =
           }
           test "toGraph rejects a relative SeeAlso Uri with ArgumentException naming the offending class (#396 AC2)" {
               let raised =
-                  try
-                      Ontology.toGraph relativeSeeAlsoOntology |> ignore
-                      None
-                  with ex ->
-                      Some ex
+                  captureException (fun () -> Ontology.toGraph relativeSeeAlsoOntology |> ignore)
 
               match raised with
               | None -> failwith "expected toGraph to raise for a relative SeeAlso Uri"
@@ -125,4 +151,37 @@ let tests =
                       ex.Message
                       "seeAlso"
                       "exception message identifies seeAlso as the offending field"
+          }
+          test "toGraph rejects a relative ClassDecl.Iri with ArgumentException (#396 fold-in)" {
+              let raised =
+                  captureException (fun () -> Ontology.toGraph relativeClassIriOntology |> ignore)
+
+              match raised with
+              | None -> failwith "expected toGraph to raise for a relative ClassDecl.Iri"
+              | Some ex ->
+                  Expect.isTrue (ex :? ArgumentException) $"expected ArgumentException, got {ex.GetType().FullName}"
+
+                  Expect.stringContains
+                      ex.Message
+                      "/tictactoe#Game"
+                      "exception message identifies the offending relative class Iri"
+          }
+          test "toGraph rejects a relative PropertyDecl.Iri with ArgumentException (#396 fold-in)" {
+              let raised =
+                  captureException (fun () -> Ontology.toGraph relativePropertyIriOntology |> ignore)
+
+              match raised with
+              | None -> failwith "expected toGraph to raise for a relative PropertyDecl.Iri"
+              | Some ex ->
+                  Expect.isTrue (ex :? ArgumentException) $"expected ArgumentException, got {ex.GetType().FullName}"
+
+                  Expect.stringContains
+                      ex.Message
+                      "https://schema.org/MoveAction"
+                      "exception message identifies the owning class"
+
+                  Expect.stringContains
+                      ex.Message
+                      "/tictactoe#square"
+                      "exception message identifies the offending relative property Iri"
           } ]
