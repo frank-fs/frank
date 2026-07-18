@@ -212,6 +212,16 @@ let private tttVocabConfig =
       DescribedByLinks = []
       ResourceHrefVars = Map.empty }
 
+/// Same shape as tttVocabConfig, but MoveAction's Rt is a RELATIVE, app-owned
+/// class IRI (as EmitterShared.hrefFor would emit for a declared-only prefix's
+/// return-type reference) rather than an already-absolute schema.org one — the
+/// case tttVocabConfig's Href-only assertions never exercised for Rt.
+let private relativeRtConfig =
+    { tttVocabConfig with
+        AlpsDescriptors =
+            [ { (tttVocabConfig.AlpsDescriptors |> List.head) with
+                  Rt = Some "/tictactoe#Game" } ] }
+
 [<Tests>]
 let dereferenceTests =
     testList
@@ -298,6 +308,41 @@ let dereferenceTests =
                   moveActionHref
                   (Some "https://schema.org/MoveAction")
                   "external vocab href stays absolute, unaffected by origin resolution"
+
+          testCase "ALPS rt for MoveAction resolves a RELATIVE Rt against the live request origin (#398 AC1)"
+          <| fun _ ->
+              use app = startVocabServer relativeRtConfig
+              use client = app.GetTestClient()
+              let resp = client.GetAsync("/alps/tictactoe").GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "200"
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              use doc = JsonDocument.Parse(body)
+              let alps = doc.RootElement.GetProperty("alps")
+              let descriptors = alps.GetProperty("descriptor")
+
+              let moveActionRt =
+                  descriptors.EnumerateArray()
+                  |> Seq.tryPick (fun d ->
+                      let mutable idEl = Unchecked.defaultof<JsonElement>
+                      let mutable rtEl = Unchecked.defaultof<JsonElement>
+
+                      if
+                          d.TryGetProperty("id", &idEl)
+                          && idEl.GetString() = "MoveAction"
+                          && d.TryGetProperty("rt", &rtEl)
+                      then
+                          Some(rtEl.GetString())
+                      else
+                          None)
+
+              Expect.isSome moveActionRt "MoveAction has a served rt value"
+
+              Expect.equal
+                  moveActionRt.Value
+                  "http://localhost/tictactoe#Game"
+                  "a RELATIVE rt is resolved against the live TestServer request origin, same as Href"
+
+              Expect.isTrue (Uri.IsWellFormedUriString(moveActionRt.Value, UriKind.Absolute)) "rt is an absolute URI"
 
           testCase "GET /tictactoe (relative IRI dereference, strip fragment) → 200 (item #6)"
           <| fun _ ->
