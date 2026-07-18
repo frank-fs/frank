@@ -6,7 +6,8 @@ open Frank.Semantic.LockFile
 open Frank.Semantic.VocabFetcher
 
 let schemaBody: byte[] =
-    Text.Encoding.UTF8.GetBytes "@prefix schema: <https://schema.org/> .\nschema:Game a <http://www.w3.org/2000/01/rdf-schema#Class> .\n"
+    Text.Encoding.UTF8.GetBytes
+        "@prefix schema: <https://schema.org/> .\nschema:Game a <http://www.w3.org/2000/01/rdf-schema#Class> .\n"
 
 let schemaBodyHash: string = sha256Hex schemaBody
 
@@ -30,7 +31,7 @@ let stubConnegFetch (result: ConnegFetchResult) : ConnegFetch =
 let countingConnegFetch (result: ConnegFetchResult) : ConnegFetch * int ref =
     let count = ref 0
 
-    let fetch : ConnegFetch =
+    let fetch: ConnegFetch =
         fun _uri _etag _lastMod ->
             incr count
             async { return result }
@@ -52,16 +53,16 @@ let mkVocabEntry (hash: string) : VocabularyEntry =
         FetchedAt = DateTimeOffset.UnixEpoch
         Hash = hash }
 
-let mkOwnedEntry (uri: string) (fetchedDaysAgo: float) : VocabularyEntry =
+let mkOwnedEntry (now: DateTimeOffset) (uri: string) (fetchedDaysAgo: float) : VocabularyEntry =
     { v1Empty with
         Uri = uri
-        FetchedAt = DateTimeOffset.UtcNow.AddDays(-fetchedDaysAgo)
+        FetchedAt = now.AddDays(-fetchedDaysAgo)
         Hash = sha256Hex schemaBody
         Owned = true }
 
-let mkUnownedEntry (uri: string) (fetchedDaysAgo: float) : VocabularyEntry =
+let mkUnownedEntry (now: DateTimeOffset) (uri: string) (fetchedDaysAgo: float) : VocabularyEntry =
     { v1Empty with
         Uri = uri
-        FetchedAt = DateTimeOffset.UtcNow.AddDays(-fetchedDaysAgo)
+        FetchedAt = now.AddDays(-fetchedDaysAgo)
         Hash = sha256Hex schemaBody
         Owned = false }

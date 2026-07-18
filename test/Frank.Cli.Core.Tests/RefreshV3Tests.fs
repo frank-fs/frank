@@ -20,7 +20,8 @@ let private mkLockV2 (vocabs: (string * VocabularyEntry) list) : LockFile =
       Mappings = [] }
 
 let private runRefresh (fetch: ConnegFetch) (force: bool) (lf: LockFile) : RefreshReport * LockFile =
-    refresh fetch SlaPolicy.defaultPolicy fixedNow force lf |> Async.RunSynchronously
+    refresh fetch SlaPolicy.defaultPolicy fixedNow force lf
+    |> Async.RunSynchronously
 
 let private hasDrift (report: RefreshReport) : bool =
     report.Outcomes
@@ -45,7 +46,7 @@ let ac4Tests =
         [ testCase "404 → DriftDetected, Validated=false, exit 2"
           <| fun () ->
               let entry =
-                  { mkUnownedEntry "http://localhost:9301/v" 35.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9301/v" 35.0 with
                       Hash = schemaBodyHash }
 
               let lock = mkLockV2 [ "vocab", entry ]
@@ -62,7 +63,7 @@ let ac4Tests =
           testCase "410 → DriftDetected, Validated=false, exit 2"
           <| fun () ->
               let entry =
-                  { mkUnownedEntry "http://localhost:9302/v" 35.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9302/v" 35.0 with
                       Hash = schemaBodyHash }
 
               let lock = mkLockV2 [ "vocab", entry ]
@@ -82,7 +83,7 @@ let ac4Tests =
                     LastChecked = Some(fixedNow.AddDays(-35.0)) }
 
               let entry =
-                  { mkUnownedEntry "http://localhost:9303/v" 35.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9303/v" 35.0 with
                       Validated = priorValidated }
 
               let lock = mkLockV2 [ "vocab", entry ]
@@ -103,7 +104,7 @@ let ac4Tests =
                     LastChecked = Some(fixedNow.AddDays(-35.0)) }
 
               let entry =
-                  { mkUnownedEntry "http://localhost:9304/v" 35.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9304/v" 35.0 with
                       Validated = priorValidated }
 
               let lock = mkLockV2 [ "vocab", entry ]
@@ -123,7 +124,7 @@ let ac4Tests =
                     LastChecked = None }
 
               let entry =
-                  { mkUnownedEntry "http://localhost:9305/v" 5.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9305/v" 5.0 with
                       Validated = priorValidated }
 
               let lock = mkLockV2 [ "vocab", entry ]
@@ -138,16 +139,19 @@ let ac4Tests =
           testCase "drift-dominates: 404 on one entry + 503 on another → exit 2"
           <| fun () ->
               let entry1 =
-                  { mkUnownedEntry "http://localhost:9306/a" 35.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9306/a" 35.0 with
                       Hash = schemaBodyHash }
 
               let entry2 =
-                  { mkUnownedEntry "http://localhost:9307/b" 35.0 with
-                      Validated = { IsValidated = true; Reason = None; LastChecked = None } }
+                  { mkUnownedEntry fixedNow "http://localhost:9307/b" 35.0 with
+                      Validated =
+                          { IsValidated = true
+                            Reason = None
+                            LastChecked = None } }
 
               let lock = mkLockV2 [ "a", entry1; "b", entry2 ]
 
-              let fetch : ConnegFetch =
+              let fetch: ConnegFetch =
                   fun uri _etag _lastMod ->
                       async {
                           let path = uri.AbsolutePath
@@ -172,21 +176,21 @@ let ac5Tests =
         [ testCase "one dead (404) + two live entries → all three visited"
           <| fun () ->
               let deadEntry =
-                  { mkUnownedEntry "http://localhost:9401/dead" 35.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9401/dead" 35.0 with
                       Hash = schemaBodyHash }
 
               let liveEntry1 =
-                  { mkUnownedEntry "http://localhost:9402/live1" 35.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9402/live1" 35.0 with
                       Hash = schemaBodyHash }
 
               let liveEntry2 =
-                  { mkUnownedEntry "http://localhost:9403/live2" 35.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9403/live2" 35.0 with
                       Hash = schemaBodyHash }
 
               let lock = mkLockV2 [ "dead", deadEntry; "live1", liveEntry1; "live2", liveEntry2 ]
               let visitCount = ref 0
 
-              let fetch : ConnegFetch =
+              let fetch: ConnegFetch =
                   fun uri _etag _lastMod ->
                       incr visitCount
 
@@ -227,7 +231,7 @@ let ac8Tests =
         "A-C8 — owned reachability SLA (90d)"
         [ testCase "owned entry within 90d is NOT re-probed (request count = 0)"
           <| fun () ->
-              let entry = mkOwnedEntry "http://localhost:9501/vocab" 85.0
+              let entry = mkOwnedEntry fixedNow "http://localhost:9501/vocab" 85.0
 
               let lock = mkLockV2 [ "vocab", entry ]
               let (fetch, count) = countingConnegFetch (turtleResult schemaBody)
@@ -239,7 +243,7 @@ let ac8Tests =
 
           testCase "owned entry past 90d IS reachability-probed (request count = 1)"
           <| fun () ->
-              let entry = mkOwnedEntry "http://localhost:9502/vocab" 95.0
+              let entry = mkOwnedEntry fixedNow "http://localhost:9502/vocab" 95.0
 
               let lock = mkLockV2 [ "vocab", entry ]
               let (fetch, count) = countingConnegFetch (turtleResult schemaBody)
@@ -257,7 +261,7 @@ let ac8Tests =
                       "@prefix schema: <https://schema.org/> .\nschema:Person a <http://www.w3.org/2000/01/rdf-schema#Class> .\n"
 
               let entry =
-                  { mkOwnedEntry "http://localhost:9503/vocab" 95.0 with
+                  { mkOwnedEntry fixedNow "http://localhost:9503/vocab" 95.0 with
                       Hash = schemaBodyHash }
 
               let lock = mkLockV2 [ "vocab", entry ]
@@ -270,7 +274,7 @@ let ac8Tests =
 
           testCase "owned entry past 90d that 404s → DriftDetected, Validated=false, exit 2"
           <| fun () ->
-              let entry = mkOwnedEntry "http://localhost:9504/vocab" 95.0
+              let entry = mkOwnedEntry fixedNow "http://localhost:9504/vocab" 95.0
 
               let lock = mkLockV2 [ "vocab", entry ]
               let stubUri = Uri "http://localhost:9504/vocab"
@@ -289,7 +293,7 @@ let ac9Tests =
         "A-C9 — unowned SLA (30d)"
         [ testCase "unowned entry within 30d is NOT re-fetched (request count = 0)"
           <| fun () ->
-              let entry = mkUnownedEntry "http://localhost:9601/vocab" 25.0
+              let entry = mkUnownedEntry fixedNow "http://localhost:9601/vocab" 25.0
 
               let lock = mkLockV2 [ "vocab", entry ]
               let (fetch, count) = countingConnegFetch (turtleResult schemaBody)
@@ -302,7 +306,7 @@ let ac9Tests =
           testCase "unowned entry past 30d IS re-fetched (request count = 1)"
           <| fun () ->
               let entry =
-                  { mkUnownedEntry "http://localhost:9602/vocab" 35.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9602/vocab" 35.0 with
                       Hash = schemaBodyHash }
 
               let lock = mkLockV2 [ "vocab", entry ]
@@ -313,7 +317,7 @@ let ac9Tests =
           testCase "--force re-fetches even within 30d (request count = 1)"
           <| fun () ->
               let entry =
-                  { mkUnownedEntry "http://localhost:9603/vocab" 5.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9603/vocab" 5.0 with
                       Hash = schemaBodyHash }
 
               let lock = mkLockV2 [ "vocab", entry ]
@@ -333,7 +337,7 @@ let m1DurableHttpStatusTests =
         [ testCase "406 → DriftDetected, Validated=false, exit 2"
           <| fun () ->
               let entry =
-                  { mkUnownedEntry "http://localhost:9701/v" 35.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9701/v" 35.0 with
                       Hash = schemaBodyHash }
 
               let lock = mkLockV2 [ "vocab", entry ]
@@ -349,7 +353,7 @@ let m1DurableHttpStatusTests =
           testCase "415 → DriftDetected, exit 2"
           <| fun () ->
               let entry =
-                  { mkUnownedEntry "http://localhost:9702/v" 35.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9702/v" 35.0 with
                       Hash = schemaBodyHash }
 
               let lock = mkLockV2 [ "vocab", entry ]
@@ -362,7 +366,7 @@ let m1DurableHttpStatusTests =
           testCase "401 → DriftDetected auth-walled, exit 2"
           <| fun () ->
               let entry =
-                  { mkUnownedEntry "http://localhost:9703/v" 35.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9703/v" 35.0 with
                       Hash = schemaBodyHash }
 
               let lock = mkLockV2 [ "vocab", entry ]
@@ -383,7 +387,7 @@ let m1DurableHttpStatusTests =
                     LastChecked = Some(fixedNow.AddDays(-35.0)) }
 
               let entry =
-                  { mkUnownedEntry "http://localhost:9704/v" 35.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9704/v" 35.0 with
                       Validated = priorValidated }
 
               let lock = mkLockV2 [ "vocab", entry ]
@@ -404,11 +408,15 @@ let m2HtmlNonRdfTests =
         "M2 — unowned text/html is not durable drift; owned text/html is still drift (A-C7)"
         [ testCase "unowned text/html 200 → NOT exit 2 (non-durable, unverifiable)"
           <| fun () ->
-              let entry = mkUnownedEntry "http://localhost:9801/v" 35.0
+              let entry = mkUnownedEntry fixedNow "http://localhost:9801/v" 35.0
               let lock = mkLockV2 [ "vocab", entry ]
 
               let fetch =
-                  stubConnegFetch (NonRdfContent {| MediaType = "text/html"; HttpStatus = 200 |})
+                  stubConnegFetch (
+                      NonRdfContent
+                          {| MediaType = "text/html"
+                             HttpStatus = 200 |}
+                  )
 
               let (report, _) = runRefresh fetch false lock
               Expect.isFalse (hasDrift report) "text/html from unowned must NOT be drift"
@@ -417,13 +425,20 @@ let m2HtmlNonRdfTests =
           testCase "unowned text/html entry has Validated=false (unverifiable, not confirmed)"
           <| fun () ->
               let entry =
-                  { mkUnownedEntry "http://localhost:9802/v" 35.0 with
-                      Validated = { IsValidated = true; Reason = None; LastChecked = None } }
+                  { mkUnownedEntry fixedNow "http://localhost:9802/v" 35.0 with
+                      Validated =
+                          { IsValidated = true
+                            Reason = None
+                            LastChecked = None } }
 
               let lock = mkLockV2 [ "vocab", entry ]
 
               let fetch =
-                  stubConnegFetch (NonRdfContent {| MediaType = "text/html"; HttpStatus = 200 |})
+                  stubConnegFetch (
+                      NonRdfContent
+                          {| MediaType = "text/html"
+                             HttpStatus = 200 |}
+                  )
 
               let (_, updatedLock) = runRefresh fetch false lock
               let updatedEntry = updatedLock.Vocabularies.["vocab"]
@@ -437,7 +452,7 @@ let m4OwnedBuildEvidenceTests =
         "M4 — owned classifyOwned is a transform over buildEvidence"
         [ testCase "owned entry hitting RedirectCapHit → DriftDetected (durable), exit 2"
           <| fun () ->
-              let entry = mkOwnedEntry "http://localhost:9901/vocab" 95.0
+              let entry = mkOwnedEntry fixedNow "http://localhost:9901/vocab" 95.0
               let lock = mkLockV2 [ "vocab", entry ]
               let fetch = stubConnegFetch RedirectCapHit
               let (report, updatedLock) = runRefresh fetch false lock
@@ -448,7 +463,7 @@ let m4OwnedBuildEvidenceTests =
 
           testCase "owned 404 → DriftDetected durable (regression after M4 refactor)"
           <| fun () ->
-              let entry = mkOwnedEntry "http://localhost:9902/vocab" 95.0
+              let entry = mkOwnedEntry fixedNow "http://localhost:9902/vocab" 95.0
               let lock = mkLockV2 [ "vocab", entry ]
               let stubUri = Uri "http://localhost:9902/vocab"
               let fetch = stubConnegFetch (HttpErrorStatus(404, stubUri))
@@ -464,7 +479,7 @@ let m4OwnedBuildEvidenceTests =
                       "@prefix schema: <https://schema.org/> .\nschema:Person a <http://www.w3.org/2000/01/rdf-schema#Class> .\n"
 
               let entry =
-                  { mkOwnedEntry "http://localhost:9903/vocab" 95.0 with
+                  { mkOwnedEntry fixedNow "http://localhost:9903/vocab" 95.0 with
                       Hash = schemaBodyHash }
 
               let lock = mkLockV2 [ "vocab", entry ]
@@ -482,7 +497,7 @@ let m5Any2xxTests =
         [ testCase "203 + Turtle body → EvidenceRefreshed, Validated=true"
           <| fun () ->
               let entry =
-                  { mkUnownedEntry "http://localhost:9951/v" 35.0 with
+                  { mkUnownedEntry fixedNow "http://localhost:9951/v" 35.0 with
                       Hash = schemaBodyHash }
 
               let lock = mkLockV2 [ "vocab", entry ]
