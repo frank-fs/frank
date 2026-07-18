@@ -12,9 +12,11 @@ type internal ResolvedDescriptor =
       Children: ResolvedDescriptor list }
 
 /// Pure projection: model → (descriptors, describedBy links). Testable typed output.
+/// Each describedBy link is (classIri, formatted `<href>; rel="type"` value) — classIri is
+/// DiscoveryMiddleware's correlation key for scoping the link to its matched resource (#398).
 /// declaredOnlyBases: set of base URI strings whose IRIs should be emitted as host-relative paths.
 val internal projectDiscovery:
-    declaredOnlyBases: Set<string> -> model: ResolvedModel -> ResolvedDescriptor list * string list
+    declaredOnlyBases: Set<string> -> model: ResolvedModel -> ResolvedDescriptor list * (string * string) list
 
 /// Emit a GeneratedDiscovery F# module from a lock file and vocabulary registry.
 ///

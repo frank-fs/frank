@@ -36,6 +36,13 @@ val internal methodsByRequestType: dataSource: EndpointDataSource -> Map<string,
 /// left as the fallback, never guessed (#397).
 val internal alpsTypeForMethods: methods: Set<string> -> string option
 
+/// Resolve a served descriptor Href against a live request origin (#398). A relative
+/// value becomes absolute against origin; an already-absolute value (external vocab)
+/// passes through unchanged — RFC 3986 §5.3 reference resolution. Public: shared with
+/// app code that must resolve the SAME codegen-emitted href against a live request
+/// origin outside the middleware — never reimplemented.
+val resolveHref: origin: string -> href: string -> string
+
 /// Reconcile codegen-emitted ALPS Type against real registered HTTP methods (#397).
 /// Tries the precise per-verb signal first (RequestClrTypeName via IAcceptsMetadata),
 /// then falls back to the coarser per-route signal (ClassIri via
@@ -46,6 +53,15 @@ val internal reconcileAlpsTypes:
     methodsByType: Map<string, Set<string>> ->
     descriptors: AlpsDescriptor list ->
         AlpsDescriptor list
+
+/// Real HTTP methods registered for the given request path, from every endpoint whose
+/// route template matches — the OPTIONS Allow header's source of truth.
+val internal methodsForPath: dataSource: EndpointDataSource -> requestPath: string -> string list
+
+/// Declared relation IRI(s) for the given request path, from ResourceRelationMetadata on
+/// every endpoint whose route template matches. Used to scope rel="type" Link headers to
+/// only the resource actually matched (#398).
+val internal relationsForPath: dataSource: EndpointDataSource -> requestPath: string -> string list
 
 /// Static discovery for the application:
 ///  - OPTIONS → `Allow` (methods from matching endpoints + HEAD + OPTIONS) + `Link rel="describedby"`

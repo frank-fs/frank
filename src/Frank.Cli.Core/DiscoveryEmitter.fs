@@ -98,10 +98,13 @@ let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource
               RequestClrTypeName = Some r.FSharpType
               Children = buildChildren bases r }))
 
-/// Collect unique `rel="type"` link values for resources that have a ClassIri.
+/// Collect unique `rel="type"` link values for resources that have a ClassIri, paired
+/// with their full, un-relativized class IRI — DiscoveryMiddleware's correlation key for
+/// scoping the served link to only the resource actually matched at serve time (#398),
+/// instead of broadcasting every app resource's link on every OPTIONS response.
 /// Declared-only prefix class IRIs are emitted as host-relative link targets.
-let private collectDescribedByLinks (bases: Set<string>) (resources: ResolvedResource list) : string list =
-    let folder (seen: Set<string>, acc: string list) (r: ResolvedResource) =
+let private collectDescribedByLinks (bases: Set<string>) (resources: ResolvedResource list) : (string * string) list =
+    let folder (seen: Set<string>, acc: (string * string) list) (r: ResolvedResource) =
         match r.ClassIri with
         | None -> seen, acc
         | Some uri ->
@@ -112,7 +115,7 @@ let private collectDescribedByLinks (bases: Set<string>) (resources: ResolvedRes
             else
                 let linkIri = EmitterShared.hrefFor bases fullIri
                 let link = $"<{linkIri}>; rel=\"type\""
-                Set.add fullIri seen, link :: acc
+                Set.add fullIri seen, (fullIri, link) :: acc
 
     let _, revLinks = List.fold folder (Set.empty, []) resources
     List.rev revLinks
@@ -189,7 +192,7 @@ let private assertRtResolves (descriptors: ResolvedDescriptor list) : unit =
 let internal projectDiscovery
     (declaredOnlyBases: Set<string>)
     (model: ResolvedModel)
-    : ResolvedDescriptor list * string list =
+    : ResolvedDescriptor list * (string * string) list =
     collectDescriptors declaredOnlyBases model.Resources, collectDescribedByLinks declaredOnlyBases model.Resources
 
 // ── Source rendering via AstRender (no string concat) ────────────────────────
@@ -266,17 +269,21 @@ let private computeHrefVars (bases: Set<string>) (model: ResolvedModel) : (strin
             classIri.AbsoluteUri, ownEntries @ extra))
     |> List.filter (fun (_, entries) -> not entries.IsEmpty)
 
+/// { ClassIri = "..."; Link = "..." } for one DescribedByLinks entry.
+let private describedByLinkExpr ((classIri, link): string * string) =
+    AstRender.recordExpr [ "ClassIri", AstRender.strExpr classIri; "Link", AstRender.strExpr link ]
+
 let private configExpr
     (profileUri: string)
     (descriptors: ResolvedDescriptor list)
-    (links: string list)
+    (links: (string * string) list)
     (hrefVars: (string * (string * string) list) list)
     =
     AstRender.recordExpr
         [ "ProfileUri", AstRender.strExpr profileUri
           "HomeRoute", AstRender.strExpr "/"
           "AlpsDescriptors", AstRender.listExpr (descriptors |> List.map descriptorExpr)
-          "DescribedByLinks", AstRender.listExpr (links |> List.map AstRender.strExpr)
+          "DescribedByLinks", AstRender.listExpr (links |> List.map describedByLinkExpr)
           "ResourceHrefVars", resourceHrefVarsExpr hrefVars ]
 
 // ── Public API ────────────────────────────────────────────────────────────────

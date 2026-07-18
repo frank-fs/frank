@@ -103,7 +103,9 @@ let sampleConfig =
             Rt = None
             ClassIri = None
             RequestClrTypeName = None } ]
-      DescribedByLinks = [ "<https://schema.org/Game>; rel=\"describedby\"" ]
+      DescribedByLinks =
+        [ { ClassIri = "https://schema.org/Game"
+            Link = "<https://schema.org/Game>; rel=\"describedby\"" } ]
       ResourceHrefVars = Map.ofList [ "https://schema.org/Game", Map.ofList [ "id", "https://schema.org/identifier" ] ] }
 
 /// Spin a TestServer where /games/{id} handles both GET and POST under the same
@@ -205,6 +207,26 @@ let startVocabServer (config: DiscoveryConfig) =
     let app = buildDiscoveryApp None config
 
     app.MapGet("/tictactoe", System.Func<string>(fun () -> "ttt:square a rdfs:Class ."))
+    |> ignore
+
+    app.StartAsync().GetAwaiter().GetResult()
+    app
+
+/// Spin a TestServer with THREE routes carrying different relation exposure:
+///   - "/tictactoe" — routed, but declares NO ResourceRelationMetadata.
+///   - "/games/{id}" — declares relation "https://schema.org/Game".
+///   - "/" is left unmapped entirely (served only by DiscoveryMiddleware's own
+///     JSON Home/OPTIONS handling, never a RouteEndpoint).
+/// Used by the rel="type" per-resource scoping acceptance test (#398 AC2).
+let startScopedRelationServer (config: DiscoveryConfig) =
+    let app = buildDiscoveryApp None config
+
+    app.MapGet("/tictactoe", System.Func<string>(fun () -> "ttt:square a rdfs:Class ."))
+    |> ignore
+
+    app
+        .MapMethods("/games/{id}", [| "GET" |], System.Func<string>(fun () -> "game"))
+        .WithMetadata({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
     |> ignore
 
     app.StartAsync().GetAwaiter().GetResult()

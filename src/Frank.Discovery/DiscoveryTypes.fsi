@@ -45,6 +45,13 @@ type JsonHomeResource =
 /// EndpointMetadataCollection.GetMetadata<T> has a `class` constraint.
 type ResourceRelationMetadata = { Relation: string }
 
+/// One `rel="type"` Link header entry. ClassIri is the full, un-relativized class
+/// IRI this link describes — the correlation key matched against a matched
+/// endpoint's ResourceRelationMetadata.Relation at serve time, so the header is
+/// scoped to the resource actually matched instead of broadcast on every OPTIONS
+/// response (#398). Link is the pre-formatted `<href>; rel="type"` header value.
+type DescribedByLink = { ClassIri: string; Link: string }
+
 /// Discovery configuration the middleware consumes. Derived from the generated
 /// `GeneratedDiscovery` module (MSBuild codegen, issue #326) in the application.
 type DiscoveryConfig =
@@ -55,9 +62,9 @@ type DiscoveryConfig =
         HomeRoute: string
         /// Flat ALPS descriptors (resource + field + action), vocabulary IRIs.
         AlpsDescriptors: AlpsDescriptor list
-        /// External vocabulary Link header values, e.g.
-        /// `<https://schema.org/Game>; rel="describedby"`.
-        DescribedByLinks: string list
+        /// Vocabulary rel="type" Link header entries, one per resource class IRI.
+        /// Scoped per matched route at serve time (#398) — never broadcast unfiltered.
+        DescribedByLinks: DescribedByLink list
         /// Per-resource mapping: relation IRI → (template variable name → absolute meaning IRI).
         /// Built at codegen time from the resolved model's field IRIs. Used by the middleware
         /// to populate JsonHomeResource.HrefVars for json-home §4.2 href-vars emission.

@@ -274,7 +274,9 @@ let private buildDiscoveryConfig (classIri: string) : DiscoveryConfig =
             Rt = None
             ClassIri = None
             RequestClrTypeName = None } ]
-      DescribedByLinks = [ sprintf "<%s>; rel=\"describedby\"" classIri ]
+      DescribedByLinks =
+        [ { ClassIri = classIri
+            Link = sprintf "<%s>; rel=\"describedby\"" classIri } ]
       ResourceHrefVars = Map.empty }
 
 let private startDiscoveryServer (discConfig: DiscoveryConfig) =

@@ -1,5 +1,6 @@
 module Frank.Discovery.Tests.MiddlewareTests
 
+open System
 open System.Net.Http
 open System.Text.Json
 open Microsoft.AspNetCore.TestHost
@@ -215,7 +216,7 @@ let private tttVocabConfig =
 let dereferenceTests =
     testList
         "DiscoveryMiddleware — relative IRI dereference (item #6)"
-        [ testCase "ALPS href for square is host-relative /tictactoe#square (not example.org)"
+        [ testCase "ALPS href for square resolves against the live request origin (#398 AC1)"
           <| fun _ ->
               use app = startVocabServer tttVocabConfig
               use client = app.GetTestClient()
@@ -260,7 +261,43 @@ let dereferenceTests =
                           None)
 
               Expect.isSome squareHref "square nested descriptor has href"
-              Expect.equal squareHref.Value "/tictactoe#square" "href is host-relative"
+
+              Expect.equal
+                  squareHref.Value
+                  "http://localhost/tictactoe#square"
+                  "href is resolved against the live TestServer request origin, not host-relative"
+
+              Expect.isTrue (Uri.IsWellFormedUriString(squareHref.Value, UriKind.Absolute)) "href is an absolute URI"
+
+          testCase "ALPS href for external vocab class stays absolute unchanged (#398 AC1)"
+          <| fun _ ->
+              use app = startVocabServer tttVocabConfig
+              use client = app.GetTestClient()
+              let resp = client.GetAsync("/alps/tictactoe").GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              use doc = JsonDocument.Parse(body)
+              let alps = doc.RootElement.GetProperty("alps")
+              let descriptors = alps.GetProperty("descriptor")
+
+              let moveActionHref =
+                  descriptors.EnumerateArray()
+                  |> Seq.tryPick (fun d ->
+                      let mutable idEl = Unchecked.defaultof<JsonElement>
+                      let mutable hEl = Unchecked.defaultof<JsonElement>
+
+                      if
+                          d.TryGetProperty("id", &idEl)
+                          && idEl.GetString() = "MoveAction"
+                          && d.TryGetProperty("href", &hEl)
+                      then
+                          Some(hEl.GetString())
+                      else
+                          None)
+
+              Expect.equal
+                  moveActionHref
+                  (Some "https://schema.org/MoveAction")
+                  "external vocab href stays absolute, unaffected by origin resolution"
 
           testCase "GET /tictactoe (relative IRI dereference, strip fragment) → 200 (item #6)"
           <| fun _ ->
@@ -416,3 +453,104 @@ let alpsTypeReconciliationTests =
               let allow = allowValues resp
               Expect.contains allow "GET" "Allow still includes GET"
               Expect.contains allow "POST" "Allow still includes POST" ]
+
+// ── #398 AC2: rel="type" Link headers scoped to the matched resource's own relation ──
+
+let private scopedRelationConfig =
+    { ProfileUri = "/alps/test"
+      HomeRoute = "/"
+      AlpsDescriptors = []
+      DescribedByLinks =
+        [ { ClassIri = "https://schema.org/Game"
+            Link = "<https://schema.org/Game>; rel=\"type\"" }
+          { ClassIri = "https://schema.org/Widget"
+            Link = "<https://schema.org/Widget>; rel=\"type\"" } ]
+      ResourceHrefVars = Map.empty }
+
+let private typeLinks (resp: HttpResponseMessage) =
+    linkValues resp |> List.filter (fun l -> l.Contains "rel=\"type\"")
+
+[<Tests>]
+let describedByScopingTests =
+    testList
+        "DiscoveryMiddleware — #398 AC2: rel=\"type\" scoped to the matched resource"
+        [ testCase "OPTIONS /games/{id} (declared relation=Game) carries only its own rel=\"type\" link"
+          <| fun _ ->
+              use app = startScopedRelationServer scopedRelationConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Options, "/games/abc")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+              let links = typeLinks resp
+              Expect.equal links.Length 1 "exactly one rel=\"type\" link — the matched resource's own"
+              Expect.stringContains links.[0] "https://schema.org/Game" "the Game link is present"
+
+              Expect.isFalse
+                  (links |> List.exists (fun l -> l.Contains "https://schema.org/Widget"))
+                  "the unrelated Widget link must NOT be broadcast"
+
+          testCase "OPTIONS /tictactoe (routed, no declared relation) carries zero rel=\"type\" links"
+          <| fun _ ->
+              use app = startScopedRelationServer scopedRelationConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Options, "/tictactoe")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.isEmpty (typeLinks resp) "no rel=\"type\" link for a route with no declared relation"
+
+          testCase "OPTIONS / (unrouted home) carries zero rel=\"type\" links"
+          <| fun _ ->
+              use app = startScopedRelationServer scopedRelationConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Options, "/")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.isEmpty (typeLinks resp) "no rel=\"type\" link for the unrouted home path"
+
+          testCase "OPTIONS still carries the unconditional rel=\"describedby\" profile Link regardless of scoping"
+          <| fun _ ->
+              use app = startScopedRelationServer scopedRelationConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Options, "/tictactoe")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+              let links = linkValues resp
+
+              Expect.isTrue
+                  (links
+                   |> List.exists (fun l -> l.Contains "rel=\"describedby\"" && l.Contains "/alps/test"))
+                  "profile describedby Link is unaffected by rel=\"type\" scoping" ]
+
+// ── #398 AC3: Allow header is a single comma-joined wire-level value ─────────
+
+/// Raw (non-comma-split) values for the given header on either general response
+/// headers or content headers — .NET splits comma-joined header VALUES apart on
+/// read via HttpClient's structured parsing, but NonValidated (added .NET 8)
+/// exposes the raw header lines exactly as written on the wire, so this is the
+/// only way to distinguish "1 line, comma-joined" from "N separate lines".
+let private rawHeaderLines (resp: HttpResponseMessage) (name: string) : string list =
+    let mutable values = Unchecked.defaultof<System.Net.Http.Headers.HeaderStringValues>
+
+    if resp.Headers.NonValidated.TryGetValues(name, &values) then
+        values |> List.ofSeq
+    elif resp.Content.Headers.NonValidated.TryGetValues(name, &values) then
+        values |> List.ofSeq
+    else
+        []
+
+[<Tests>]
+let allowHeaderJoiningTests =
+    testList
+        "DiscoveryMiddleware — #398 AC3: Allow header is one comma-joined wire value"
+        [ testCase "OPTIONS /games/{id} (multi-verb) yields exactly one raw Allow header line, comma-joined"
+          <| fun _ ->
+              use app = startAlpsTypeServer alpsTypeConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Options, "/games/abc")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+              let raw = rawHeaderLines resp "Allow"
+              Expect.equal raw.Length 1 "Allow is exactly one wire-level header line, not one per method"
+              let joined = raw.[0]
+              Expect.stringContains joined "," "the single Allow value lists methods comma-joined"
+              Expect.stringContains joined "GET" "Allow lists GET"
+              Expect.stringContains joined "POST" "Allow lists POST"
+
+              // Convention parity: this is the SAME serialization convention ASP.NET Core's own
+              // built-in 405 path uses (HttpMethodMatcherPolicy) — single comma-joined value.
+              Expect.isFalse (joined.Contains "\n") "single header value, no embedded newlines" ]

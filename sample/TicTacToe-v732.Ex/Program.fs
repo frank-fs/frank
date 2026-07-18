@@ -108,16 +108,16 @@ let private findDescriptorHref (id: string) =
 let private agentRelIri = findDescriptorHref "agent"
 let private squareRelIri = findDescriptorHref "cell"
 
-let private resolveRelativeIri (origin: string) (iri: string) =
-    if iri.StartsWith "/" then origin + iri else iri
-
 let private isLdJson (ctx: HttpContext) =
     let ct = ctx.Request.ContentType
     ct <> null && ct.Contains("application/ld+json")
 
 let private parseMoveFromDoc (origin: string) (isLd: bool) (doc: JsonNode) =
-    let sq = resolveRelativeIri origin squareRelIri
-    let ag = resolveRelativeIri origin agentRelIri
+    // Resolve the SAME codegen-emitted href the ALPS profile itself serves, against the
+    // live request origin — DiscoveryMiddleware.resolveHref is the single source of this
+    // resolution rule (#398), never reimplemented here.
+    let sq = DiscoveryMiddleware.resolveHref origin squareRelIri
+    let ag = DiscoveryMiddleware.resolveHref origin agentRelIri
 
     if isLd then
         let pos = doc.[sq] |> Option.ofObj |> Option.map (fun n -> n.GetValue<string>())

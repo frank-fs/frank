@@ -1233,11 +1233,11 @@ let minor7HostRelativeTests =
 
               Expect.exists
                   links
-                  (fun l -> l.Contains "/ex#Game")
+                  (fun (_, l) -> l.Contains "/ex#Game")
                   "declared-only ex:Game class IRI must be host-relative in Link header"
 
               Expect.isFalse
-                  (links |> List.exists (fun l -> l.Contains "example.org"))
+                  (links |> List.exists (fun (_, l) -> l.Contains "example.org"))
                   "no example.org absolute IRI in Link headers for declared-only prefix"
           }
 
@@ -1253,7 +1253,7 @@ let minor7HostRelativeTests =
 
               Expect.exists
                   links
-                  (fun l -> l.Contains "https://schema.org/MoveAction")
+                  (fun (_, l) -> l.Contains "https://schema.org/MoveAction")
                   "external vocab class IRI (schema:MoveAction) stays absolute in Link header"
           }
 

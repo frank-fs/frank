@@ -138,6 +138,26 @@ let internal alpsTypeForMethods (methods: Set<string>) : string option =
     else
         None
 
+/// Resolve a served descriptor Href against a live request origin (#398). A relative
+/// value (e.g. "/tictactoe#square", emitted for the app's own declared-only vocabulary —
+/// see EmitterShared.hrefFor) becomes absolute against origin; an already-absolute value
+/// (external vocab, e.g. https://schema.org/Game) passes through unchanged — RFC 3986
+/// §5.3 reference resolution, the same rule `Uri(baseUri, ref)` already applies for
+/// LinkedDataMiddleware's per-request term resolution (#396).
+/// Public: shared with app code that must resolve the SAME codegen-emitted href against
+/// a live request origin outside the middleware (e.g. a POST handler decoding a JSON-LD
+/// body whose keys are the client-observed, already-resolved IRIs) — never reimplemented.
+let resolveHref (origin: string) (href: string) : string = Uri(Uri origin, href).AbsoluteUri
+
+/// Resolve every Href/Rt in a descriptor tree (top-level and nested children) against a
+/// live request origin (#398). Rt is resolved alongside Href so an internal `rt` reference
+/// to another descriptor's (now-absolute) href stays self-consistent within the served document.
+let rec private resolveDescriptorHrefs (origin: string) (d: AlpsDescriptor) : AlpsDescriptor =
+    { d with
+        Href = d.Href |> Option.map (resolveHref origin)
+        Rt = d.Rt |> Option.map (resolveHref origin)
+        Descriptors = d.Descriptors |> List.map (resolveDescriptorHrefs origin) }
+
 /// Reconcile codegen-emitted ALPS Type against real registered HTTP methods (#397).
 /// Tries the precise per-verb signal first (RequestClrTypeName via IAcceptsMetadata —
 /// disambiguates an action sharing a route with other verbs), then falls back to the
@@ -167,6 +187,48 @@ let internal reconcileAlpsTypes
             Descriptors = d.Descriptors |> List.map reconcile }
 
     descriptors |> List.map reconcile
+
+// ── #398: per-request path matching shared by Allow and rel="type" scoping ───
+
+/// RouteEndpoints whose route template matches the given raw request path, regardless
+/// of the HTTP method each declares — the one-time template-match step shared by
+/// methodsForPath and relationsForPath. TemplateMatcher is not thread-safe — a fresh
+/// instance is constructed per candidate route, mirroring the prior inline usage.
+let private endpointsForPath (dataSource: EndpointDataSource) (requestPath: string) : RouteEndpoint list =
+    let pathString = PathString(requestPath)
+
+    scanRouteEndpoints dataSource
+    |> Seq.filter (fun re ->
+        let raw = re.RoutePattern.RawText
+        let pattern = if raw.StartsWith('/') then raw.TrimStart('/') else raw
+        let matcher = TemplateMatcher(TemplateParser.Parse(pattern), RouteValueDictionary())
+        matcher.TryMatch(pathString, RouteValueDictionary()))
+    |> Seq.toList
+
+/// Real HTTP methods registered for the given request path, from every endpoint whose
+/// route template matches — the OPTIONS Allow header's source of truth.
+let internal methodsForPath (dataSource: EndpointDataSource) (requestPath: string) : string list =
+    endpointsForPath dataSource requestPath
+    |> List.choose (fun re ->
+        match re.Metadata.GetMetadata<HttpMethodMetadata>() with
+        | null -> None
+        | meta -> Some(meta.HttpMethods |> Seq.toList))
+    |> List.collect id
+    |> List.distinct
+
+/// Declared relation IRI(s) for the given request path, from ResourceRelationMetadata on
+/// every endpoint whose route template matches. Used to scope rel="type" Link headers to
+/// only the resource actually matched (#398) — a route carrying no relation (e.g. "/",
+/// "/tictactoe") yields an empty list, and every codegen-emitted DescribedByLink for
+/// OTHER resources is withheld, not broadcast.
+let internal relationsForPath (dataSource: EndpointDataSource) (requestPath: string) : string list =
+    endpointsForPath dataSource requestPath
+    |> List.choose (fun re ->
+        // ResourceRelationMetadata is an F# record — box it first, as above.
+        match re.Metadata.GetMetadata<ResourceRelationMetadata>() |> box with
+        | null -> None
+        | relBox -> Some((unbox<ResourceRelationMetadata> relBox).Relation))
+    |> List.distinct
 
 /// Static discovery for the application:
 ///  - OPTIONS → `Allow` (methods from matching endpoints + HEAD + OPTIONS) + `Link rel="describedby"`
@@ -218,31 +280,19 @@ type DiscoveryMiddleware
                 (methodsByRequestType endpointDataSource)
                 config.AlpsDescriptors)
 
-    let methodsForPath (requestPath: string) =
-        let pathString = PathString(requestPath)
-
-        endpointDataSource.Endpoints
-        |> Seq.choose (fun ep ->
-            match ep with
-            | :? RouteEndpoint as re ->
-                let raw = re.RoutePattern.RawText
-                let pattern = if raw.StartsWith('/') then raw.TrimStart('/') else raw
-                // TemplateMatcher is not thread-safe — construct per request.
-                let matcher = TemplateMatcher(TemplateParser.Parse(pattern), RouteValueDictionary())
-
-                if matcher.TryMatch(pathString, RouteValueDictionary()) then
-                    match ep.Metadata.GetMetadata<HttpMethodMetadata>() with
-                    | null -> None
-                    | meta -> Some(meta.HttpMethods |> Seq.toList)
-                else
-                    None
-            | _ -> None)
-        |> Seq.concat
-        |> Seq.distinct
-        |> Seq.toList
+    // #398: DescribedByLinks keyed by class IRI, so a matched route's own declared
+    // relation looks up only its own rel="type" link(s) — never every app resource's.
+    // Computed once via Lazy<_>, same lifetime/rationale as cachedHomeResources.
+    let describedByLinksByRelation =
+        lazy
+            (config.DescribedByLinks
+             |> List.groupBy (fun l -> l.ClassIri)
+             |> List.map (fun (classIri, links) -> classIri, links |> List.map (fun l -> l.Link))
+             |> Map.ofList)
 
     let handleOptions (ctx: HttpContext) : Task =
-        let methods = methodsForPath ctx.Request.Path.Value
+        let requestPath = ctx.Request.Path.Value
+        let methods = methodsForPath endpointDataSource requestPath
 
         let methods =
             if List.contains "GET" methods && not (List.contains "HEAD" methods) then
@@ -258,12 +308,25 @@ type DiscoveryMiddleware
                 methods
 
         if not methods.IsEmpty then
-            ctx.Response.Headers.["Allow"] <- StringValues(methods |> List.sort |> List.toArray)
+            // Single comma-joined value — one wire-level header line, matching ASP.NET
+            // Core's own built-in Allow serialization (HttpMethodMatcherPolicy) instead of
+            // one line per method (#398).
+            ctx.Response.Headers.["Allow"] <- StringValues(methods |> List.sort |> String.concat ", ")
 
         let profileLink = sprintf "<%s>; rel=\"describedby\"" config.ProfileUri
         ctx.Response.Headers.Append("Link", profileLink)
 
-        for link in config.DescribedByLinks do
+        // #398: scope rel="type" links to the matched route's own declared relation(s) —
+        // a route with no declared relation gets zero rel="type" links.
+        let scopedLinks =
+            relationsForPath endpointDataSource requestPath
+            |> List.collect (fun relation ->
+                describedByLinksByRelation.Value
+                |> Map.tryFind relation
+                |> Option.defaultValue [])
+            |> List.distinct
+
+        for link in scopedLinks do
             ctx.Response.Headers.Append("Link", link)
 
         ctx.Response.StatusCode <- 200
@@ -274,6 +337,27 @@ type DiscoveryMiddleware
         | true, v -> v.ToString().Contains "application/json-home"
         | _ -> false
 
+    // #398: ALPS href values are resolved against the LIVE request origin, not served
+    // schemeless-relative — mirrors LinkedDataMiddleware's per-request term resolution
+    // (#396). A malformed Host header cannot mint resolvable hrefs, so this fails the
+    // same way LinkedDataMiddleware does: logged and 400, never a garbage-but-valid URI.
+    let handleAlpsProfile (ctx: HttpContext) : Task =
+        match Frank.OriginValidation.tryValidateOrigin ctx.Request with
+        | None ->
+            logger.LogWarning(
+                "DiscoveryMiddleware: malformed Host header '{Host}' — cannot mint resolvable ALPS hrefs, rejecting with 400",
+                ctx.Request.Host.Value
+            )
+
+            ctx.Response.StatusCode <- 400
+            Task.CompletedTask
+        | Some origin ->
+            let resolved =
+                cachedAlpsDescriptors.Value |> List.map (resolveDescriptorHrefs origin)
+
+            ctx.Response.ContentType <- "application/alps+json"
+            ctx.Response.WriteAsync(AlpsSerializer.serialize resolved)
+
     member _.Invoke(ctx: HttpContext) : Task =
         let path = ctx.Request.Path.Value
         let isGet = HttpMethods.IsGet ctx.Request.Method
@@ -281,8 +365,7 @@ type DiscoveryMiddleware
         if HttpMethods.IsOptions ctx.Request.Method then
             handleOptions ctx
         elif isGet && path = config.ProfileUri then
-            ctx.Response.ContentType <- "application/alps+json"
-            ctx.Response.WriteAsync(AlpsSerializer.serialize cachedAlpsDescriptors.Value)
+            handleAlpsProfile ctx
         elif isGet && path = config.HomeRoute && acceptsJsonHome ctx then
             ctx.Response.Headers.Append("Vary", "Accept")
             ctx.Response.ContentType <- "application/json-home"
