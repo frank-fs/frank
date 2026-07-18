@@ -1,32 +1,15 @@
 module Frank.Cli.MSBuild.Tests.BuildGateIntegrationTests
 
 open System
-open System.Diagnostics
 open System.IO
-open System.Threading.Tasks
 open Expecto
 open Frank.Cli.MSBuild
 open Frank.Cli.MSBuild.Tests.Fixtures
 open Frank.Cli.MSBuild.Tests.StubBuildEngine
+open Frank.Cli.MSBuild.Tests.SubprocessBuild
 open Frank.TestSupport.TempDir
 
 // ── Path resolution ───────────────────────────────────────────────────────────
-
-/// Walk up n directory levels from path.
-let private goUp (n: int) (path: string) : string =
-    let rec loop remaining current =
-        if remaining = 0 then
-            current
-        else
-            loop (remaining - 1) (Path.GetDirectoryName(current: string))
-
-    loop n path
-
-/// Worktree root: 6 levels up from the test assembly path.
-/// Assembly path: <root>/test/Frank.Cli.MSBuild.Tests/bin/<cfg>/net10.0/<name>.dll
-/// goUp 1 removes filename; goUp 2-6 traverse up to root.
-let private worktreeRoot: string =
-    typeof<ValidateLockFileTask>.Assembly.Location |> goUp 6
 
 let private targetsFilePath: string =
     Path.Combine(worktreeRoot, "src", "Frank.Cli.MSBuild", "build", "Frank.Cli.MSBuild.targets")
@@ -40,34 +23,6 @@ let private frankDiscoveryFsproj: string =
 
 let private frankSemanticFsproj: string =
     Path.Combine(worktreeRoot, "src", "Frank.Semantic", "Frank.Semantic.fsproj")
-
-/// Shared subprocess driver. Captures combined stdout+stderr; kills on capMs timeout.
-let private runProcess (exe: string) (args: string) (capMs: int) : int * string =
-    let psi = ProcessStartInfo(exe, args)
-    psi.RedirectStandardOutput <- true
-    psi.RedirectStandardError <- true
-    psi.UseShellExecute <- false
-    psi.Environment.["DOTNET_SYSTEM_GLOBALIZATION_INVARIANT"] <- "1"
-
-    use proc = new Process()
-    proc.StartInfo <- psi
-    proc.Start() |> ignore
-
-    let stdoutTask: Task<string> = proc.StandardOutput.ReadToEndAsync()
-    let stderrTask: Task<string> = proc.StandardError.ReadToEndAsync()
-    let allDone = Task.WhenAll([| stdoutTask :> Task; stderrTask :> Task |])
-    let finished = allDone.Wait(capMs)
-
-    if not finished then
-        try
-            proc.Kill()
-        with _ ->
-            ()
-
-        invalidOp $"{exe} did not complete within cap of {capMs}ms"
-
-    proc.WaitForExit()
-    proc.ExitCode, stdoutTask.Result + stderrTask.Result
 
 let private runDotnetBuild (projPath: string) (capMs: int) : int * string =
     runProcess "dotnet" $"build \"{projPath}\"" capMs
@@ -116,14 +71,7 @@ let private writeProjectWith
 /// Minimal fixture project: ValidateLockFileTask gate under test.
 /// Overrides FrankGenerateFcsEmitters — fixture has no Vocabulary.fs or FCS package refs.
 let private writeFixtureProject (dir: string) (lockPath: string) : string =
-    writeProjectWith
-        dir
-        "Stub"
-        "BuildFixture"
-        lockPath
-        ""
-        ""
-        "  <Target Name=\"FrankGenerateFcsEmitters\" />\n"
+    writeProjectWith dir "Stub" "BuildFixture" lockPath "" "" "  <Target Name=\"FrankGenerateFcsEmitters\" />\n"
 
 /// Discovery fixture project: uses a genuine ProjectReference to trigger _FrankHasDiscovery.
 /// Canonicalized temp dir ensures MSBuild can resolve the ProjectReference path correctly.
@@ -181,9 +129,13 @@ module Vocab =
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
+/// testSequencedGroup: all subprocess-`dotnet build`-spawning tests across this project
+/// share the "msbuild-subprocess" group so Expecto never races them for MSBuild
+/// node-reuse locks — independent of what else is on the machine (#402).
 [<Tests>]
 let buildGateIntegrationTests =
-    testList
+    testSequencedGroup "msbuild-subprocess"
+    <| testList
         "D2 — Build gate integration (subprocess dotnet build)"
         [ test "AT2/AT3: dotnet build with proposed+unresolved lock exits non-zero and emits MS001" {
               withTempDir (fun dir ->
@@ -263,7 +215,8 @@ let buildGateIntegrationTests =
                   Expect.equal exitCode 0 $"Confirmed-only lock must pass build gate; output:\n{combined}")
           }
 
-          test "AC1c: second dotnet build of single-package consumer skips FrankGenerateFcsEmitters (incremental, A1 #386)" {
+          test
+              "AC1c: second dotnet build of single-package consumer skips FrankGenerateFcsEmitters (incremental, A1 #386)" {
               withTempDir (fun dir ->
                   let lockPath = writeLockFile dir singlePkgLock
                   let projPath = writeSinglePackageFixtureProject dir lockPath
@@ -339,7 +292,8 @@ let buildGateIntegrationTests =
 ///   genIdx(3) > extraIdx(2) ← assertion FAILS → confirms the fix is load-bearing.
 [<Tests>]
 let item2LibraryInjectTests =
-    testList
+    testSequencedGroup "msbuild-subprocess"
+    <| testList
         "Item-2: domain-anchored inject ordering for library projects (no Program.fs)"
         [ test "FrankInjectGeneratedFile places Generated before last domain file, not trailing Generated* file" {
               withTempDir (fun dir ->
