@@ -222,6 +222,29 @@ let private relativeRtConfig =
             [ { (tttVocabConfig.AlpsDescriptors |> List.head) with
                   Rt = Some "/tictactoe#Game" } ] }
 
+/// Scan a top-level ALPS descriptor array for the entry with `id = descId` and return its
+/// `propName` string property, if present — the "find descriptor by id, pull one named
+/// property" pattern shared by every assertion in this file that inspects a served ALPS
+/// body's top-level descriptors (#398 /simplify item 3: generalized from the id-scan
+/// previously duplicated inline for href/rt, and from alpsTypeOf's own id-scan for type).
+let private descriptorProperty (descId: string) (propName: string) (alpsBody: string) : string option =
+    use doc = JsonDocument.Parse alpsBody
+    let descriptors = doc.RootElement.GetProperty("alps").GetProperty("descriptor")
+
+    descriptors.EnumerateArray()
+    |> Seq.tryPick (fun d ->
+        let mutable idEl = Unchecked.defaultof<JsonElement>
+        let mutable propEl = Unchecked.defaultof<JsonElement>
+
+        if
+            d.TryGetProperty("id", &idEl)
+            && idEl.GetString() = descId
+            && d.TryGetProperty(propName, &propEl)
+        then
+            Some(propEl.GetString())
+        else
+            None)
+
 [<Tests>]
 let dereferenceTests =
     testList
@@ -285,24 +308,7 @@ let dereferenceTests =
               use client = app.GetTestClient()
               let resp = client.GetAsync("/alps/tictactoe").GetAwaiter().GetResult()
               let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-              use doc = JsonDocument.Parse(body)
-              let alps = doc.RootElement.GetProperty("alps")
-              let descriptors = alps.GetProperty("descriptor")
-
-              let moveActionHref =
-                  descriptors.EnumerateArray()
-                  |> Seq.tryPick (fun d ->
-                      let mutable idEl = Unchecked.defaultof<JsonElement>
-                      let mutable hEl = Unchecked.defaultof<JsonElement>
-
-                      if
-                          d.TryGetProperty("id", &idEl)
-                          && idEl.GetString() = "MoveAction"
-                          && d.TryGetProperty("href", &hEl)
-                      then
-                          Some(hEl.GetString())
-                      else
-                          None)
+              let moveActionHref = descriptorProperty "MoveAction" "href" body
 
               Expect.equal
                   moveActionHref
@@ -316,25 +322,7 @@ let dereferenceTests =
               let resp = client.GetAsync("/alps/tictactoe").GetAwaiter().GetResult()
               Expect.equal (int resp.StatusCode) 200 "200"
               let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-              use doc = JsonDocument.Parse(body)
-              let alps = doc.RootElement.GetProperty("alps")
-              let descriptors = alps.GetProperty("descriptor")
-
-              let moveActionRt =
-                  descriptors.EnumerateArray()
-                  |> Seq.tryPick (fun d ->
-                      let mutable idEl = Unchecked.defaultof<JsonElement>
-                      let mutable rtEl = Unchecked.defaultof<JsonElement>
-
-                      if
-                          d.TryGetProperty("id", &idEl)
-                          && idEl.GetString() = "MoveAction"
-                          && d.TryGetProperty("rt", &rtEl)
-                      then
-                          Some(rtEl.GetString())
-                      else
-                          None)
-
+              let moveActionRt = descriptorProperty "MoveAction" "rt" body
               Expect.isSome moveActionRt "MoveAction has a served rt value"
 
               Expect.equal
@@ -413,22 +401,7 @@ let private alpsTypeConfig =
       ResourceHrefVars = Map.empty }
 
 let private alpsTypeOf (descId: string) (alpsBody: string) : string =
-    use doc = System.Text.Json.JsonDocument.Parse alpsBody
-    let descriptors = doc.RootElement.GetProperty("alps").GetProperty("descriptor")
-
-    descriptors.EnumerateArray()
-    |> Seq.tryPick (fun d ->
-        let mutable idEl = Unchecked.defaultof<System.Text.Json.JsonElement>
-        let mutable typeEl = Unchecked.defaultof<System.Text.Json.JsonElement>
-
-        if
-            d.TryGetProperty("id", &idEl)
-            && idEl.GetString() = descId
-            && d.TryGetProperty("type", &typeEl)
-        then
-            Some(typeEl.GetString())
-        else
-            None)
+    descriptorProperty descId "type" alpsBody
     |> Option.defaultWith (fun () -> failwith $"descriptor '{descId}' not found in ALPS body")
 
 [<Tests>]

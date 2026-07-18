@@ -13,7 +13,9 @@ let private owl = "http://www.w3.org/2002/07/owl#"
 ///   unchanged — an external vocab Uri is never rebased against `baseUri`, even when supplied.
 /// - Relative (the app's own declared-only prefix, emitted host-relative by LinkedDataEmitter):
 ///   rebased against `baseUri` when supplied (#396 round 5 — resolves the real deployed origin
-///   at call time, not a codegen-time placeholder).
+///   at call time, not a codegen-time placeholder). The absolute-vs-relative rule itself is
+///   Frank.UriResolution.resolveAgainst — the ONE place both this module and
+///   Frank.Discovery.DiscoveryMiddleware.resolveHref apply it (#398 /simplify item 1).
 /// - Relative with no `baseUri` supplied: a codegen misclassification (or a caller with no live
 ///   origin to rebase against) — fail loud here, before the throwing .AbsoluteUri accessor,
 ///   naming the offending field and its owning class when there is one (#396). `classIri` is
@@ -25,20 +27,18 @@ let private resolveAbsolute
     (classIri: Uri option)
     (u: Uri)
     : Uri =
-    if u.IsAbsoluteUri then
-        u
-    else
-        match baseUri with
-        | Some b -> Uri(b, u)
-        | None ->
-            let owner =
-                match classIri with
-                | Some c -> $"OntologyDecl class '{c}'"
-                | None -> "OntologyDecl"
+    match baseUri with
+    | Some b -> Frank.UriResolution.resolveAgainst b u
+    | None when u.IsAbsoluteUri -> u
+    | None ->
+        let owner =
+            match classIri with
+            | Some c -> $"OntologyDecl class '{c}'"
+            | None -> "OntologyDecl"
 
-            invalidArg
-                paramName
-                $"{owner} declares a relative {fieldLabel} Uri '{u.OriginalString}'; {fieldLabel} must be an absolute, dereferenceable URI, or a baseUri must be supplied to rebase it — Ontology.toGraph/toJsonLdContext received no baseUri."
+        invalidArg
+            paramName
+            $"{owner} declares a relative {fieldLabel} Uri '{u.OriginalString}'; {fieldLabel} must be an absolute, dereferenceable URI, or a baseUri must be supplied to rebase it — Ontology.toGraph/toJsonLdContext received no baseUri."
 
 /// Assert `u` is absolute — unlike resolveAbsolute, NEVER rebases against a baseUri, regardless
 /// of whether one is supplied. ContextBases is built exclusively from `using` (external vocab)

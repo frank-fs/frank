@@ -76,4 +76,9 @@ type DiscoveryMiddleware =
         logger: ILogger<DiscoveryMiddleware> ->
             DiscoveryMiddleware
 
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of times
+    /// the resolved ALPS descriptor tree was actually (re)built — proves build-once-per-
+    /// distinct-origin, not once per request (#398 /simplify item 6).
+    member internal ResolvedAlpsBuildCount: int
+
     member Invoke: ctx: HttpContext -> Task

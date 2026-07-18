@@ -210,14 +210,15 @@ let private parseMoveFromDoc (origin: string) (isLd: bool) (doc: JsonNode) =
 
         pos, plr
 
-let private moveHandler (ctx: HttpContext) =
+/// Parse and apply the move body against `id`, once `origin` is known-valid — the SAME
+/// origin-validation discipline handleAlpsProfile already applies before minting any
+/// origin-resolved href (#398 /simplify item 7).
+let private performMove (ctx: HttpContext) (origin: string) (id: string) =
     task {
-        let id = routeId ctx
         use reader = new StreamReader(ctx.Request.Body)
         let! body = reader.ReadToEndAsync()
         let doc = JsonNode.Parse body
         let ld = isLdJson ctx
-        let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
         let position, player = parseMoveFromDoc origin ld doc
 
         match position, player with
@@ -236,6 +237,23 @@ let private moveHandler (ctx: HttpContext) =
         | _ ->
             ctx.Response.StatusCode <- 400
             do! ctx.Response.WriteAsync("""{"title":"Missing position or player"}""")
+    }
+
+/// A malformed Host header cannot mint resolvable hrefs (resolveHref's Uri(Uri origin, _)
+/// throws for it) — reject with 400 before ever calling parseMoveFromDoc/resolveHref,
+/// matching handleAlpsProfile's own behavior instead of crashing with an unhandled
+/// UriFormatException (#398 /simplify item 7). ProvenanceMiddleware already guards this
+/// route upstream today, but moveHandler must not depend on that ordering for its own
+/// correctness — defense in depth, consistent with the ex: sample which has no such guard.
+let private moveHandler (ctx: HttpContext) =
+    task {
+        match Frank.OriginValidation.tryValidateOrigin ctx.Request with
+        | None ->
+            ctx.Response.StatusCode <- 400
+            do! ctx.Response.WriteAsync("""{"title":"Malformed Host header"}""")
+        | Some origin ->
+            let id = routeId ctx
+            do! performMove ctx origin id
     }
 
 let private tttVocabTtl =

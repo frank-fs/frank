@@ -1,6 +1,7 @@
 module Frank.Discovery.DiscoveryMiddleware
 
 open System
+open System.Collections.Concurrent
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Metadata
@@ -17,6 +18,24 @@ let private scanRouteEndpoints (dataSource: EndpointDataSource) : RouteEndpoint 
         match ep with
         | :? RouteEndpoint as re -> Some re
         | _ -> None)
+
+/// HTTP methods declared on an endpoint via HttpMethodMetadata, or None when absent — the
+/// GetMetadata<HttpMethodMetadata>() → null-check → .HttpMethods idiom shared by every
+/// endpoint-metadata scan in this file (#398 /simplify item 2).
+let private httpMethodsOf (re: RouteEndpoint) : string list option =
+    match re.Metadata.GetMetadata<HttpMethodMetadata>() with
+    | null -> None
+    | meta -> Some(meta.HttpMethods |> Seq.toList)
+
+/// Declared relation IRI on an endpoint via ResourceRelationMetadata, or None when absent —
+/// the GetMetadata<ResourceRelationMetadata>() |> box → null-check → unbox → .Relation idiom
+/// shared by every endpoint-metadata scan in this file (#398 /simplify item 2).
+/// ResourceRelationMetadata is an F# record — it doesn't support the `null` pattern
+/// directly, so box it first.
+let private relationOf (re: RouteEndpoint) : string option =
+    match re.Metadata.GetMetadata<ResourceRelationMetadata>() |> box with
+    | null -> None
+    | relBox -> Some((unbox<ResourceRelationMetadata> relBox).Relation)
 
 /// Build JSON Home resource entries from live endpoints.
 /// Endpoints carrying ResourceRelationMetadata contribute to one merged entry per
@@ -44,16 +63,9 @@ let homeResourcesFromEndpoints
 
     scanRouteEndpoints dataSource
     |> Seq.choose (fun re ->
-        // ResourceRelationMetadata is an F# record — it doesn't support the `null`
-        // pattern directly, so box it first (mirrors the `null` match idiom below).
-        match re.Metadata.GetMetadata<ResourceRelationMetadata>() |> box with
-        | null -> None
-        | relBox ->
-            let relMeta = unbox<ResourceRelationMetadata> relBox
-
-            match re.Metadata.GetMetadata<HttpMethodMetadata>() with
-            | null -> None
-            | methodMeta -> Some(relMeta.Relation, re.RoutePattern.RawText, methodMeta.HttpMethods |> Seq.toList))
+        match relationOf re, httpMethodsOf re with
+        | Some relation, Some methods -> Some(relation, re.RoutePattern.RawText, methods)
+        | _ -> None)
     |> Seq.groupBy (fun (relation, href, _) -> (relation, href))
     |> Seq.map (fun ((relation, href), entries) ->
         let allMethods =
@@ -88,15 +100,9 @@ let homeResourcesFromEndpoints
 let internal methodsByRelation (dataSource: EndpointDataSource) : Map<string, Set<string>> =
     scanRouteEndpoints dataSource
     |> Seq.choose (fun re ->
-        // ResourceRelationMetadata is an F# record — box it first, as above.
-        match re.Metadata.GetMetadata<ResourceRelationMetadata>() |> box with
-        | null -> None
-        | relBox ->
-            let relMeta = unbox<ResourceRelationMetadata> relBox
-
-            match re.Metadata.GetMetadata<HttpMethodMetadata>() with
-            | null -> None
-            | methodMeta -> Some(relMeta.Relation, methodMeta.HttpMethods |> Set.ofSeq))
+        match relationOf re, httpMethodsOf re with
+        | Some relation, Some methods -> Some(relation, methods |> Set.ofList)
+        | _ -> None)
     |> Seq.groupBy fst
     |> Seq.map (fun (relation, entries) -> relation, entries |> Seq.collect snd |> Set.ofSeq)
     |> Map.ofSeq
@@ -112,13 +118,10 @@ let internal methodsByRequestType (dataSource: EndpointDataSource) : Map<string,
     |> Seq.choose (fun re ->
         match re.Metadata.GetMetadata<IAcceptsMetadata>() with
         | null -> None
+        | accepts when isNull accepts.RequestType -> None
         | accepts ->
-            if isNull accepts.RequestType then
-                None
-            else
-                match re.Metadata.GetMetadata<HttpMethodMetadata>() with
-                | null -> None
-                | methodMeta -> Some(accepts.RequestType.FullName, methodMeta.HttpMethods |> Set.ofSeq))
+            httpMethodsOf re
+            |> Option.map (fun methods -> accepts.RequestType.FullName, methods |> Set.ofList))
     |> Seq.groupBy fst
     |> Seq.map (fun (typeName, entries) -> typeName, entries |> Seq.collect snd |> Set.ofSeq)
     |> Map.ofSeq
@@ -138,25 +141,37 @@ let internal alpsTypeForMethods (methods: Set<string>) : string option =
     else
         None
 
+/// Resolve a served descriptor Href/Rt string against a pre-parsed live request origin
+/// Uri (#398). The absolute-vs-relative rule itself is Frank.UriResolution.resolveAgainst —
+/// the ONE place both this module and Frank.LinkedData.Ontology.resolveAbsolute apply it
+/// (#398 /simplify item 1); this function only handles the string↔Uri conversion at its
+/// own boundary. Internal: callers resolving many descriptors in one request should parse
+/// `origin` once (see resolveDescriptorHrefsAgainst / DiscoveryMiddleware.handleAlpsProfile)
+/// rather than re-parse it at every leaf (#398 /simplify items 4-5).
+let private resolveHrefAgainst (baseUri: Uri) (href: string) : string =
+    (Frank.UriResolution.resolveAgainst baseUri (Uri(href, UriKind.RelativeOrAbsolute))).AbsoluteUri
+
 /// Resolve a served descriptor Href against a live request origin (#398). A relative
 /// value (e.g. "/tictactoe#square", emitted for the app's own declared-only vocabulary —
 /// see EmitterShared.hrefFor) becomes absolute against origin; an already-absolute value
 /// (external vocab, e.g. https://schema.org/Game) passes through unchanged — RFC 3986
-/// §5.3 reference resolution, the same rule `Uri(baseUri, ref)` already applies for
-/// LinkedDataMiddleware's per-request term resolution (#396).
+/// §5.3 reference resolution (Frank.UriResolution.resolveAgainst), the same rule
+/// LinkedDataMiddleware's per-request term resolution already applies (#396).
 /// Public: shared with app code that must resolve the SAME codegen-emitted href against
 /// a live request origin outside the middleware (e.g. a POST handler decoding a JSON-LD
 /// body whose keys are the client-observed, already-resolved IRIs) — never reimplemented.
-let resolveHref (origin: string) (href: string) : string = Uri(Uri origin, href).AbsoluteUri
+let resolveHref (origin: string) (href: string) : string = resolveHrefAgainst (Uri origin) href
 
 /// Resolve every Href/Rt in a descriptor tree (top-level and nested children) against a
-/// live request origin (#398). Rt is resolved alongside Href so an internal `rt` reference
-/// to another descriptor's (now-absolute) href stays self-consistent within the served document.
-let rec private resolveDescriptorHrefs (origin: string) (d: AlpsDescriptor) : AlpsDescriptor =
+/// pre-parsed live request origin Uri (#398) — parsed ONCE by the caller and threaded
+/// through the whole recursive walk, not re-parsed at every leaf (#398 /simplify items
+/// 4-5). Rt is resolved alongside Href so an internal `rt` reference to another
+/// descriptor's (now-absolute) href stays self-consistent within the served document.
+let rec private resolveDescriptorHrefsAgainst (baseUri: Uri) (d: AlpsDescriptor) : AlpsDescriptor =
     { d with
-        Href = d.Href |> Option.map (resolveHref origin)
-        Rt = d.Rt |> Option.map (resolveHref origin)
-        Descriptors = d.Descriptors |> List.map (resolveDescriptorHrefs origin) }
+        Href = d.Href |> Option.map (resolveHrefAgainst baseUri)
+        Rt = d.Rt |> Option.map (resolveHrefAgainst baseUri)
+        Descriptors = d.Descriptors |> List.map (resolveDescriptorHrefsAgainst baseUri) }
 
 /// Reconcile codegen-emitted ALPS Type against real registered HTTP methods (#397).
 /// Tries the precise per-verb signal first (RequestClrTypeName via IAcceptsMetadata —
@@ -209,10 +224,7 @@ let private endpointsForPath (dataSource: EndpointDataSource) (requestPath: stri
 /// route template matches — the OPTIONS Allow header's source of truth.
 let internal methodsForPath (dataSource: EndpointDataSource) (requestPath: string) : string list =
     endpointsForPath dataSource requestPath
-    |> List.choose (fun re ->
-        match re.Metadata.GetMetadata<HttpMethodMetadata>() with
-        | null -> None
-        | meta -> Some(meta.HttpMethods |> Seq.toList))
+    |> List.choose httpMethodsOf
     |> List.collect id
     |> List.distinct
 
@@ -223,11 +235,7 @@ let internal methodsForPath (dataSource: EndpointDataSource) (requestPath: strin
 /// OTHER resources is withheld, not broadcast.
 let internal relationsForPath (dataSource: EndpointDataSource) (requestPath: string) : string list =
     endpointsForPath dataSource requestPath
-    |> List.choose (fun re ->
-        // ResourceRelationMetadata is an F# record — box it first, as above.
-        match re.Metadata.GetMetadata<ResourceRelationMetadata>() |> box with
-        | null -> None
-        | relBox -> Some((unbox<ResourceRelationMetadata> relBox).Relation))
+    |> List.choose relationOf
     |> List.distinct
 
 /// Static discovery for the application:
@@ -289,6 +297,32 @@ type DiscoveryMiddleware
              |> List.groupBy (fun l -> l.ClassIri)
              |> List.map (fun (classIri, links) -> classIri, links |> List.map (fun l -> l.Link))
              |> Map.ofList)
+
+    // #398 /simplify item 6: resolved-descriptor-tree cache, origin-keyed — mirrors
+    // LinkedDataMiddleware.cachedStaticBody's origin-keyed Lazy memoization (#382),
+    // applied here to handleAlpsProfile's per-request href/rt resolution, which used to
+    // re-walk the whole descriptor tree on every request regardless of origin repetition.
+    // DiscoveryConfig (unlike LinkedDataConfig) is a single constructor-injected value —
+    // one per middleware instance, never looked up per-endpoint per-request — so a plain
+    // instance-level dictionary keyed by origin alone is the right-sized mirror of the
+    // same idea (LinkedDataMiddleware additionally keys by config via ConditionalWeakTable
+    // because ONE of its middleware instances serves MANY distinct LinkedDataConfig values,
+    // one per endpoint; DiscoveryMiddleware never does).
+    let resolvedAlpsCache = ConcurrentDictionary<string, Lazy<AlpsDescriptor list>>()
+    let mutable resolvedAlpsBuildCount = 0
+
+    let cachedResolvedAlps (origin: string) : AlpsDescriptor list =
+        resolvedAlpsCache
+            .GetOrAdd(
+                origin,
+                (fun _ ->
+                    Lazy<AlpsDescriptor list>(fun () ->
+                        System.Threading.Interlocked.Increment(&resolvedAlpsBuildCount) |> ignore
+
+                        cachedAlpsDescriptors.Value
+                        |> List.map (resolveDescriptorHrefsAgainst (Uri origin))))
+            )
+            .Value
 
     let handleOptions (ctx: HttpContext) : Task =
         let requestPath = ctx.Request.Path.Value
@@ -352,11 +386,14 @@ type DiscoveryMiddleware
             ctx.Response.StatusCode <- 400
             Task.CompletedTask
         | Some origin ->
-            let resolved =
-                cachedAlpsDescriptors.Value |> List.map (resolveDescriptorHrefs origin)
-
+            let resolved = cachedResolvedAlps origin
             ctx.Response.ContentType <- "application/alps+json"
             ctx.Response.WriteAsync(AlpsSerializer.serialize resolved)
+
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of times
+    /// the resolved ALPS descriptor tree was actually (re)built — proves build-once-per-
+    /// distinct-origin, not once per request (#398 /simplify item 6).
+    member internal _.ResolvedAlpsBuildCount = resolvedAlpsBuildCount
 
     member _.Invoke(ctx: HttpContext) : Task =
         let path = ctx.Request.Path.Value
