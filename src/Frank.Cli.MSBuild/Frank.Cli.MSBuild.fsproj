@@ -1,9 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- net8.0: MSBuild task assemblies must match the lowest SDK TFM supported.
-         MSBuild/.NET SDK loads task assemblies in-process; net8.0 covers net8/9/10 hosts. -->
-    <TargetFramework>net8.0</TargetFramework>
+    <!-- net10.0: every real consumer of this task (Frank.Semantic + the build gate it
+         powers) is net10.0-only per #401, so the invoking SDK is always >=10.0.x already
+         — no net8/9-SDK host scenario survives to justify a lower-TFM task assembly. -->
+    <TargetFramework>net10.0</TargetFramework>
     <Description>MSBuild task package for Frank semantic lock file validation and Discovery code generation</Description>
     <PackageTags>fsharp;frank;msbuild;semantic;code-generation</PackageTags>
     <!-- Task packages use CopyLocalLockFileAssemblies so deps land next to the dll -->

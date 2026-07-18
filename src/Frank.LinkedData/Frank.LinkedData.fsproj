@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <TargetFramework>net10.0</TargetFramework>
     <PackageTags>linked-data;rdf;json-ld;turtle;content-negotiation</PackageTags>
     <Description>Content-negotiation middleware for serving RDF graphs in multiple representations (JSON-LD, Turtle, RDF/XML)</Description>
   </PropertyGroup>
