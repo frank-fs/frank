@@ -29,14 +29,10 @@ module DiscoveryExtensions =
             let addServices (services: IServiceCollection) =
                 services.AddSingleton<DiscoveryConfig>(config) |> ignore
                 services.AddSingleton<IStartupValidator>(HrefVarsValidator(config)) |> ignore
-                // #400: registers IApiDescriptionGroupCollectionProvider (TryAddSingleton),
-                // the shared, cached HTTP-method correlation source DiscoveryMiddleware
-                // reads. AddEndpointsApiExplorer() alone provides this — it ships in the
-                // Microsoft.AspNetCore.App shared framework (Microsoft.AspNetCore.Mvc.ApiExplorer),
-                // so Frank.Discovery needs no Microsoft.AspNetCore.OpenApi package reference just
-                // to reach this service. TryAddSingleton means this is a no-op when an app's own
-                // Frank.OpenApi AddOpenApi() call already registered the same provider first.
-                services.AddEndpointsApiExplorer() |> ignore
+                // #411: DiscoveryMiddleware's ALPS Type correlation reads the narrow
+                // ResourceEndpointDataSource that WebHostBuilder.Run itself registers as a
+                // DI singleton at Run()-time — nothing to register here. Frank.Discovery has
+                // no ApiExplorer/Microsoft.AspNetCore.OpenApi dependency.
                 spec.Services services
 
             let addMiddleware (app: IApplicationBuilder) =

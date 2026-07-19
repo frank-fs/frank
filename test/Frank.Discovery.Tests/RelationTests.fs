@@ -32,6 +32,10 @@ let private tryGetRelationMeta (ep: Microsoft.AspNetCore.Http.Endpoint) =
         Some(boxed |> unbox<ResourceRelationMetadata>)
 
 /// Spin a minimal TestServer seeded with two Frank resources, each carrying `relation`.
+/// Uses the SAME Frank.Builder.ResourceEndpointDataSource wiring WebHostBuilder.Run uses
+/// in production (#411) — the real, Frank-built Endpoint[] (already carrying
+/// ResourceRelationMetadata via the `relation` CE op) is wrapped directly, not re-declared
+/// via a second, redundant MapMethods/.WithMetadata pass.
 let private startRelationServer () =
     let gameResource =
         resource "/games/{id}" {
@@ -52,32 +56,19 @@ let private startRelationServer () =
             ResourceHrefVars =
                 Map.ofList [ "https://schema.org/Game", Map.ofList [ "id", "https://schema.org/identifier" ] ] }
 
+    let endpoints: Endpoint[] =
+        Array.append gameResource.Endpoints lobbyResource.Endpoints
+
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(config) |> ignore
     builder.Services.AddRouting() |> ignore
-    builder.Services.AddEndpointsApiExplorer() |> ignore
+    let dataSource = ResourceEndpointDataSource(endpoints)
+    builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
-
-    for ep in gameResource.Endpoints do
-        let re = ep :?> RouteEndpoint
-        let methods = ep.Metadata.GetMetadata<HttpMethodMetadata>().HttpMethods
-
-        app
-            .MapMethods(re.RoutePattern.RawText, methods, System.Func<string>(fun () -> ""))
-            .WithMetadata({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
-        |> ignore
-
-    for ep in lobbyResource.Endpoints do
-        let re = ep :?> RouteEndpoint
-        let methods = ep.Metadata.GetMetadata<HttpMethodMetadata>().HttpMethods
-
-        app
-            .MapMethods(re.RoutePattern.RawText, methods, System.Func<string>(fun () -> ""))
-            .WithMetadata({ Relation = "https://schema.org/WebPage" }: ResourceRelationMetadata)
-        |> ignore
+    (app :> IEndpointRouteBuilder).DataSources.Add(dataSource)
 
     app.StartAsync().GetAwaiter().GetResult()
     app

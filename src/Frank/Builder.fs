@@ -361,8 +361,15 @@ module Builder =
 
     let resource routeTemplate = ResourceBuilder(routeTemplate)
 
+    /// The EndpointDataSource wrapping Frank's own composed Endpoint[] — the SAME array
+    /// spec.Endpoints holds after full webHost CE composition. WebHostBuilder.Run registers
+    /// this exact instance as a narrowly-typed DI singleton (#411), separately from the
+    /// generic EndpointDataSource it also adds to IEndpointRouteBuilder.DataSources.
+    /// Extension packages (e.g. Frank.Discovery's DiscoveryMiddleware) constructor-inject
+    /// this narrow type when they need to read ONLY Frank-declared endpoints — never any
+    /// non-Frank endpoint that might share the generic composite EndpointDataSource.
     [<Sealed>]
-    type internal ResourceEndpointDataSource(endpoints: Endpoint[]) =
+    type ResourceEndpointDataSource(endpoints: Endpoint[]) =
         inherit EndpointDataSource()
 
         override __.Endpoints = endpoints :> _
@@ -430,6 +437,16 @@ module Builder =
                 else
                     WebApplication.CreateSlimBuilder(args)
 
+            // #411: built and registered as a distinct, narrowly-typed DI singleton
+            // BEFORE Build() — spec.Endpoints is fully composed by the time the webHost
+            // CE block finishes (Run is its terminal member), so this is safe regardless
+            // of where useDiscoveryWith sits relative to `resource` in the block.
+            // Frank.Discovery's DiscoveryMiddleware constructor-injects this narrow type
+            // for ALPS Type correlation, reading Endpoint.Metadata directly — no
+            // ApiExplorer/reflection walk involved (#411).
+            let dataSource = ResourceEndpointDataSource(spec.Endpoints)
+            builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
+
             spec.Host(builder.WebHost) |> ignore
             spec.Services(builder.Services) |> ignore
             let app = builder.Build()
@@ -440,7 +457,11 @@ module Builder =
             |> spec.Middleware
             |> ignore
 
-            let dataSource = ResourceEndpointDataSource(spec.Endpoints)
+            // The generic EndpointDataSource registration is a separate, post-Build()-only
+            // step (IEndpointRouteBuilder.DataSources is only reachable after Build()) —
+            // this is the ONE piece of endpoint-source wiring that structurally cannot move
+            // earlier (confirmed: registering an EndpointDataSource singleton into DI before
+            // Build() does not get auto-wired into IEndpointRouteBuilder.DataSources).
             (app :> IEndpointRouteBuilder).DataSources.Add(dataSource)
 
             if Environment.GetEnvironmentVariable "FRANK_VALIDATE" = "1" then
@@ -455,7 +476,9 @@ module Builder =
                 Action<_>(fun webBuilder ->
                     spec
                         .Host(webBuilder)
-                        .ConfigureServices(spec.Services >> ignore)
+                        .ConfigureServices(fun services ->
+                            spec.Services services |> ignore
+                            services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore)
                         .Configure(fun app ->
                             app
                             |> spec.BeforeRoutingMiddleware

@@ -5,7 +5,6 @@ open System.Collections.Concurrent
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Metadata
-open Microsoft.AspNetCore.Mvc.ApiExplorer
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.Routing.Template
 open Microsoft.Extensions.Logging
@@ -37,6 +36,17 @@ let private relationOf (re: RouteEndpoint) : string option =
     match re.Metadata.GetMetadata<ResourceRelationMetadata>() |> box with
     | null -> None
     | relBox -> Some((unbox<ResourceRelationMetadata> relBox).Relation)
+
+/// Accepted request CLR type full name declared on an endpoint via IAcceptsMetadata,
+/// normalized via Frank.ClrTypeName so a module-nested/generic request type correlates
+/// against codegen's FCS-derived RequestClrTypeName — or None when absent/untyped.
+let private acceptedRequestTypeOf (re: RouteEndpoint) : string option =
+    match re.Metadata.GetMetadata<IAcceptsMetadata>() with
+    | null -> None
+    | meta ->
+        match meta.RequestType with
+        | null -> None
+        | t -> Some(Frank.ClrTypeName.normalizeFullName t.FullName)
 
 /// Build JSON Home resource entries from live endpoints.
 /// Endpoints carrying ResourceRelationMetadata contribute to one merged entry per
@@ -87,104 +97,51 @@ let homeResourcesFromEndpoints
           HrefVars = varMeanings })
     |> Seq.toList
 
-// ── #400: ALPS Type reconciliation against real registered HTTP methods ──────
+// ── #411: ALPS Type reconciliation against real registered HTTP methods ──────
 // Codegen (DiscoveryEmitter) bakes a Type fallback from lock-file Rt presence — it
 // cannot see the app's actual `resource { get/post/... }` registrations. Here, where
 // the ALPS profile is served, the served Type is reconciled against ground truth,
 // never left to a lock-file guess (#397).
 //
-// The ground truth is read from IApiDescriptionGroupCollectionProvider (registered by
-// useDiscoveryWith's AddEndpointsApiExplorer() call, TryAddSingleton — #400 Fix 1: no
-// Microsoft.AspNetCore.OpenApi package reference needed just to reach this service), NOT
-// a direct EndpointDataSource.Endpoints walk. This is the SAME cached, version-checked
-// provider
-// Microsoft.AspNetCore.OpenApi's own OpenApiDocumentService reads to build
-// OpenApiDocument.Paths: when an app also references Frank.OpenApi, the underlying
-// endpoint-metadata scan (EndpointMetadataApiDescriptionProvider.OnProvidersExecuting)
-// runs once total, not once per component (AC1) — ApiDescriptionGroupCollectionProvider
-// recomputes only when IActionDescriptorCollectionProvider.ActionDescriptors.Version
-// changes (never, for Frank's fixed-after-startup endpoint set), so a second consumer
-// accessing .ApiDescriptionGroups after the first is served the cached result.
-// ApiDescription.ActionDescriptor.EndpointMetadata is a verbatim copy of the live
-// RouteEndpoint's own EndpointMetadataCollection (AddActionDescriptorEndpointMetadata),
-// so ResourceRelationMetadata/IAcceptsMetadata are exactly as available here as they
-// were from a direct EndpointDataSource walk — no correlation power is lost.
+// The ground truth is read directly from Frank's own composed Endpoint[] — the SAME
+// RouteEndpoint instances ResourceEndpointDataSource wraps and WebHostBuilder.Run
+// registers as a narrowly-typed DI singleton at Run()-time, after the whole webHost CE
+// block has finished composing (#411). No ApiExplorer/reflection walk, no
+// Microsoft.AspNetCore.OpenApi dependency, and no risk of ASP.NET Core's internal
+// ApiDescription machinery silently excluding an endpoint (e.g. one lacking a
+// MethodInfo) — Endpoint.Metadata is read the same way handleOptions/
+// homeResourcesFromEndpoints already read it above, just for a different metadata pair
+// (IAcceptsMetadata/ResourceRelationMetadata → HTTP method).
 //
-// AC1's "single walk" claim rests on ApiDescriptionGroupCollectionProvider's current
-// (undocumented, internal) caching behavior in the installed ASP.NET Core SDK version,
-// not a guaranteed public contract (#400 Fix 5) — OpenApiCorrelationTests.fs's counting
-// test (CountingEndpointDataSource) is the safety net that would catch a future SDK
-// regression here.
+// The narrow ResourceEndpointDataSource (Frank-only endpoints, injected into
+// DiscoveryMiddleware separately from the generic EndpointDataSource used for Allow) and
+// the generic EndpointDataSource used for Allow/OPTIONS above are deliberately different
+// sources by design, not a drift risk to detect: the generic source may also carry
+// non-Frank endpoints (any app-registered route sharing a path), which Allow legitimately
+// wants and ALPS Type correlation does not.
 
-/// All ApiDescriptions across every group — the flattened view of the shared,
-/// DI-cached provider both this module and Microsoft.AspNetCore.OpenApi's document
-/// generation read (#400).
-let private allApiDescriptions (provider: IApiDescriptionGroupCollectionProvider) : ApiDescription seq =
-    provider.ApiDescriptionGroups.Items |> Seq.collect (fun group -> group.Items)
-
-/// #400 Fix 3: drift-detection diagnostic between the two correlation sources. Allow
-/// (handleOptions) is built directly from EndpointDataSource.Endpoints — an unconditional
-/// walk that sees every endpoint. ALPS-Type reconciliation (cachedAlpsDescriptors) is
-/// built from allApiDescriptions, which is populated by ASP.NET Core's internal
-/// EndpointMetadataApiDescriptionProvider — an inclusion filter that silently skips any
-/// endpoint lacking a MethodInfo (TestHelpers.routeEndpoint's own doc comment). Every
-/// Frank-built endpoint currently stamps handler.Method, so this is dormant today; a
-/// future silent exclusion would otherwise surface only as a wrong served ALPS Type with
-/// no diagnostic trail (constitution rule 7: no silent middleware failures). Compares
-/// (endpoint, HTTP method) pair counts — the same granularity on both sides, since one
-/// route declaring N methods yields N ApiDescriptions — and only logs (never throws):
-/// this is observability, not a hard failure.
-let internal checkCorrelationSourcesAgree
-    (logger: ILogger)
-    (dataSource: EndpointDataSource)
-    (provider: IApiDescriptionGroupCollectionProvider)
-    : unit =
-    let routeMethodCount =
-        scanRouteEndpoints dataSource
-        |> Seq.sumBy (fun re -> httpMethodsOf re |> Option.map List.length |> Option.defaultValue 0)
-
-    let apiDescriptionCount = allApiDescriptions provider |> Seq.length
-
-    if routeMethodCount <> apiDescriptionCount then
-        logger.LogWarning(
-            "DiscoveryMiddleware: route-table (endpoint, HTTP method) count ({RouteMethodCount}) does not match the count IApiDescriptionGroupCollectionProvider produced ({ApiDescriptionCount}) — some endpoint(s) may be silently excluded from ALPS Type reconciliation (e.g. missing MethodInfo). The served OPTIONS Allow header and ALPS Type may disagree for the affected resource(s).",
-            routeMethodCount,
-            apiDescriptionCount
-        )
-
-/// The first endpoint-metadata item of type 'T carried by an ApiDescription's copied
-/// EndpointMetadataCollection, or None — the ApiDescription-sourced counterpart to
-/// relationOf/httpMethodsOf's GetMetadata<T>() idiom above (#400).
-let private apiDescriptionMetadataOf<'T> (d: ApiDescription) : 'T option =
-    d.ActionDescriptor.EndpointMetadata
-    |> Seq.tryPick (function
-        | :? 'T as t -> Some t
-        | _ -> None)
-
-/// One fold over every live ApiDescription, reading each's EndpointMetadata once and
-/// accumulating BOTH correlation keys simultaneously — relation IRI (from
-/// ResourceRelationMetadata) and accepted request CLR type full name (from
-/// IAcceptsMetadata, normalized via Frank.ClrTypeName so a module-nested/generic request
-/// type correlates against codegen's FCS-derived RequestClrTypeName). Grouping into the
-/// two final maps happens once, at the end, from the accumulated pairs. This is the
-/// single-pass consolidation of what were two independent walks of allApiDescriptions
-/// (#400 /simplify Fix 6) — used both by methodsByRelation/methodsByRequestType below
+/// One fold over every live RouteEndpoint, reading each's metadata once and accumulating
+/// BOTH correlation keys simultaneously — relation IRI (from ResourceRelationMetadata)
+/// and accepted request CLR type full name (from IAcceptsMetadata, normalized via
+/// Frank.ClrTypeName). Grouping into the two final maps happens once, at the end, from
+/// the accumulated pairs — used both by methodsByRelation/methodsByRequestType below
 /// (each still a single walk when called alone, for isolated testability) and by
 /// cachedAlpsDescriptors's lazy, the only call site that needs both maps together.
 let private correlateMethodsByRelationAndRequestType
-    (provider: IApiDescriptionGroupCollectionProvider)
+    (dataSource: EndpointDataSource)
     : Map<string, Set<string>> * Map<string, Set<string>> =
+    // Flattened to (endpoint, method) pairs FIRST — keeps the accumulation loop below to a
+    // single nesting level instead of a per-endpoint inner loop over its methods (Holzmann 9).
+    let endpointMethodPairs =
+        scanRouteEndpoints dataSource
+        |> Seq.collect (fun re -> httpMethodsOf re |> Option.defaultValue [] |> List.map (fun m -> re, m))
+
     let byRelation = ResizeArray<string * string>()
     let byRequestType = ResizeArray<string * string>()
 
-    for d in allApiDescriptions provider do
-        apiDescriptionMetadataOf<ResourceRelationMetadata> d
-        |> Option.iter (fun r -> byRelation.Add(r.Relation, d.HttpMethod))
-
-        apiDescriptionMetadataOf<IAcceptsMetadata> d
-        |> Option.iter (fun a ->
-            if not (isNull a.RequestType) then
-                byRequestType.Add(Frank.ClrTypeName.normalizeFullName a.RequestType.FullName, d.HttpMethod))
+    for re, m in endpointMethodPairs do
+        relationOf re |> Option.iter (fun r -> byRelation.Add(r, m))
+        acceptedRequestTypeOf re |> Option.iter (fun t -> byRequestType.Add(t, m))
 
     let toMethodsMap (pairs: ResizeArray<string * string>) =
         pairs
@@ -194,14 +151,14 @@ let private correlateMethodsByRelationAndRequestType
 
     toMethodsMap byRelation, toMethodsMap byRequestType
 
-/// Real HTTP methods per relation IRI, from live ApiDescriptions' ResourceRelationMetadata.
+/// Real HTTP methods per relation IRI, from live endpoints' ResourceRelationMetadata.
 /// Coarse correlation key: one `resource { relation X; ... }` block stamps the SAME
 /// relation on every verb it registers, so a route serving both GET and POST under one
 /// relation (#390) yields a multi-method set here.
-let internal methodsByRelation (provider: IApiDescriptionGroupCollectionProvider) : Map<string, Set<string>> =
-    correlateMethodsByRelationAndRequestType provider |> fst
+let internal methodsByRelation (dataSource: EndpointDataSource) : Map<string, Set<string>> =
+    correlateMethodsByRelationAndRequestType dataSource |> fst
 
-/// Real HTTP methods per accepted request CLR type full name, from live ApiDescriptions'
+/// Real HTTP methods per accepted request CLR type full name, from live endpoints'
 /// IAcceptsMetadata. Precise correlation key: Frank.OpenApi's `accepts` operation is
 /// stamped only on the endpoint whose own HttpMethodMetadata matches
 /// (ResourceBuilderExtensions.addHandlerDefinition), so this disambiguates an action's
@@ -209,8 +166,8 @@ let internal methodsByRelation (provider: IApiDescriptionGroupCollectionProvider
 /// accepting MoveRequest on a route that also serves GET for Game). The map key is
 /// normalized via Frank.ClrTypeName.normalizeFullName so a module-nested/generic request
 /// type correlates against codegen's FCS-derived RequestClrTypeName.
-let internal methodsByRequestType (provider: IApiDescriptionGroupCollectionProvider) : Map<string, Set<string>> =
-    correlateMethodsByRelationAndRequestType provider |> snd
+let internal methodsByRequestType (dataSource: EndpointDataSource) : Map<string, Set<string>> =
+    correlateMethodsByRelationAndRequestType dataSource |> snd
 
 /// ALPS §2.2 transition semantics from a resource's real registered HTTP method(s).
 /// GET present (however else the route is used) is safe; exactly {PUT} or {DELETE} is
@@ -334,7 +291,7 @@ type DiscoveryMiddleware
         next: RequestDelegate,
         config: DiscoveryConfig,
         endpointDataSource: EndpointDataSource,
-        apiDescriptionProvider: IApiDescriptionGroupCollectionProvider,
+        resourceEndpointDataSource: Frank.Builder.ResourceEndpointDataSource,
         logger: ILogger<DiscoveryMiddleware>
     ) =
 
@@ -366,14 +323,15 @@ type DiscoveryMiddleware
 
     let cachedHomeResources = lazy (buildHomeResources ())
 
-    // #397/#400: reconciled once, same lifetime/rationale as cachedHomeResources — the
-    // endpoint set is fixed after startup.
+    // #397/#411: reconciled once, same lifetime/rationale as cachedHomeResources — the
+    // endpoint set is fixed after startup. Sourced from the narrow, Frank-only
+    // ResourceEndpointDataSource (#411) — never the generic endpointDataSource above,
+    // which may also carry non-Frank endpoints Allow legitimately wants but ALPS Type
+    // correlation should not see.
     let cachedAlpsDescriptors =
         lazy
-            (checkCorrelationSourcesAgree logger endpointDataSource apiDescriptionProvider
-
-             let methodsByRel, methodsByReq =
-                 correlateMethodsByRelationAndRequestType apiDescriptionProvider
+            (let methodsByRel, methodsByReq =
+                correlateMethodsByRelationAndRequestType (resourceEndpointDataSource :> EndpointDataSource)
 
              reconcileAlpsTypes methodsByRel methodsByReq config.AlpsDescriptors)
 

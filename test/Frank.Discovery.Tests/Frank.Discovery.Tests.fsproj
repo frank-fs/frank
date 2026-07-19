@@ -14,12 +14,10 @@
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="AlpsMemoizationTests.fs" />
     <Compile Include="AlpsTypeReconciliationTests.fs" />
-    <Compile Include="OpenApiCorrelationTests.fs" />
-    <Compile Include="CorrelationDriftDiagnosticTests.fs" />
+    <Compile Include="CeOrderingTests.fs" />
     <Compile Include="RelationTests.fs" />
     <Compile Include="ResolverTests.fs" />
     <Compile Include="ValidatorTests.fs" />
-    <Compile Include="OpenApiIntegrationTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
@@ -37,9 +35,6 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Frank.Discovery/Frank.Discovery.fsproj" />
-    <!-- #400 AC1: proves Frank.Discovery + Frank.OpenApi coexist on ONE shared
-         correlation source when an app references both. -->
-    <ProjectReference Include="../../src/Frank.OpenApi/Frank.OpenApi.fsproj" />
   </ItemGroup>
 
 </Project>

@@ -210,6 +210,18 @@ module Builder =
 
     val resource: routeTemplate: string -> ResourceBuilder
 
+    /// The EndpointDataSource wrapping Frank's own composed Endpoint[] — the SAME array
+    /// spec.Endpoints holds after full webHost CE composition. WebHostBuilder.Run registers
+    /// this exact instance as a narrowly-typed DI singleton (#411), separately from the
+    /// generic EndpointDataSource it also adds to IEndpointRouteBuilder.DataSources —
+    /// Frank.Discovery's DiscoveryMiddleware constructor-injects this narrow type
+    /// specifically for ALPS Type correlation, reading Endpoint.Metadata directly with no
+    /// ApiExplorer/reflection dependency.
+    [<Sealed>]
+    type ResourceEndpointDataSource =
+        new: endpoints: Endpoint[] -> ResourceEndpointDataSource
+        inherit EndpointDataSource
+
     type WebHostSpec =
         { Host: (IWebHostBuilder -> IWebHostBuilder)
           BeforeRoutingMiddleware: (IApplicationBuilder -> IApplicationBuilder)

@@ -19,10 +19,12 @@ open System
 open System.Net.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Expecto
 open VDS.RDF
+open Frank.Builder
 open Frank.Semantic
 open Frank.Provenance
 open Frank.LinkedData
@@ -279,26 +281,40 @@ let private buildDiscoveryConfig (classIri: string) : DiscoveryConfig =
             Link = sprintf "<%s>; rel=\"describedby\"" classIri } ]
       ResourceHrefVars = Map.empty }
 
+/// #411: DiscoveryMiddleware's ALPS Type correlation reads Frank's own composed
+/// Endpoint[] directly via the narrow Frank.Builder.ResourceEndpointDataSource — no
+/// ApiExplorer/AddEndpointsApiExplorer() involved. Built here as a real RouteEndpoint
+/// (mirroring Frank's own ResourceSpec.Build) rather than via MapMethods, so it is the
+/// SAME concrete wiring WebHostBuilder.Run uses in production.
 let private startDiscoveryServer (discConfig: DiscoveryConfig) =
-    let builder = WebApplication.CreateBuilder()
-    builder.WebHost.UseTestServer() |> ignore
-    builder.Services.AddSingleton(discConfig) |> ignore
-    builder.Services.AddRouting() |> ignore
-    builder.Services.AddEndpointsApiExplorer() |> ignore
-    let app = builder.Build()
-    app.UseRouting() |> ignore
-    app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
-
     let relation =
         discConfig.AlpsDescriptors
         |> List.tryHead
         |> Option.bind (fun d -> d.Href)
         |> Option.defaultValue "urn:unknown"
 
-    app
-        .MapMethods("/orders", [| "GET" |], System.Func<string>(fun () -> "{}"))
-        .WithMetadata({ Relation = relation }: ResourceRelationMetadata)
-    |> ignore
+    let routePattern = Microsoft.AspNetCore.Routing.Patterns.RoutePatternFactory.Parse "/orders"
+    let handler = RequestDelegate(fun ctx -> ctx.Response.WriteAsync("{}"))
+
+    let metadata =
+        EndpointMetadataCollection(
+            box (HttpMethodMetadata [| "GET" |]),
+            box handler.Method,
+            box ({ Relation = relation }: ResourceRelationMetadata)
+        )
+
+    let endpoint = RouteEndpoint(handler, routePattern, 0, metadata, null)
+
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddSingleton(discConfig) |> ignore
+    builder.Services.AddRouting() |> ignore
+    let dataSource = ResourceEndpointDataSource([| endpoint |])
+    builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
+    let app = builder.Build()
+    app.UseRouting() |> ignore
+    app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
+    (app :> IEndpointRouteBuilder).DataSources.Add(dataSource)
 
     app.StartAsync().GetAwaiter().GetResult()
     app

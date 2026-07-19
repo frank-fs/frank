@@ -5,27 +5,13 @@ open System.Net.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Metadata
-open Microsoft.AspNetCore.Mvc.ApiExplorer
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.Routing.Patterns
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
+open Frank.Builder
 open Frank.Discovery
-
-/// Build a real IApiDescriptionGroupCollectionProvider wired the same way
-/// AddEndpointsApiExplorer()/AddOpenApi() wires it in a real app (#400) — the exact
-/// shared, cached source both Frank.Discovery's ALPS-Type correlation and
-/// Microsoft.AspNetCore.OpenApi's document generation read. For tests that construct
-/// DiscoveryMiddleware directly (no TestServer/UseMiddleware<T> DI resolution).
-/// WebApplicationBuilder supplies IHostEnvironment/ILoggerFactory/ParameterPolicyFactory
-/// for free; only EndpointDataSource is overridden with the caller's test fixture.
-let apiDescriptionProviderFor (dataSource: EndpointDataSource) : IApiDescriptionGroupCollectionProvider =
-    let builder = WebApplication.CreateBuilder()
-    builder.Services.AddEndpointsApiExplorer() |> ignore
-    builder.Services.AddSingleton<EndpointDataSource>(dataSource) |> ignore
-    let app = builder.Build()
-    app.Services.GetRequiredService<IApiDescriptionGroupCollectionProvider>()
 
 /// Captures all log messages emitted through the logging pipeline.
 /// Add via builder.Logging.AddProvider to intercept middleware log output.
@@ -48,42 +34,62 @@ type CapturingLoggerProvider() =
 
         member _.Dispose() = ()
 
+/// #397: fixture request-body type for AcceptsMetadata-correlation tests (stands in
+/// for a generated MoveRequest-style type).
+type MoveRequestFixture = { Position: string }
+
+/// Build a RouteEndpoint stamping HttpMethodMetadata + the handler's own MethodInfo
+/// (mirrors Frank's real ResourceSpec.Build, which adds `handler.Method`) plus any extra
+/// caller-supplied metadata. #411: DiscoveryMiddleware's ALPS Type correlation now reads
+/// Endpoint.Metadata directly (no ApiExplorer inclusion filter), but handler.Method is
+/// still stamped here for parity with real Frank-built endpoints.
+let routeEndpoint (pattern: string) (methods: string[]) (metadata: obj list) : RouteEndpoint =
+    let builder = RoutePatternFactory.Parse pattern
+    let handler = RequestDelegate(fun _ -> System.Threading.Tasks.Task.CompletedTask)
+
+    let metadataCollection =
+        EndpointMetadataCollection(box (HttpMethodMetadata(methods)) :: box handler.Method :: metadata)
+
+    RouteEndpoint(handler, builder, 0, metadataCollection, null)
+
 /// Build a WebApplication wired for discovery-middleware testing: TestServer, routing,
-/// DiscoveryConfig registered, DiscoveryMiddleware in the pipeline. `configureBuilder`
-/// (when given) runs before `Build()` — e.g. to register a logging provider. Callers add
-/// their own routes on the returned (unstarted) app.
+/// DiscoveryConfig registered, `endpoints` wrapped in a real
+/// Frank.Builder.ResourceEndpointDataSource (#411 — the SAME concrete type
+/// DiscoveryMiddleware's production constructor receives via WebHostBuilder.Run),
+/// registered both as a DI singleton (ALPS Type correlation) and added to
+/// IEndpointRouteBuilder.DataSources (actual routing) — mirroring WebHostBuilder.Run's own
+/// sequence. `configureBuilder` (when given) runs before `Build()` — e.g. to register a
+/// logging provider.
 let private buildDiscoveryApp
     (configureBuilder: (WebApplicationBuilder -> unit) option)
     (config: DiscoveryConfig)
+    (endpoints: Endpoint[])
     : WebApplication =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(config) |> ignore
     builder.Services.AddRouting() |> ignore
-    // #400: registers IApiDescriptionGroupCollectionProvider — DiscoveryMiddleware's
-    // shared HTTP-method correlation source, the same one useDiscoveryWith registers in
-    // production via AddEndpointsApiExplorer().
-    builder.Services.AddEndpointsApiExplorer() |> ignore
+    let dataSource = ResourceEndpointDataSource(endpoints)
+    builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
     configureBuilder |> Option.iter (fun f -> f builder)
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
+    (app :> IEndpointRouteBuilder).DataSources.Add(dataSource)
     app
 
 /// Spin a TestServer with the discovery middleware in front of a couple of
 /// routed endpoints. The GET /games/{id} endpoint carries ResourceRelationMetadata
 /// so the middleware can build the JSON Home directory at runtime.
 let startServer (config: DiscoveryConfig) =
-    let app = buildDiscoveryApp None config
+    let endpoints: Endpoint[] =
+        [| routeEndpoint
+               "/games/{id}"
+               [| "GET" |]
+               [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata) ]
+           routeEndpoint "/games/{id}/moves" [| "POST" |] [] |]
 
-    app
-        .MapMethods("/games/{id}", [| "GET" |], System.Func<string>(fun () -> "game"))
-        .WithMetadata({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
-    |> ignore
-
-    app.MapMethods("/games/{id}/moves", [| "POST" |], System.Func<string>(fun () -> "moved"))
-    |> ignore
-
+    let app = buildDiscoveryApp None config endpoints
     app.StartAsync().GetAwaiter().GetResult()
     app
 
@@ -132,37 +138,35 @@ let sampleConfig =
 /// Spin a TestServer where /games/{id} handles both GET and POST under the same
 /// ResourceRelationMetadata. Used by the multi-verb merge test (#390).
 let startMultiVerbServer (config: DiscoveryConfig) =
-    let app = buildDiscoveryApp None config
+    let endpoints: Endpoint[] =
+        [| routeEndpoint
+               "/games/{id}"
+               [| "GET" |]
+               [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata) ]
+           routeEndpoint
+               "/games/{id}"
+               [| "POST" |]
+               [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata) ] |]
 
-    app
-        .MapMethods("/games/{id}", [| "GET" |], System.Func<string>(fun () -> "game"))
-        .WithMetadata({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
-    |> ignore
-
-    app
-        .MapMethods("/games/{id}", [| "POST" |], System.Func<string>(fun () -> "moved"))
-        .WithMetadata({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
-    |> ignore
-
+    let app = buildDiscoveryApp None config endpoints
     app.StartAsync().GetAwaiter().GetResult()
     app
 
 /// Spin a TestServer where two DIFFERENT hrefs share the SAME relation IRI.
 /// Used by the duplicate-key guard test (#390 F4).
 let startDuplicateRelationServer (config: DiscoveryConfig) =
-    let app = buildDiscoveryApp None config
+    let endpoints: Endpoint[] =
+        [| routeEndpoint
+               "/games/{id}"
+               [| "GET" |]
+               [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata) ]
+           // Second, DIFFERENT href with the SAME relation — configuration error scenario.
+           routeEndpoint
+               "/games/{gid}/variant"
+               [| "POST" |]
+               [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata) ] |]
 
-    app
-        .MapMethods("/games/{id}", [| "GET" |], System.Func<string>(fun () -> "game"))
-        .WithMetadata({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
-    |> ignore
-
-    // Second, DIFFERENT href with the SAME relation — configuration error scenario.
-    app
-        .MapMethods("/games/{gid}/variant", [| "POST" |], System.Func<string>(fun () -> "variant"))
-        .WithMetadata({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
-    |> ignore
-
+    let app = buildDiscoveryApp None config endpoints
     app.StartAsync().GetAwaiter().GetResult()
     app
 
@@ -171,78 +175,58 @@ let startDuplicateRelationServer (config: DiscoveryConfig) =
 let startDuplicateRelationServerWithLogCapture (config: DiscoveryConfig) =
     let provider = new CapturingLoggerProvider()
 
+    let endpoints: Endpoint[] =
+        [| routeEndpoint
+               "/games/{id}"
+               [| "GET" |]
+               [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata) ]
+           routeEndpoint
+               "/games/{gid}/variant"
+               [| "POST" |]
+               [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata) ] |]
+
     let app =
-        buildDiscoveryApp (Some(fun b -> b.Logging.AddProvider(provider) |> ignore)) config
-
-    app
-        .MapMethods("/games/{id}", [| "GET" |], System.Func<string>(fun () -> "game"))
-        .WithMetadata({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
-    |> ignore
-
-    app
-        .MapMethods("/games/{gid}/variant", [| "POST" |], System.Func<string>(fun () -> "variant"))
-        .WithMetadata({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
-    |> ignore
+        buildDiscoveryApp (Some(fun b -> b.Logging.AddProvider(provider) |> ignore)) config endpoints
 
     app.StartAsync().GetAwaiter().GetResult()
     provider, app
-
-/// #397: fixture request-body type for AcceptsMetadata-correlation tests (stands in
-/// for a generated MoveRequest-style type).
-type MoveRequestFixture = { Position: string }
-
-/// Build a RouteEndpoint stamping HttpMethodMetadata + the handler's own MethodInfo
-/// (mirrors Frank's real ResourceSpec.Build, which adds `handler.Method` —
-/// EndpointMetadataApiDescriptionProvider silently skips any endpoint lacking one) plus
-/// any extra caller-supplied metadata (#400).
-let routeEndpoint (pattern: string) (methods: string[]) (metadata: obj list) : RouteEndpoint =
-    let builder = RoutePatternFactory.Parse pattern
-    let handler = RequestDelegate(fun _ -> System.Threading.Tasks.Task.CompletedTask)
-
-    let metadataCollection =
-        EndpointMetadataCollection(box (HttpMethodMetadata(methods)) :: box handler.Method :: metadata)
-
-    RouteEndpoint(handler, builder, 0, metadataCollection, null)
 
 /// Spin a TestServer with GET /games/{id} (relation=Game), PUT and DELETE /widgets/{id}
 /// (single-method relations), and POST /games/{id} carrying IAcceptsMetadata for
 /// MoveRequestFixture on the SAME route as the GET (#390 multi-verb) — the AC1 fixture
 /// for #397's HTTP-method reconciliation.
 let startAlpsTypeServer (config: DiscoveryConfig) =
-    let app = buildDiscoveryApp None config
+    let endpoints: Endpoint[] =
+        [| routeEndpoint
+               "/games/{id}"
+               [| "GET" |]
+               [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata) ]
+           routeEndpoint
+               "/games/{id}"
+               [| "POST" |]
+               [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
+                 box (
+                     AcceptsMetadata([| "application/json" |], typeof<MoveRequestFixture>, false)
+                     :> IAcceptsMetadata
+                 ) ]
+           routeEndpoint
+               "/widgets/{id}"
+               [| "PUT" |]
+               [ box ({ Relation = "https://schema.org/Widget" }: ResourceRelationMetadata) ]
+           routeEndpoint
+               "/gadgets/{id}"
+               [| "DELETE" |]
+               [ box ({ Relation = "https://schema.org/Gadget" }: ResourceRelationMetadata) ] |]
 
-    app
-        .MapMethods("/games/{id}", [| "GET" |], System.Func<string>(fun () -> "game"))
-        .WithMetadata({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
-    |> ignore
-
-    app
-        .MapMethods("/games/{id}", [| "POST" |], System.Func<string>(fun () -> "moved"))
-        .WithMetadata({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
-        .WithMetadata(AcceptsMetadata([| "application/json" |], typeof<MoveRequestFixture>, false) :> IAcceptsMetadata)
-    |> ignore
-
-    app
-        .MapMethods("/widgets/{id}", [| "PUT" |], System.Func<string>(fun () -> "updated"))
-        .WithMetadata({ Relation = "https://schema.org/Widget" }: ResourceRelationMetadata)
-    |> ignore
-
-    app
-        .MapMethods("/gadgets/{id}", [| "DELETE" |], System.Func<string>(fun () -> "removed"))
-        .WithMetadata({ Relation = "https://schema.org/Gadget" }: ResourceRelationMetadata)
-    |> ignore
-
+    let app = buildDiscoveryApp None config endpoints
     app.StartAsync().GetAwaiter().GetResult()
     app
 
 /// Spin a TestServer with discovery middleware AND a /tictactoe vocabulary route.
 /// Used by the dereference acceptance test (item #6).
 let startVocabServer (config: DiscoveryConfig) =
-    let app = buildDiscoveryApp None config
-
-    app.MapGet("/tictactoe", System.Func<string>(fun () -> "ttt:square a rdfs:Class ."))
-    |> ignore
-
+    let endpoints: Endpoint[] = [| routeEndpoint "/tictactoe" [| "GET" |] [] |]
+    let app = buildDiscoveryApp None config endpoints
     app.StartAsync().GetAwaiter().GetResult()
     app
 
@@ -253,15 +237,13 @@ let startVocabServer (config: DiscoveryConfig) =
 ///     JSON Home/OPTIONS handling, never a RouteEndpoint).
 /// Used by the rel="type" per-resource scoping acceptance test (#398 AC2).
 let startScopedRelationServer (config: DiscoveryConfig) =
-    let app = buildDiscoveryApp None config
+    let endpoints: Endpoint[] =
+        [| routeEndpoint "/tictactoe" [| "GET" |] []
+           routeEndpoint
+               "/games/{id}"
+               [| "GET" |]
+               [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata) ] |]
 
-    app.MapGet("/tictactoe", System.Func<string>(fun () -> "ttt:square a rdfs:Class ."))
-    |> ignore
-
-    app
-        .MapMethods("/games/{id}", [| "GET" |], System.Func<string>(fun () -> "game"))
-        .WithMetadata({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
-    |> ignore
-
+    let app = buildDiscoveryApp None config endpoints
     app.StartAsync().GetAwaiter().GetResult()
     app

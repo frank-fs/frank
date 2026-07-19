@@ -2,7 +2,6 @@ module Frank.Discovery.DiscoveryMiddleware
 
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
-open Microsoft.AspNetCore.Mvc.ApiExplorer
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.Logging
 
@@ -17,30 +16,20 @@ open Microsoft.Extensions.Logging
 val homeResourcesFromEndpoints:
     resourceHrefVars: Map<string, Map<string, string>> -> dataSource: EndpointDataSource -> JsonHomeResource list
 
-/// Real HTTP methods per relation IRI, from live ApiDescriptions' ResourceRelationMetadata.
+/// Real HTTP methods per relation IRI, from live endpoints' ResourceRelationMetadata.
 /// Coarse correlation key: one `resource { relation X; ... }` block stamps the SAME
 /// relation on every verb it registers, so a route serving both GET and POST under one
-/// relation (#390) yields a multi-method set here. Sourced from
-/// IApiDescriptionGroupCollectionProvider — the shared, DI-cached provider
-/// Microsoft.AspNetCore.OpenApi's own document generation also reads, so the underlying
-/// endpoint-metadata scan runs once total when an app also references Frank.OpenApi,
-/// not once per component (#400).
-val internal methodsByRelation: provider: IApiDescriptionGroupCollectionProvider -> Map<string, Set<string>>
+/// relation (#390) yields a multi-method set here. Sourced directly from Frank's own
+/// composed Endpoint[] (typically the narrow ResourceEndpointDataSource) — no
+/// ApiExplorer/reflection walk, no Microsoft.AspNetCore.OpenApi dependency (#411).
+val internal methodsByRelation: dataSource: EndpointDataSource -> Map<string, Set<string>>
 
-/// Real HTTP methods per accepted request CLR type full name, from live ApiDescriptions'
+/// Real HTTP methods per accepted request CLR type full name, from live endpoints'
 /// IAcceptsMetadata. Precise correlation key: Frank.OpenApi's `accepts` operation is
 /// stamped only on the endpoint whose own HttpMethodMetadata matches, so this
 /// disambiguates an action's real method even when its route also serves other verbs
-/// (#397/#400).
-val internal methodsByRequestType: provider: IApiDescriptionGroupCollectionProvider -> Map<string, Set<string>>
-
-/// Drift-detection diagnostic (#400 Fix 3): compares the (endpoint, HTTP method) pair
-/// count from a direct EndpointDataSource walk against the count
-/// IApiDescriptionGroupCollectionProvider produced, logging a warning (never throwing)
-/// when they diverge — a signal that some endpoint may be silently excluded from ALPS
-/// Type reconciliation (e.g. missing MethodInfo).
-val internal checkCorrelationSourcesAgree:
-    logger: ILogger -> dataSource: EndpointDataSource -> provider: IApiDescriptionGroupCollectionProvider -> unit
+/// (#397/#411).
+val internal methodsByRequestType: dataSource: EndpointDataSource -> Map<string, Set<string>>
 
 /// ALPS §2.2 transition semantics from a resource's real registered HTTP method(s).
 /// GET present (however else the route is used) is safe; exactly {PUT} or {DELETE} is
@@ -86,7 +75,7 @@ type DiscoveryMiddleware =
         next: RequestDelegate *
         config: DiscoveryConfig *
         endpointDataSource: EndpointDataSource *
-        apiDescriptionProvider: IApiDescriptionGroupCollectionProvider *
+        resourceEndpointDataSource: Frank.Builder.ResourceEndpointDataSource *
         logger: ILogger<DiscoveryMiddleware> ->
             DiscoveryMiddleware
 

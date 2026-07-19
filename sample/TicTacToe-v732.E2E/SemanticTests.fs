@@ -1418,19 +1418,21 @@ type SemanticTests() =
             Assert.That(finished, Is.True, "Discovery client could not finish game against ex: server")
         }
 
-    // ── #400 AC2: ex: server's MoveAction ALPS Type is genuinely live-derived ───
+    // ── #400/#411 AC2: ex: server's MoveAction ALPS Type is genuinely live-derived ──
     //
     // TicTacToe-v732.Ex had no Frank.OpenApi reference before #400 — its POST
     // /games/{id} move handler carried no IAcceptsMetadata, so #397's HTTP-method
     // reconciliation had no live signal to correlate MoveAction's ALPS Type against
     // (its own ClassIri, ex:MoveAction, is never itself a declared route relation —
     // only ex:Game is). The served Type fell back, unreconciled, to the codegen-time
-    // default. #400 closes this gap for real: the ex: sample's POST now declares
+    // default. #400 closed this gap: the ex: sample's POST declares
     // `accepts typeof<MoveRequest>` (Frank.OpenApi's HandlerDefinition), giving
-    // Frank.Discovery's IApiDescriptionGroupCollectionProvider (registered via
-    // AddEndpointsApiExplorer(), not AddOpenApi() — Frank.Discovery has no dependency
-    // on Microsoft.AspNetCore.OpenApi at all as of this branch) a live IAcceptsMetadata
-    // signal to match.
+    // Frank.Discovery's HTTP-method correlation a live IAcceptsMetadata signal to match.
+    // #411 replaced #400's correlation SOURCE — Frank.Discovery now reads Frank's own
+    // composed Endpoint[] directly (via the narrow ResourceEndpointDataSource
+    // WebHostBuilder.Run registers), not IApiDescriptionGroupCollectionProvider/
+    // AddEndpointsApiExplorer() — while the reconciled ALPS Type semantics this test
+    // asserts on are unchanged.
     //
     // Falsifiability (adversarial-review finding, confirmed live): MoveRequest is a
     // module-nested F# type (`module TicTacToe.Model` → `MoveRequest`), so its CLR
@@ -1442,8 +1444,8 @@ type SemanticTests() =
     // alpsTypeDefault ignores its descriptor argument entirely) — MoveRequest.rt is
     // "ex:Game" in the ex: sample's lock file (see .frank/semantic-mappings.lock.json),
     // so this assertion does NOT falsify whether Rt happens to be present; it falsifies
-    // whether live reconciliation via IApiDescriptionGroupCollectionProvider actually ran
-    // and overrode the always-"semantic" codegen default to the live POST's real "unsafe"
+    // whether live reconciliation against Frank's own Endpoint[] actually ran and
+    // overrode the always-"semantic" codegen default to the live POST's real "unsafe"
     // classification. A reverted/broken correlation path (confirmed by temporarily
     // disabling normalizeClrTypeFullName and re-running this exact test against the live
     // server) serves "semantic" here, not "unsafe" — this assertion genuinely falsifies
@@ -1454,7 +1456,7 @@ type SemanticTests() =
     // RequestClrTypeName-specific fix MoveAction's assertion targets. Both are grounded
     // in an independently observed OPTIONS Allow header.
     [<Test>]
-    member this.``AT-S9 ex: server's ALPS Types are genuinely live-derived via IApiDescriptionGroupCollectionProvider (AddEndpointsApiExplorer)``
+    member this.``AT-S9 ex: server's ALPS Types are genuinely live-derived from Frank's own Endpoint[] (ResourceEndpointDataSource)``
         ()
         =
         task {

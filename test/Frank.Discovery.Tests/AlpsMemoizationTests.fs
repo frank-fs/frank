@@ -6,8 +6,8 @@ open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.Logging.Abstractions
 open Microsoft.Extensions.Primitives
 open Expecto
+open Frank.Builder
 open Frank.Discovery
-open Frank.Tests.Shared.TestEndpointDataSource
 open Frank.Discovery.Tests.TestHelpers
 
 /// #398 /simplify item 6: handleAlpsProfile used to re-walk the whole resolved-descriptor
@@ -20,9 +20,9 @@ open Frank.Discovery.Tests.TestHelpers
 /// build-once-per-distinct-origin.
 
 let private emptyEndpoints =
-    TestEndpointDataSource([||]) :> Microsoft.AspNetCore.Routing.EndpointDataSource
+    Frank.Builder.ResourceEndpointDataSource([||]) :> Microsoft.AspNetCore.Routing.EndpointDataSource
 
-let private emptyApiDescriptionProvider = apiDescriptionProviderFor emptyEndpoints
+let private emptyResourceEndpoints = Frank.Builder.ResourceEndpointDataSource([||])
 
 /// Unlike sampleConfig (both Hrefs already absolute, schema.org), this descriptor carries a
 /// RELATIVE, app-owned href — the case whose resolved value actually differs per origin, so
@@ -65,7 +65,7 @@ let private newMiddleware (config: DiscoveryConfig) =
         next,
         config,
         emptyEndpoints,
-        emptyApiDescriptionProvider,
+        emptyResourceEndpoints,
         NullLogger<DiscoveryMiddleware.DiscoveryMiddleware>.Instance
     )
 
