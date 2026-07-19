@@ -2,14 +2,14 @@
 
   <!--
     Assembly resolution: when imported directly (not via NuGet pack), the dll
-    lives at bin/<Configuration>/net8.0/ relative to the .targets file's parent.
-    When imported from a NuGet pack the dll lives at lib/net8.0/ in the pack
+    lives at bin/<Configuration>/net10.0/ relative to the .targets file's parent.
+    When imported from a NuGet pack the dll lives at lib/net10.0/ in the pack
     layout. The property FrankMSBuildAssemblyFile can be set by the caller to
     override both defaults.
   -->
   <PropertyGroup>
-    <FrankMSBuildAssemblyFile Condition="'$(FrankMSBuildAssemblyFile)' == '' and Exists('$(MSBuildThisFileDirectory)..\lib\net8.0\Frank.Cli.MSBuild.dll')">$(MSBuildThisFileDirectory)..\lib\net8.0\Frank.Cli.MSBuild.dll</FrankMSBuildAssemblyFile>
-    <FrankMSBuildAssemblyFile Condition="'$(FrankMSBuildAssemblyFile)' == ''">$(MSBuildThisFileDirectory)..\bin\$(Configuration)\net8.0\Frank.Cli.MSBuild.dll</FrankMSBuildAssemblyFile>
+    <FrankMSBuildAssemblyFile Condition="'$(FrankMSBuildAssemblyFile)' == '' and Exists('$(MSBuildThisFileDirectory)..\lib\net10.0\Frank.Cli.MSBuild.dll')">$(MSBuildThisFileDirectory)..\lib\net10.0\Frank.Cli.MSBuild.dll</FrankMSBuildAssemblyFile>
+    <FrankMSBuildAssemblyFile Condition="'$(FrankMSBuildAssemblyFile)' == ''">$(MSBuildThisFileDirectory)..\bin\$(Configuration)\net10.0\Frank.Cli.MSBuild.dll</FrankMSBuildAssemblyFile>
   </PropertyGroup>
 
   <UsingTask
