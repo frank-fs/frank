@@ -23,8 +23,12 @@ namespace Frank
 /// unreconciled — the exact defect a coincidentally-correct codegen default can mask.
 /// Shared by Frank.Discovery.DiscoveryMiddleware and Frank.Provenance.ProvenanceMiddleware
 /// (#400 /simplify: one implementation, not two independent copies — constitution rule 8).
+/// Codegen/interop plumbing — not part of Frank's public API surface; visible only to
+/// those two generated-module resolvers via InternalsVisibleTo (same precedent as
+/// GeneratedModuleReflection.fs — Frank is a published, multi-target package and this
+/// exists solely to serve two unpublished, net10.0-only consumers).
 [<RequireQualifiedAccess>]
-module ClrTypeName =
+module internal ClrTypeName =
 
     /// Strip a closed generic's bracketed, assembly-qualified type-argument list (if
     /// present — everything from the first '[' onward) and normalize '+' module/type
