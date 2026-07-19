@@ -1425,31 +1425,36 @@ type SemanticTests() =
     // reconciliation had no live signal to correlate MoveAction's ALPS Type against
     // (its own ClassIri, ex:MoveAction, is never itself a declared route relation —
     // only ex:Game is). The served Type fell back, unreconciled, to the codegen-time
-    // Rt-based default. #400 closes this gap for real: the ex: sample's POST now
-    // declares `accepts typeof<MoveRequest>` (Frank.OpenApi's HandlerDefinition),
-    // giving Frank.Discovery's Microsoft.AspNetCore.OpenApi-backed correlation
-    // (IApiDescriptionGroupCollectionProvider) a live IAcceptsMetadata signal to match.
+    // default. #400 closes this gap for real: the ex: sample's POST now declares
+    // `accepts typeof<MoveRequest>` (Frank.OpenApi's HandlerDefinition), giving
+    // Frank.Discovery's IApiDescriptionGroupCollectionProvider (registered via
+    // AddEndpointsApiExplorer(), not AddOpenApi() — Frank.Discovery has no dependency
+    // on Microsoft.AspNetCore.OpenApi at all as of this branch) a live IAcceptsMetadata
+    // signal to match.
     //
     // Falsifiability (adversarial-review finding, confirmed live): MoveRequest is a
     // module-nested F# type (`module TicTacToe.Model` → `MoveRequest`), so its CLR
     // reflection FullName is '+'-nested ("TicTacToe.Model+MoveRequest") while codegen's
     // FCS-derived RequestClrTypeName is '.'-separated ("TicTacToe.Model.MoveRequest") —
     // these never compared equal before DiscoveryMiddleware.methodsByRequestType's
-    // normalizeClrTypeFullName fix, so reconciliation silently no-op'd. MoveRequest.rt
-    // is therefore deliberately declared absent in the ex: sample's lock file (see
-    // .frank/semantic-mappings.lock.json), making MoveAction's codegen-time default
-    // "semantic" — WRONG relative to the live POST's real "unsafe" classification. A
-    // reverted/broken correlation path (confirmed by temporarily disabling
-    // normalizeClrTypeFullName and re-running this exact test against the live server)
-    // serves "semantic" here, not "unsafe" — this assertion genuinely falsifies
+    // normalizeClrTypeFullName fix, so reconciliation silently no-op'd. The codegen-time
+    // default is unconditionally "semantic" regardless of Rt (DiscoveryEmitter.fs's
+    // alpsTypeDefault ignores its descriptor argument entirely) — MoveRequest.rt is
+    // "ex:Game" in the ex: sample's lock file (see .frank/semantic-mappings.lock.json),
+    // so this assertion does NOT falsify whether Rt happens to be present; it falsifies
+    // whether live reconciliation via IApiDescriptionGroupCollectionProvider actually ran
+    // and overrode the always-"semantic" codegen default to the live POST's real "unsafe"
+    // classification. A reverted/broken correlation path (confirmed by temporarily
+    // disabling normalizeClrTypeFullName and re-running this exact test against the live
+    // server) serves "semantic" here, not "unsafe" — this assertion genuinely falsifies
     // MoveAction's reconciliation specifically, not via Game as an indirect proxy.
     // Game's own Type is checked too — reconciled from the live GET, WRONG under its
-    // own codegen default ("semantic", since Game declares no Rt either) — proving
-    // reconciliation runs at all (the coarser ClassIri/relation path), independent of
-    // the RequestClrTypeName-specific fix MoveAction's assertion targets. Both are
-    // grounded in an independently observed OPTIONS Allow header.
+    // own codegen default ("semantic", same alpsTypeDefault) — proving reconciliation
+    // runs at all (the coarser ClassIri/relation path), independent of the
+    // RequestClrTypeName-specific fix MoveAction's assertion targets. Both are grounded
+    // in an independently observed OPTIONS Allow header.
     [<Test>]
-    member this.``AT-S9 ex: server's ALPS Types are genuinely live-derived from Microsoft.AspNetCore.OpenApi document generation``
+    member this.``AT-S9 ex: server's ALPS Types are genuinely live-derived via IApiDescriptionGroupCollectionProvider (AddEndpointsApiExplorer)``
         ()
         =
         task {
@@ -1470,7 +1475,7 @@ type SemanticTests() =
             Assert.That(
                 moveActionType,
                 Is.EqualTo(Some "unsafe"),
-                "MoveAction must be served as 'unsafe', reconciled from the live POST /games/{id}'s IAcceptsMetadata (#400) — overriding the WRONG codegen default 'semantic' (MoveRequest declares no Rt in the ex: lock file), not left unresolved"
+                "MoveAction must be served as 'unsafe', reconciled from the live POST /games/{id}'s IAcceptsMetadata (#400) — overriding the always-'semantic' codegen default (alpsTypeDefault, Rt-independent), not left unresolved"
             )
 
             let gameType = SemanticTests.AlpsDescriptorTypeByLocalId(alpsBody, "Game")
@@ -1478,7 +1483,7 @@ type SemanticTests() =
             Assert.That(
                 gameType,
                 Is.EqualTo(Some "safe"),
-                "Game must be served as 'safe', reconciled from the live GET on the same route — the codegen default ('semantic', since Game declares no Rt) would be WRONG if reconciliation were not genuinely running against live data"
+                "Game must be served as 'safe', reconciled from the live GET on the same route — the always-'semantic' codegen default (alpsTypeDefault, Rt-independent) would be WRONG if reconciliation were not genuinely running against live data"
             )
 
             // Ground both classifications in an independently observed live fact: the

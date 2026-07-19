@@ -62,7 +62,7 @@ let private buildDiscoveryApp
     builder.Services.AddRouting() |> ignore
     // #400: registers IApiDescriptionGroupCollectionProvider — DiscoveryMiddleware's
     // shared HTTP-method correlation source, the same one useDiscoveryWith registers in
-    // production via AddOpenApi().
+    // production via AddEndpointsApiExplorer().
     builder.Services.AddEndpointsApiExplorer() |> ignore
     configureBuilder |> Option.iter (fun f -> f builder)
     let app = builder.Build()

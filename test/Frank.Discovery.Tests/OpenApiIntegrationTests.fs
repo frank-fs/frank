@@ -10,21 +10,23 @@ open Frank.Discovery.Tests.TestHelpers
 
 /// #400 AC1, end-to-end: an app that references BOTH Frank.Discovery (project-referenced
 /// by this test project) AND Frank.OpenApi (also project-referenced — see fsproj) must
-/// serve both its ALPS profile (Frank.Discovery's internal, generate-only AddOpenApi()
-/// call) and its own hosted /openapi/{document}.json (Frank.OpenApi's useOpenApi(),
-/// mirrored here via the same underlying services.AddOpenApi()/app.MapOpenApi() calls
-/// Frank.OpenApi's WebHostBuilderExtensions wraps) without collision — each document
-/// name is independent (Frank.Discovery: "frank-discovery-internal"; this app: default
-/// "v1"), and Frank.Discovery never itself calls MapOpenApi(). Uses TestHelpers'
-/// MoveRequestFixture (shared #400 module-nested fixture, #400 /simplify Fix 3).
+/// serve both its ALPS profile (via Frank.Discovery's IApiDescriptionGroupCollectionProvider,
+/// registered by AddEndpointsApiExplorer() — Frank.Discovery no longer calls AddOpenApi() at
+/// all) and its own hosted /openapi/{document}.json (Frank.OpenApi's useOpenApi(), mirrored
+/// here via the same underlying services.AddOpenApi()/app.MapOpenApi() calls Frank.OpenApi's
+/// WebHostBuilderExtensions wraps) without collision — the app's own separate AddOpenApi("v1")
+/// call for Frank.OpenApi hosting never collides with Frank.Discovery's shared provider, and
+/// Frank.Discovery never itself calls MapOpenApi(). Uses TestHelpers' MoveRequestFixture
+/// (shared #400 module-nested fixture, #400 /simplify Fix 3).
 
 let private startCombinedServer () : WebApplication =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddRouting() |> ignore
     // The app's OWN OpenAPI document (default "v1") — what Frank.OpenApi's useOpenApi()
-    // registers/hosts. Frank.Discovery's separate, internal "frank-discovery-internal"
-    // document (registered by useDiscoveryWith's AddOpenApi() call) never collides with it.
+    // registers/hosts. Frank.Discovery only registers the shared
+    // IApiDescriptionGroupCollectionProvider (via AddEndpointsApiExplorer()), so this
+    // app-owned AddOpenApi("v1") call never collides with it.
     builder.Services.AddOpenApi() |> ignore
 
     let config =
@@ -89,4 +91,4 @@ let tests =
               Expect.equal
                   (int openApiResp.StatusCode)
                   200
-                  "the app's own hosted OpenAPI document still serves 200 — Frank.Discovery's internal, generate-only AddOpenApi() call (a separate document name) never hosts /openapi/... itself and does not break it" ]
+                  "the app's own hosted OpenAPI document still serves 200 — Frank.Discovery's shared IApiDescriptionGroupCollectionProvider registration (via AddEndpointsApiExplorer()) never hosts /openapi/... itself and does not break it" ]
