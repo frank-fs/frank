@@ -375,7 +375,12 @@ let private alpsTypeConfig =
             // route-level correlation alone can't find this. Only the precise
             // RequestClrTypeName (IAcceptsMetadata) signal resolves it.
             ClassIri = None
-            RequestClrTypeName = Some typeof<MoveRequestFixture>.FullName }
+            // Deliberately NOT `typeof<MoveRequestFixture>.FullName` — that would give
+            // the CLR-reflected, '+'-nested form ("...TestHelpers+MoveRequestFixture"),
+            // masking the real defect this fixture exists to catch (adversarial review
+            // finding, #400 AC2): codegen's actual RequestClrTypeName is always FCS's
+            // dot-separated form, never the CLR '+' form, for a module-nested type.
+            RequestClrTypeName = Some "Frank.Discovery.Tests.TestHelpers.MoveRequestFixture" }
           { Id = "Widget"
             Type = "semantic"
             Doc = None

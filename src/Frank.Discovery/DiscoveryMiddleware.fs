@@ -136,12 +136,28 @@ let internal methodsByRelation (provider: IApiDescriptionGroupCollectionProvider
     |> Seq.map (fun (relation, entries) -> relation, entries |> Seq.map snd |> Set.ofSeq)
     |> Map.ofSeq
 
+/// Normalize a live, reflection-derived `System.Type.FullName` to the SAME convention
+/// DiscoveryEmitter bakes into `RequestClrTypeName` (FSharpEntity.TryFullName, via
+/// Frank.Cli.Core's Extractor/ConventionEngine/ResolvedModel pipeline). CLR reflection
+/// separates a type nested in a compiled F# module with '+' (e.g. a `MoveRequest`
+/// record declared inside `module TicTacToe.Model` compiles as the nested type
+/// "TicTacToe.Model+MoveRequest"), while FCS's symbolic FullName represents the exact
+/// same source-level qualified name with '.' throughout ("TicTacToe.Model.MoveRequest")
+/// — F# source syntax never distinguishes module-nesting from namespace-nesting.
+/// Without this normalization the two conventions never compare equal: methodsByRequestType's
+/// map key (built from live IAcceptsMetadata.RequestType.FullName) silently fails to match
+/// any module-nested RequestClrTypeName, so reconciliation no-ops and the codegen default
+/// survives unreconciled — the exact defect a coincidentally-correct codegen default can mask.
+let private normalizeClrTypeFullName (fullName: string) : string = fullName.Replace('+', '.')
+
 /// Real HTTP methods per accepted request CLR type full name, from live ApiDescriptions'
 /// IAcceptsMetadata. Precise correlation key: Frank.OpenApi's `accepts` operation is
 /// stamped only on the endpoint whose own HttpMethodMetadata matches
 /// (ResourceBuilderExtensions.addHandlerDefinition), so this disambiguates an action's
 /// real method even when its route also serves other verbs (e.g. POST /games/{id}
-/// accepting MoveRequest on a route that also serves GET for Game).
+/// accepting MoveRequest on a route that also serves GET for Game). The map key is
+/// normalized via normalizeClrTypeFullName so a module-nested request type correlates
+/// against codegen's FCS-derived RequestClrTypeName (both '.'-separated).
 let internal methodsByRequestType (provider: IApiDescriptionGroupCollectionProvider) : Map<string, Set<string>> =
     allApiDescriptions provider
     |> Seq.choose (fun d ->
@@ -150,7 +166,7 @@ let internal methodsByRequestType (provider: IApiDescriptionGroupCollectionProvi
             if isNull a.RequestType then
                 None
             else
-                Some(a.RequestType.FullName, d.HttpMethod)))
+                Some(normalizeClrTypeFullName a.RequestType.FullName, d.HttpMethod)))
     |> Seq.groupBy fst
     |> Seq.map (fun (typeName, entries) -> typeName, entries |> Seq.map snd |> Set.ofSeq)
     |> Map.ofSeq

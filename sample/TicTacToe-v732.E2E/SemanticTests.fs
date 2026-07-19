@@ -1457,12 +1457,24 @@ type SemanticTests() =
     // giving Frank.Discovery's Microsoft.AspNetCore.OpenApi-backed correlation
     // (IApiDescriptionGroupCollectionProvider) a live IAcceptsMetadata signal to match.
     //
-    // Falsifiability: MoveAction alone reading "unsafe" is also what the coincidentally-
-    // correct codegen default would produce (the old gap this issue closes), so this
-    // test additionally checks Game's Type is "safe" — genuinely live-derived from the
-    // SAME route's GET, but WRONG under the codegen default ("semantic", since Game
-    // declares no Rt) — a fact no static fallback could produce by coincidence — and
-    // grounds both classifications in an independently observed OPTIONS Allow header.
+    // Falsifiability (adversarial-review finding, confirmed live): MoveRequest is a
+    // module-nested F# type (`module TicTacToe.Model` → `MoveRequest`), so its CLR
+    // reflection FullName is '+'-nested ("TicTacToe.Model+MoveRequest") while codegen's
+    // FCS-derived RequestClrTypeName is '.'-separated ("TicTacToe.Model.MoveRequest") —
+    // these never compared equal before DiscoveryMiddleware.methodsByRequestType's
+    // normalizeClrTypeFullName fix, so reconciliation silently no-op'd. MoveRequest.rt
+    // is therefore deliberately declared absent in the ex: sample's lock file (see
+    // .frank/semantic-mappings.lock.json), making MoveAction's codegen-time default
+    // "semantic" — WRONG relative to the live POST's real "unsafe" classification. A
+    // reverted/broken correlation path (confirmed by temporarily disabling
+    // normalizeClrTypeFullName and re-running this exact test against the live server)
+    // serves "semantic" here, not "unsafe" — this assertion genuinely falsifies
+    // MoveAction's reconciliation specifically, not via Game as an indirect proxy.
+    // Game's own Type is checked too — reconciled from the live GET, WRONG under its
+    // own codegen default ("semantic", since Game declares no Rt either) — proving
+    // reconciliation runs at all (the coarser ClassIri/relation path), independent of
+    // the RequestClrTypeName-specific fix MoveAction's assertion targets. Both are
+    // grounded in an independently observed OPTIONS Allow header.
     [<Test>]
     member this.``AT-S9 ex: server's ALPS Types are genuinely live-derived from Microsoft.AspNetCore.OpenApi document generation``
         ()
@@ -1485,7 +1497,7 @@ type SemanticTests() =
             Assert.That(
                 moveActionType,
                 Is.EqualTo(Some "unsafe"),
-                "MoveAction must be served as 'unsafe', reconciled from the live POST /games/{id}'s IAcceptsMetadata (#400) — not left unresolved"
+                "MoveAction must be served as 'unsafe', reconciled from the live POST /games/{id}'s IAcceptsMetadata (#400) — overriding the WRONG codegen default 'semantic' (MoveRequest declares no Rt in the ex: lock file), not left unresolved"
             )
 
             let gameType = SemanticTests.AlpsDescriptorTypeByLocalId(alpsBody, "Game")

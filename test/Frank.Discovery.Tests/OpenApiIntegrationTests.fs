@@ -42,7 +42,12 @@ let private startCombinedServer () : WebApplication =
                     Descriptors = []
                     Rt = None
                     ClassIri = None
-                    RequestClrTypeName = Some typeof<MoveRequestFixture>.FullName } ] }
+                    // Deliberately NOT `typeof<MoveRequestFixture>.FullName` — that gives the
+                    // CLR-reflected '+'-nested form, masking the real defect this fixture
+                    // exists to catch (adversarial review finding, #400 AC2): codegen's actual
+                    // RequestClrTypeName is always FCS's dot-separated form for a module-nested
+                    // type, never the CLR '+' form.
+                    RequestClrTypeName = Some "Frank.Discovery.Tests.OpenApiIntegrationTests.MoveRequestFixture" } ] }
 
     builder.Services.AddSingleton(config) |> ignore
     let app = builder.Build()
