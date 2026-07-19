@@ -59,8 +59,9 @@ let routeEndpoint (pattern: string) (methods: string[]) (metadata: obj list) : R
 /// registered both as a DI singleton (ALPS Type correlation) and added to
 /// IEndpointRouteBuilder.DataSources (actual routing) — mirroring WebHostBuilder.Run's own
 /// sequence. `configureBuilder` (when given) runs before `Build()` — e.g. to register a
-/// logging provider.
-let private buildDiscoveryApp
+/// logging provider. Public (not `private`) so other Frank.Discovery.Tests modules (e.g.
+/// RelationTests.fs) reuse this exact wiring instead of re-declaring it.
+let buildDiscoveryApp
     (configureBuilder: (WebApplicationBuilder -> unit) option)
     (config: DiscoveryConfig)
     (endpoints: Endpoint[])

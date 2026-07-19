@@ -6,7 +6,6 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
-open Microsoft.Extensions.DependencyInjection
 open Expecto
 open Frank.Builder
 open Frank.Discovery
@@ -32,8 +31,9 @@ let private tryGetRelationMeta (ep: Microsoft.AspNetCore.Http.Endpoint) =
         Some(boxed |> unbox<ResourceRelationMetadata>)
 
 /// Spin a minimal TestServer seeded with two Frank resources, each carrying `relation`.
-/// Uses the SAME Frank.Builder.ResourceEndpointDataSource wiring WebHostBuilder.Run uses
-/// in production (#411) — the real, Frank-built Endpoint[] (already carrying
+/// Reuses TestHelpers.buildDiscoveryApp's ResourceEndpointDataSource wiring (#411 — the
+/// SAME concrete type DiscoveryMiddleware's production constructor receives via
+/// WebHostBuilder.Run) — the real, Frank-built Endpoint[] (already carrying
 /// ResourceRelationMetadata via the `relation` CE op) is wrapped directly, not re-declared
 /// via a second, redundant MapMethods/.WithMetadata pass.
 let private startRelationServer () =
@@ -59,17 +59,7 @@ let private startRelationServer () =
     let endpoints: Endpoint[] =
         Array.append gameResource.Endpoints lobbyResource.Endpoints
 
-    let builder = WebApplication.CreateBuilder()
-    builder.WebHost.UseTestServer() |> ignore
-    builder.Services.AddSingleton(config) |> ignore
-    builder.Services.AddRouting() |> ignore
-    let dataSource = ResourceEndpointDataSource(endpoints)
-    builder.Services.AddSingleton<IResourceEndpointDataSource>(dataSource) |> ignore
-    let app = builder.Build()
-    app.UseRouting() |> ignore
-    app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
-    (app :> IEndpointRouteBuilder).DataSources.Add(dataSource)
-
+    let app = buildDiscoveryApp None config endpoints
     app.StartAsync().GetAwaiter().GetResult()
     app
 
