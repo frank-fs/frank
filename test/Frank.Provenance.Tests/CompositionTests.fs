@@ -293,7 +293,9 @@ let private startDiscoveryServer (discConfig: DiscoveryConfig) =
         |> Option.bind (fun d -> d.Href)
         |> Option.defaultValue "urn:unknown"
 
-    let routePattern = Microsoft.AspNetCore.Routing.Patterns.RoutePatternFactory.Parse "/orders"
+    let routePattern =
+        Microsoft.AspNetCore.Routing.Patterns.RoutePatternFactory.Parse "/orders"
+
     let handler = RequestDelegate(fun ctx -> ctx.Response.WriteAsync("{}"))
 
     let metadata =
