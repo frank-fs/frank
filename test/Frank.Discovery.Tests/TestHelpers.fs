@@ -3,9 +3,11 @@ module Frank.Discovery.Tests.TestHelpers
 open System
 open System.Net.Http
 open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Metadata
 open Microsoft.AspNetCore.Mvc.ApiExplorer
 open Microsoft.AspNetCore.Routing
+open Microsoft.AspNetCore.Routing.Patterns
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
@@ -188,6 +190,19 @@ let startDuplicateRelationServerWithLogCapture (config: DiscoveryConfig) =
 /// #397: fixture request-body type for AcceptsMetadata-correlation tests (stands in
 /// for a generated MoveRequest-style type).
 type MoveRequestFixture = { Position: string }
+
+/// Build a RouteEndpoint stamping HttpMethodMetadata + the handler's own MethodInfo
+/// (mirrors Frank's real ResourceSpec.Build, which adds `handler.Method` —
+/// EndpointMetadataApiDescriptionProvider silently skips any endpoint lacking one) plus
+/// any extra caller-supplied metadata (#400).
+let routeEndpoint (pattern: string) (methods: string[]) (metadata: obj list) : RouteEndpoint =
+    let builder = RoutePatternFactory.Parse pattern
+    let handler = RequestDelegate(fun _ -> System.Threading.Tasks.Task.CompletedTask)
+
+    let metadataCollection =
+        EndpointMetadataCollection(box (HttpMethodMetadata(methods)) :: box handler.Method :: metadata)
+
+    RouteEndpoint(handler, builder, 0, metadataCollection, null)
 
 /// Spin a TestServer with GET /games/{id} (relation=Game), PUT and DELETE /widgets/{id}
 /// (single-method relations), and POST /games/{id} carrying IAcceptsMetadata for

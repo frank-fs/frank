@@ -1,11 +1,9 @@
 module Frank.Discovery.Tests.OpenApiCorrelationTests
 
-open System.Threading.Tasks
 open Expecto
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Metadata
 open Microsoft.AspNetCore.Routing
-open Microsoft.AspNetCore.Routing.Patterns
 open Microsoft.Extensions.FileProviders
 open Microsoft.Extensions.Primitives
 open Frank.Discovery
@@ -26,24 +24,11 @@ type private CountingEndpointDataSource(endpoints: Endpoint[]) =
 
     override _.GetChangeToken() = NullChangeToken.Singleton :> _
 
-/// A single POST /games/{id} endpoint carrying both correlation signals (relation +
-/// accepts) — enough for methodsByRelation and methodsByRequestType to each find a
-/// match, mirroring #397's original fixture shape. MethodInfo is stamped explicitly
-/// (mirrors Frank's real ResourceSpec.Build's `handler.Method`) — without it,
-/// EndpointMetadataApiDescriptionProvider silently skips the endpoint.
-let private moveEndpoint () : Endpoint =
-    let pattern = RoutePatternFactory.Parse "/games/{id}"
-    let handler = RequestDelegate(fun _ -> Task.CompletedTask)
-
-    let metadata =
-        EndpointMetadataCollection(
-            [ box (HttpMethodMetadata([| "POST" |]))
-              box handler.Method
-              box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
-              box (AcceptsMetadata([| "application/json" |], typeof<string>, false) :> obj) ]
-        )
-
-    RouteEndpoint(handler, pattern, 0, metadata, null)
+// moveEndpoint() (a single POST /games/{id} endpoint carrying both correlation signals
+// — relation + accepts, enough for methodsByRelation and methodsByRequestType to each
+// find a match) is now TestHelpers.routeEndpoint (#400 /simplify Fix 4): same
+// "RouteEndpoint + HttpMethodMetadata + handler.Method + extra metadata" construction as
+// AlpsTypeReconciliationTests.fs's routeEndpoint.
 
 [<Tests>]
 let tests =
@@ -51,7 +36,15 @@ let tests =
         "DiscoveryMiddleware — #400 AC1: single shared IApiDescriptionGroupCollectionProvider walk"
         [ test
               "Frank.Discovery's correlation + a second independent .ApiDescriptionGroups access (what Microsoft.AspNetCore.OpenApi's own document generation performs) walk EndpointDataSource.Endpoints exactly once total, not once per consumer" {
-              let countingDs = CountingEndpointDataSource([| moveEndpoint () |])
+              let countingDs =
+                  CountingEndpointDataSource(
+                      [| routeEndpoint
+                             "/games/{id}"
+                             [| "POST" |]
+                             [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
+                               box (AcceptsMetadata([| "application/json" |], typeof<string>, false) :> obj) ] |]
+                  )
+
               let provider = apiDescriptionProviderFor countingDs
 
               // Consumer #1: Frank.Discovery's own ALPS-Type correlation (DiscoveryMiddleware's

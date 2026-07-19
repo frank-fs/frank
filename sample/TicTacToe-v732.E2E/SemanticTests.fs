@@ -89,31 +89,37 @@ type SemanticTests() =
         walk doc.RootElement
         acc |> Seq.toList
 
-    /// Return the href of the ALPS descriptor whose id matches localId, or None.
-    /// Searches nested descriptors recursively; depth bounded by ALPS document structure.
-    static member private AlpsDescriptorHrefByLocalId(alpsBody: string, localId: string) : string option =
+    /// Return the given JSON property (`propertyName`, e.g. "href" or "type") of the
+    /// ALPS descriptor whose id matches localId, or None. Searches nested descriptors
+    /// recursively; depth bounded by ALPS document structure. Shared implementation for
+    /// AlpsDescriptorHrefByLocalId ("href") and AlpsDescriptorTypeByLocalId ("type") —
+    /// the two were a near-verbatim copy differing only in property name (#400 /simplify
+    /// Fix 5).
+    static member private AlpsDescriptorPropertyByLocalId
+        (alpsBody: string, localId: string, propertyName: string)
+        : string option =
         use doc = JsonDocument.Parse alpsBody
         let mutable alpsEl = Unchecked.defaultof<JsonElement>
         let mutable descriptorEl = Unchecked.defaultof<JsonElement>
 
-        let matchHref (d: JsonElement) : string option =
+        let matchProperty (d: JsonElement) : string option =
             let mutable idEl = Unchecked.defaultof<JsonElement>
-            let mutable hrefEl = Unchecked.defaultof<JsonElement>
+            let mutable propEl = Unchecked.defaultof<JsonElement>
 
             if
                 d.TryGetProperty("id", &idEl)
                 && idEl.GetString() = localId
-                && d.TryGetProperty("href", &hrefEl)
+                && d.TryGetProperty(propertyName, &propEl)
             then
-                hrefEl.GetString() |> Option.ofObj
+                propEl.GetString() |> Option.ofObj
             else
                 None
 
         let rec findIn (arr: JsonElement) : string option =
             arr.EnumerateArray()
             |> Seq.tryPick (fun d ->
-                match matchHref d with
-                | Some h -> Some h
+                match matchProperty d with
+                | Some v -> Some v
                 | None ->
                     let mutable nestedEl = Unchecked.defaultof<JsonElement>
 
@@ -130,48 +136,15 @@ type SemanticTests() =
         else
             None
 
+    /// Return the href of the ALPS descriptor whose id matches localId, or None.
+    static member private AlpsDescriptorHrefByLocalId(alpsBody: string, localId: string) : string option =
+        SemanticTests.AlpsDescriptorPropertyByLocalId(alpsBody, localId, "href")
+
     /// Return the ALPS "type" of the descriptor whose id matches localId, or None.
-    /// Searches nested descriptors recursively; depth bounded by ALPS document structure.
     /// #400 AC2: the live-derived counterpart to AlpsDescriptorHrefByLocalId — reads the
     /// served (post-reconciliation) Type, not the codegen-time fallback baked at build time.
     static member private AlpsDescriptorTypeByLocalId(alpsBody: string, localId: string) : string option =
-        use doc = JsonDocument.Parse alpsBody
-        let mutable alpsEl = Unchecked.defaultof<JsonElement>
-        let mutable descriptorEl = Unchecked.defaultof<JsonElement>
-
-        let matchType (d: JsonElement) : string option =
-            let mutable idEl = Unchecked.defaultof<JsonElement>
-            let mutable typeEl = Unchecked.defaultof<JsonElement>
-
-            if
-                d.TryGetProperty("id", &idEl)
-                && idEl.GetString() = localId
-                && d.TryGetProperty("type", &typeEl)
-            then
-                typeEl.GetString() |> Option.ofObj
-            else
-                None
-
-        let rec findIn (arr: JsonElement) : string option =
-            arr.EnumerateArray()
-            |> Seq.tryPick (fun d ->
-                match matchType d with
-                | Some t -> Some t
-                | None ->
-                    let mutable nestedEl = Unchecked.defaultof<JsonElement>
-
-                    if d.TryGetProperty("descriptor", &nestedEl) then
-                        findIn nestedEl
-                    else
-                        None)
-
-        if
-            doc.RootElement.TryGetProperty("alps", &alpsEl)
-            && alpsEl.TryGetProperty("descriptor", &descriptorEl)
-        then
-            findIn descriptorEl
-        else
-            None
+        SemanticTests.AlpsDescriptorPropertyByLocalId(alpsBody, localId, "type")
 
     /// Find the non-agent input of the ALPS 'unsafe' (action) descriptor by role.
     /// Returns the origin-resolved absolute IRI of the nested field whose href is NOT agentIri.

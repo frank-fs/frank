@@ -12,6 +12,7 @@
     <Compile Include="ProblemJson.fs" />
     <Compile Include="RequestBodyBuffer.fs" />
     <Compile Include="ContentNegotiation.fs" />
+    <Compile Include="ClrTypeName.fs" />
     <Compile Include="UriResolution.fs" />
     <Compile Include="OriginValidation.fs" />
     <Compile Include="GeneratedModuleReflection.fs" />

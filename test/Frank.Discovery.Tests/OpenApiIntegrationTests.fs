@@ -6,6 +6,7 @@ open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Expecto
 open Frank.Discovery
+open Frank.Discovery.Tests.TestHelpers
 
 /// #400 AC1, end-to-end: an app that references BOTH Frank.Discovery (project-referenced
 /// by this test project) AND Frank.OpenApi (also project-referenced — see fsproj) must
@@ -14,8 +15,8 @@ open Frank.Discovery
 /// mirrored here via the same underlying services.AddOpenApi()/app.MapOpenApi() calls
 /// Frank.OpenApi's WebHostBuilderExtensions wraps) without collision — each document
 /// name is independent (Frank.Discovery: "frank-discovery-internal"; this app: default
-/// "v1"), and Frank.Discovery never itself calls MapOpenApi().
-type private MoveRequestFixture = { Position: string }
+/// "v1"), and Frank.Discovery never itself calls MapOpenApi(). Uses TestHelpers'
+/// MoveRequestFixture (shared #400 module-nested fixture, #400 /simplify Fix 3).
 
 let private startCombinedServer () : WebApplication =
     let builder = WebApplication.CreateBuilder()
@@ -47,7 +48,7 @@ let private startCombinedServer () : WebApplication =
                     // exists to catch (adversarial review finding, #400 AC2): codegen's actual
                     // RequestClrTypeName is always FCS's dot-separated form for a module-nested
                     // type, never the CLR '+' form.
-                    RequestClrTypeName = Some "Frank.Discovery.Tests.OpenApiIntegrationTests.MoveRequestFixture" } ] }
+                    RequestClrTypeName = Some "Frank.Discovery.Tests.TestHelpers.MoveRequestFixture" } ] }
 
     builder.Services.AddSingleton(config) |> ignore
     let app = builder.Build()

@@ -1,30 +1,38 @@
 module Frank.Discovery.Tests.AlpsTypeReconciliationTests
 
 open Expecto
-open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Metadata
-open Microsoft.AspNetCore.Routing
-open Microsoft.AspNetCore.Routing.Patterns
 open Frank.Discovery
 open Frank.Discovery.Tests.TestHelpers
 open Frank.Tests.Shared.TestEndpointDataSource
 
-/// #400 AC2 (adversarial-review finding): a module-nested fixture type. F# compiles a
-/// type declared textually inside a `module` (this file's own top-level module) as a
-/// NESTED CLR type of that module's compiled class, so CLR reflection separates it with
-/// '+' (e.g. "...AlpsTypeReconciliationTests+ModuleNestedRequestFixture"). DiscoveryEmitter's
-/// real codegen output (FCS's FSharpEntity.TryFullName, Frank.Cli.Core/Extractor.fs) bakes
-/// the SAME logical name with '.' throughout instead
-/// ("...AlpsTypeReconciliationTests.ModuleNestedRequestFixture") — F# source syntax never
-/// distinguishes module-nesting from namespace-nesting. Constructed here as a literal
-/// string, NOT via `typeof<ModuleNestedRequestFixture>.FullName.Replace('+', '.')` or any
-/// other transform of the SAME reflection call used to build the live AcceptsMetadata
-/// below — otherwise both sides would agree by construction and this test would prove
-/// nothing (the exact masking that hid the original defect).
-type private ModuleNestedRequestFixture = { Position: string }
+/// #400 AC2 (adversarial-review finding): MoveRequestFixture (TestHelpers.fs) is a
+/// module-nested fixture type. F# compiles a type declared textually inside a `module`
+/// as a NESTED CLR type of that module's compiled class, so CLR reflection separates it
+/// with '+' (e.g. "...TestHelpers+MoveRequestFixture"). DiscoveryEmitter's real codegen
+/// output (FCS's FSharpEntity.TryFullName, Frank.Cli.Core/Extractor.fs) bakes the SAME
+/// logical name with '.' throughout instead ("...TestHelpers.MoveRequestFixture") — F#
+/// source syntax never distinguishes module-nesting from namespace-nesting. Constructed
+/// here as a literal string, NOT via `typeof<MoveRequestFixture>.FullName.Replace('+', '.')`
+/// or any other transform of the SAME reflection call used to build the live
+/// AcceptsMetadata below — otherwise both sides would agree by construction and this
+/// test would prove nothing (the exact masking that hid the original defect).
+let private moveRequestFixtureFcsStyleName =
+    "Frank.Discovery.Tests.TestHelpers.MoveRequestFixture"
 
-let private moduleNestedRequestFixtureFcsStyleName =
-    "Frank.Discovery.Tests.AlpsTypeReconciliationTests.ModuleNestedRequestFixture"
+/// #400 /simplify Fix 2 (maintainer-requested correctness hardening): a closed generic
+/// fixture type. CLR reflection appends a backtick-arity marker AND, for a closed
+/// generic, bracketed assembly-qualified type arguments (e.g.
+/// "...GenericRequestFixture`1[[System.Int32, ...]]"), while FCS's TryFullName for the
+/// same (open, unapplied) generic type definition keeps the backtick-arity marker but
+/// never the bracketed type arguments ("...GenericRequestFixture`1") — confirmed via a
+/// `dotnet fsi` probe against FSharpChecker.ParseAndCheckProject (see Frank.ClrTypeName
+/// module doc), not assumed. Constructed here as a literal string for the same
+/// masking-proof reason as moveRequestFixtureFcsStyleName above.
+type private GenericRequestFixture<'T> = { Payload: 'T }
+
+let private genericRequestFixtureFcsStyleName =
+    "Frank.Discovery.Tests.AlpsTypeReconciliationTests.GenericRequestFixture`1"
 
 // ── #397 AC1: alpsTypeForMethods (pure) ───────────────────────────────────────
 
@@ -176,18 +184,10 @@ let reconcileAlpsTypesTests =
 // #397's original version of these tests drove EndpointDataSource directly; #400 sources
 // correlation from IApiDescriptionGroupCollectionProvider instead (the shared provider
 // Microsoft.AspNetCore.OpenApi's own document generation also reads — see
-// DiscoveryMiddleware.fs's module-level rationale comment). routeEndpoint here must stamp
-// a MethodInfo (mirroring Frank's real ResourceSpec.Build, which adds `handler.Method`) —
-// EndpointMetadataApiDescriptionProvider silently skips any endpoint lacking one.
-
-let private routeEndpoint (pattern: string) (methods: string[]) (metadata: obj list) : RouteEndpoint =
-    let builder = RoutePatternFactory.Parse pattern
-    let handler = RequestDelegate(fun _ -> System.Threading.Tasks.Task.CompletedTask)
-
-    let metadataCollection =
-        EndpointMetadataCollection(box (HttpMethodMetadata(methods)) :: box handler.Method :: metadata)
-
-    RouteEndpoint(handler, builder, 0, metadataCollection, null)
+// DiscoveryMiddleware.fs's module-level rationale comment). routeEndpoint (TestHelpers.fs)
+// here must stamp a MethodInfo (mirroring Frank's real ResourceSpec.Build, which adds
+// `handler.Method`) — EndpointMetadataApiDescriptionProvider silently skips any endpoint
+// lacking one.
 
 [<Tests>]
 let methodsByRelationTests =
@@ -257,20 +257,57 @@ let methodsByRelationTests =
               // for the wrong reason, the exact "same-derivation-both-sides" masking
               // that let the original bug hide behind #397's/#400's earlier tests).
               Expect.stringContains
-                  typeof<ModuleNestedRequestFixture>.FullName
+                  typeof<MoveRequestFixture>.FullName
                   "+"
                   "sanity: a type declared inside a module is CLR-reflected as nested ('+') — proves this fixture is genuinely module-nested, not a vacuous top-level type"
 
               Expect.isFalse
-                  (typeof<ModuleNestedRequestFixture>.FullName = moduleNestedRequestFixtureFcsStyleName)
+                  (typeof<MoveRequestFixture>.FullName = moveRequestFixtureFcsStyleName)
                   "sanity: the raw CLR FullName must NOT already equal the FCS-style dotted form — otherwise normalization couldn't be distinguished from a no-op"
 
               let ep =
                   routeEndpoint
                       "/games/{id}"
                       [| "POST" |]
+                      [ box (AcceptsMetadata([| "application/json" |], typeof<MoveRequestFixture>, false) :> obj) ]
+
+              let ds = TestEndpointDataSource([| ep |])
+              let provider = apiDescriptionProviderFor ds
+              let result = DiscoveryMiddleware.methodsByRequestType provider
+
+              Expect.equal
+                  (Map.find moveRequestFixtureFcsStyleName result)
+                  (Set.ofList [ "POST" ])
+                  "methodsByRequestType's map key must be the FCS-style dotted form (matching real codegen's RequestClrTypeName) — not the raw CLR '+'-nested reflection value — or reconciliation silently no-ops for every module-nested request type in production"
+          }
+
+          test
+              "methodsByRequestType normalizes a closed generic CLR type's backtick-arity + bracketed type-args to the FCS-equivalent form (#400 /simplify Fix 2)" {
+              // Sanity checks first, same rigor as the module-nested case above: prove
+              // this fixture genuinely exercises BOTH the '+' nesting AND the
+              // backtick-arity/bracketed-args mismatch, not a vacuous generic that
+              // happens to already agree with the FCS-style form.
+              let rawFullName = typeof<GenericRequestFixture<int>>.FullName
+
+              Expect.stringContains rawFullName "+" "sanity: nested inside this file's module — CLR-reflected with '+'"
+
+              Expect.stringContains rawFullName "`1" "sanity: generic backtick-arity marker present"
+
+              Expect.stringContains
+                  rawFullName
+                  "[["
+                  "sanity: bracketed, assembly-qualified type arguments present (closed generic)"
+
+              Expect.isFalse
+                  (rawFullName = genericRequestFixtureFcsStyleName)
+                  "sanity: the raw CLR FullName must NOT already equal the FCS-style form — otherwise normalization couldn't be distinguished from a no-op"
+
+              let ep =
+                  routeEndpoint
+                      "/games/{id}"
+                      [| "POST" |]
                       [ box (
-                            AcceptsMetadata([| "application/json" |], typeof<ModuleNestedRequestFixture>, false) :> obj
+                            AcceptsMetadata([| "application/json" |], typeof<GenericRequestFixture<int>>, false) :> obj
                         ) ]
 
               let ds = TestEndpointDataSource([| ep |])
@@ -278,7 +315,7 @@ let methodsByRelationTests =
               let result = DiscoveryMiddleware.methodsByRequestType provider
 
               Expect.equal
-                  (Map.find moduleNestedRequestFixtureFcsStyleName result)
+                  (Map.find genericRequestFixtureFcsStyleName result)
                   (Set.ofList [ "POST" ])
-                  "methodsByRequestType's map key must be the FCS-style dotted form (matching real codegen's RequestClrTypeName) — not the raw CLR '+'-nested reflection value — or reconciliation silently no-ops for every module-nested request type in production"
+                  "methodsByRequestType's map key must strip the closed generic's bracketed type-args (keeping the backtick-arity marker) and normalize '+' to '.' — matching codegen's FCS-derived RequestClrTypeName for a generic request type"
           } ]

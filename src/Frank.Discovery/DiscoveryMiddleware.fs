@@ -123,32 +123,45 @@ let private apiDescriptionMetadataOf<'T> (d: ApiDescription) : 'T option =
         | :? 'T as t -> Some t
         | _ -> None)
 
+/// One fold over every live ApiDescription, reading each's EndpointMetadata once and
+/// accumulating BOTH correlation keys simultaneously — relation IRI (from
+/// ResourceRelationMetadata) and accepted request CLR type full name (from
+/// IAcceptsMetadata, normalized via Frank.ClrTypeName so a module-nested/generic request
+/// type correlates against codegen's FCS-derived RequestClrTypeName). Grouping into the
+/// two final maps happens once, at the end, from the accumulated pairs. This is the
+/// single-pass consolidation of what were two independent walks of allApiDescriptions
+/// (#400 /simplify Fix 6) — used both by methodsByRelation/methodsByRequestType below
+/// (each still a single walk when called alone, for isolated testability) and by
+/// cachedAlpsDescriptors's lazy, the only call site that needs both maps together.
+let private correlateMethodsByRelationAndRequestType
+    (provider: IApiDescriptionGroupCollectionProvider)
+    : Map<string, Set<string>> * Map<string, Set<string>> =
+    let byRelation = ResizeArray<string * string>()
+    let byRequestType = ResizeArray<string * string>()
+
+    for d in allApiDescriptions provider do
+        apiDescriptionMetadataOf<ResourceRelationMetadata> d
+        |> Option.iter (fun r -> byRelation.Add(r.Relation, d.HttpMethod))
+
+        apiDescriptionMetadataOf<IAcceptsMetadata> d
+        |> Option.iter (fun a ->
+            if not (isNull a.RequestType) then
+                byRequestType.Add(Frank.ClrTypeName.normalizeFullName a.RequestType.FullName, d.HttpMethod))
+
+    let toMethodsMap (pairs: ResizeArray<string * string>) =
+        pairs
+        |> Seq.groupBy fst
+        |> Seq.map (fun (key, entries) -> key, entries |> Seq.map snd |> Set.ofSeq)
+        |> Map.ofSeq
+
+    toMethodsMap byRelation, toMethodsMap byRequestType
+
 /// Real HTTP methods per relation IRI, from live ApiDescriptions' ResourceRelationMetadata.
 /// Coarse correlation key: one `resource { relation X; ... }` block stamps the SAME
 /// relation on every verb it registers, so a route serving both GET and POST under one
 /// relation (#390) yields a multi-method set here.
 let internal methodsByRelation (provider: IApiDescriptionGroupCollectionProvider) : Map<string, Set<string>> =
-    allApiDescriptions provider
-    |> Seq.choose (fun d ->
-        apiDescriptionMetadataOf<ResourceRelationMetadata> d
-        |> Option.map (fun r -> r.Relation, d.HttpMethod))
-    |> Seq.groupBy fst
-    |> Seq.map (fun (relation, entries) -> relation, entries |> Seq.map snd |> Set.ofSeq)
-    |> Map.ofSeq
-
-/// Normalize a live, reflection-derived `System.Type.FullName` to the SAME convention
-/// DiscoveryEmitter bakes into `RequestClrTypeName` (FSharpEntity.TryFullName, via
-/// Frank.Cli.Core's Extractor/ConventionEngine/ResolvedModel pipeline). CLR reflection
-/// separates a type nested in a compiled F# module with '+' (e.g. a `MoveRequest`
-/// record declared inside `module TicTacToe.Model` compiles as the nested type
-/// "TicTacToe.Model+MoveRequest"), while FCS's symbolic FullName represents the exact
-/// same source-level qualified name with '.' throughout ("TicTacToe.Model.MoveRequest")
-/// — F# source syntax never distinguishes module-nesting from namespace-nesting.
-/// Without this normalization the two conventions never compare equal: methodsByRequestType's
-/// map key (built from live IAcceptsMetadata.RequestType.FullName) silently fails to match
-/// any module-nested RequestClrTypeName, so reconciliation no-ops and the codegen default
-/// survives unreconciled — the exact defect a coincidentally-correct codegen default can mask.
-let private normalizeClrTypeFullName (fullName: string) : string = fullName.Replace('+', '.')
+    correlateMethodsByRelationAndRequestType provider |> fst
 
 /// Real HTTP methods per accepted request CLR type full name, from live ApiDescriptions'
 /// IAcceptsMetadata. Precise correlation key: Frank.OpenApi's `accepts` operation is
@@ -156,20 +169,10 @@ let private normalizeClrTypeFullName (fullName: string) : string = fullName.Repl
 /// (ResourceBuilderExtensions.addHandlerDefinition), so this disambiguates an action's
 /// real method even when its route also serves other verbs (e.g. POST /games/{id}
 /// accepting MoveRequest on a route that also serves GET for Game). The map key is
-/// normalized via normalizeClrTypeFullName so a module-nested request type correlates
-/// against codegen's FCS-derived RequestClrTypeName (both '.'-separated).
+/// normalized via Frank.ClrTypeName.normalizeFullName so a module-nested/generic request
+/// type correlates against codegen's FCS-derived RequestClrTypeName.
 let internal methodsByRequestType (provider: IApiDescriptionGroupCollectionProvider) : Map<string, Set<string>> =
-    allApiDescriptions provider
-    |> Seq.choose (fun d ->
-        apiDescriptionMetadataOf<IAcceptsMetadata> d
-        |> Option.bind (fun a ->
-            if isNull a.RequestType then
-                None
-            else
-                Some(normalizeClrTypeFullName a.RequestType.FullName, d.HttpMethod)))
-    |> Seq.groupBy fst
-    |> Seq.map (fun (typeName, entries) -> typeName, entries |> Seq.map snd |> Set.ofSeq)
-    |> Map.ofSeq
+    correlateMethodsByRelationAndRequestType provider |> snd
 
 /// ALPS §2.2 transition semantics from a resource's real registered HTTP method(s).
 /// GET present (however else the route is used) is safe; exactly {PUT} or {DELETE} is
@@ -329,10 +332,10 @@ type DiscoveryMiddleware
     // endpoint set is fixed after startup.
     let cachedAlpsDescriptors =
         lazy
-            (reconcileAlpsTypes
-                (methodsByRelation apiDescriptionProvider)
-                (methodsByRequestType apiDescriptionProvider)
-                config.AlpsDescriptors)
+            (let methodsByRel, methodsByReq =
+                correlateMethodsByRelationAndRequestType apiDescriptionProvider
+
+             reconcileAlpsTypes methodsByRel methodsByReq config.AlpsDescriptors)
 
     // #398: DescribedByLinks keyed by class IRI, so a matched route's own declared
     // relation looks up only its own rel="type" link(s) — never every app resource's.

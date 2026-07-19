@@ -96,7 +96,7 @@ module private Capture =
         sentinelTypes |> Array.exists (fun s -> s = t)
 
     let private lookupProvClass (config: ProvenanceConfig) (t: Type) : (Frank.Semantic.ProvOClass * Uri) option =
-        let key = t.FullName.Replace('+', '.')
+        let key = Frank.ClrTypeName.normalizeFullName t.FullName
 
         Map.tryFind key config.ProvClasses
         |> Option.bind (fun (cls, iriOpt) -> iriOpt |> Option.map (fun iri -> cls, iri))
