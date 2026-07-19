@@ -210,31 +210,19 @@ module Builder =
 
     val resource: routeTemplate: string -> ResourceBuilder
 
-    /// Public marker interface for Frank's own narrow, Frank-only EndpointDataSource
-    /// (#411 / narrowed post-review). Exists solely so DiscoveryMiddleware's public
-    /// constructor (ASP.NET Core's UseMiddleware&lt;T&gt; enumerates public constructors
-    /// only) can depend on a public type without exposing ResourceEndpointDataSource's own
-    /// constructor — which would let any Frank app construct and register a spoofed
-    /// instance into DI. Only WebHostBuilder.Run ever constructs the concrete type;
-    /// everything else (DiscoveryMiddleware included) depends on this interface.
-    type IResourceEndpointDataSource =
-        /// The underlying EndpointDataSource — Frank's own composed Endpoint[] only.
-        abstract member DataSource: EndpointDataSource
-
     /// The EndpointDataSource wrapping Frank's own composed Endpoint[] — the SAME array
     /// spec.Endpoints holds after full webHost CE composition. WebHostBuilder.Run registers
     /// this exact instance as a narrowly-typed DI singleton (#411), separately from the
     /// generic EndpointDataSource it also adds to IEndpointRouteBuilder.DataSources —
-    /// Frank.Discovery's DiscoveryMiddleware constructor-injects IResourceEndpointDataSource
+    /// Frank.Discovery's DiscoveryMiddleware constructor-injects this concrete type
     /// specifically for ALPS Type correlation, reading Endpoint.Metadata directly with no
     /// ApiExplorer/reflection dependency. The constructor is internal — only
-    /// WebHostBuilder.Run constructs one; external code can only depend on
-    /// IResourceEndpointDataSource.
+    /// WebHostBuilder.Run constructs one; the public sealed type with an internal
+    /// constructor already prevents external code from spoofing an instance into DI.
     [<Sealed>]
     type ResourceEndpointDataSource =
         internal new: endpoints: Endpoint[] -> ResourceEndpointDataSource
         inherit EndpointDataSource
-        interface IResourceEndpointDataSource
 
     type WebHostSpec =
         { Host: (IWebHostBuilder -> IWebHostBuilder)

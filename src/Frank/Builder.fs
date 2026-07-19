@@ -361,35 +361,22 @@ module Builder =
 
     let resource routeTemplate = ResourceBuilder(routeTemplate)
 
-    /// Public marker interface for Frank's own narrow, Frank-only EndpointDataSource
-    /// (#411 / narrowed post-review). Exists solely so DiscoveryMiddleware's public
-    /// constructor (ASP.NET Core's UseMiddleware&lt;T&gt; enumerates public constructors
-    /// only) can depend on a public type without exposing ResourceEndpointDataSource's own
-    /// constructor — which would let any Frank app construct and register a spoofed
-    /// instance into DI. Only WebHostBuilder.Run ever constructs the concrete type;
-    /// everything else (DiscoveryMiddleware included) depends on this interface.
-    type IResourceEndpointDataSource =
-        /// The underlying EndpointDataSource — Frank's own composed Endpoint[] only.
-        abstract member DataSource: EndpointDataSource
-
     /// The EndpointDataSource wrapping Frank's own composed Endpoint[] — the SAME array
     /// spec.Endpoints holds after full webHost CE composition. WebHostBuilder.Run registers
     /// this exact instance as a narrowly-typed DI singleton (#411), separately from the
     /// generic EndpointDataSource it also adds to IEndpointRouteBuilder.DataSources.
     /// Extension packages (e.g. Frank.Discovery's DiscoveryMiddleware) constructor-inject
-    /// IResourceEndpointDataSource when they need to read ONLY Frank-declared endpoints —
-    /// never any non-Frank endpoint that might share the generic composite
-    /// EndpointDataSource. The constructor is internal — only WebHostBuilder.Run
-    /// constructs one; external code can only depend on IResourceEndpointDataSource.
+    /// this concrete type when they need to read ONLY Frank-declared endpoints — never any
+    /// non-Frank endpoint that might share the generic composite EndpointDataSource. The
+    /// constructor is internal — only WebHostBuilder.Run constructs one; the public sealed
+    /// type with an internal constructor already prevents external code from spoofing an
+    /// instance into DI.
     [<Sealed>]
     type ResourceEndpointDataSource internal (endpoints: Endpoint[]) =
         inherit EndpointDataSource()
 
         override __.Endpoints = endpoints :> _
         override __.GetChangeToken() = NullChangeToken.Singleton :> _
-
-        interface IResourceEndpointDataSource with
-            member this.DataSource = this :> EndpointDataSource
 
     type WebHostSpec =
         { Host: (IWebHostBuilder -> IWebHostBuilder)
@@ -461,7 +448,7 @@ module Builder =
             // for ALPS Type correlation, reading Endpoint.Metadata directly — no
             // ApiExplorer/reflection walk involved (#411).
             let dataSource = ResourceEndpointDataSource(spec.Endpoints)
-            builder.Services.AddSingleton<IResourceEndpointDataSource>(dataSource) |> ignore
+            builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
 
             spec.Host(builder.WebHost) |> ignore
             spec.Services(builder.Services) |> ignore
@@ -494,7 +481,7 @@ module Builder =
                         .Host(webBuilder)
                         .ConfigureServices(fun services ->
                             spec.Services services |> ignore
-                            services.AddSingleton<IResourceEndpointDataSource>(dataSource) |> ignore)
+                            services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore)
                         .Configure(fun app ->
                             app
                             |> spec.BeforeRoutingMiddleware

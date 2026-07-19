@@ -21,7 +21,7 @@ let private runSpecOnTestServer (spec: WebHostSpec) : WebApplication =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     let dataSource = ResourceEndpointDataSource(spec.Endpoints)
-    builder.Services.AddSingleton<IResourceEndpointDataSource>(dataSource) |> ignore
+    builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
     spec.Services builder.Services |> ignore
     let app = builder.Build()
 

@@ -312,7 +312,7 @@ let private startDiscoveryServer (discConfig: DiscoveryConfig) =
     builder.Services.AddSingleton(discConfig) |> ignore
     builder.Services.AddRouting() |> ignore
     let dataSource = ResourceEndpointDataSource([| endpoint |])
-    builder.Services.AddSingleton<IResourceEndpointDataSource>(dataSource) |> ignore
+    builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore

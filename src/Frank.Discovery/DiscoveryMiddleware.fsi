@@ -75,7 +75,7 @@ type DiscoveryMiddleware =
         next: RequestDelegate *
         config: DiscoveryConfig *
         endpointDataSource: EndpointDataSource *
-        resourceEndpointDataSource: Frank.Builder.IResourceEndpointDataSource *
+        resourceEndpointDataSource: Frank.Builder.ResourceEndpointDataSource *
         logger: ILogger<DiscoveryMiddleware> ->
             DiscoveryMiddleware
 

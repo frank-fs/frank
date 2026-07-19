@@ -71,7 +71,7 @@ let buildDiscoveryApp
     builder.Services.AddSingleton(config) |> ignore
     builder.Services.AddRouting() |> ignore
     let dataSource = ResourceEndpointDataSource(endpoints)
-    builder.Services.AddSingleton<IResourceEndpointDataSource>(dataSource) |> ignore
+    builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
     configureBuilder |> Option.iter (fun f -> f builder)
     let app = builder.Build()
     app.UseRouting() |> ignore
