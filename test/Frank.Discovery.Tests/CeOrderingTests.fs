@@ -21,7 +21,7 @@ let private runSpecOnTestServer (spec: WebHostSpec) : WebApplication =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     let dataSource = ResourceEndpointDataSource(spec.Endpoints)
-    builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
+    builder.Services.AddSingleton<IResourceEndpointDataSource>(dataSource) |> ignore
     spec.Services builder.Services |> ignore
     let app = builder.Build()
 
@@ -46,8 +46,7 @@ let private runSpecOnTestServer (spec: WebHostSpec) : WebApplication =
 let tests =
     testList
         "webHost CE — #411 AC2: useDiscoveryWith-before-resource ordering safety"
-        [ testCase
-              "useDiscoveryWith declared BEFORE the resource block still reconciles that resource's live ALPS Type"
+        [ testCase "useDiscoveryWith declared BEFORE the resource block still reconciles that resource's live ALPS Type"
           <| fun _ ->
               let builder = WebHostBuilder([||])
 
@@ -55,18 +54,18 @@ let tests =
                   { DiscoveryConfig.Empty with
                       ProfileUri = "/alps/test"
                       AlpsDescriptors =
-                        [ { Id = "Game"
-                            // Deliberately WRONG codegen default — must be overridden by live
-                            // reconciliation for this test to prove anything (a vacuous fixture
-                            // where the default already matches the reconciled value would pass
-                            // even with reconciliation silently no-op'd).
-                            Type = "unsafe"
-                            Doc = None
-                            Href = Some "https://schema.org/Game"
-                            Descriptors = []
-                            Rt = None
-                            ClassIri = Some "https://schema.org/Game"
-                            RequestClrTypeName = None } ] }
+                          [ { Id = "Game"
+                              // Deliberately WRONG codegen default — must be overridden by live
+                              // reconciliation for this test to prove anything (a vacuous fixture
+                              // where the default already matches the reconciled value would pass
+                              // even with reconciliation silently no-op'd).
+                              Type = "unsafe"
+                              Doc = None
+                              Href = Some "https://schema.org/Game"
+                              Descriptors = []
+                              Rt = None
+                              ClassIri = Some "https://schema.org/Game"
+                              RequestClrTypeName = None } ] }
 
               let gameResource =
                   resource "/games/{id}" {

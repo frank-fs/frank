@@ -70,7 +70,7 @@ let private buildDiscoveryApp
     builder.Services.AddSingleton(config) |> ignore
     builder.Services.AddRouting() |> ignore
     let dataSource = ResourceEndpointDataSource(endpoints)
-    builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
+    builder.Services.AddSingleton<IResourceEndpointDataSource>(dataSource) |> ignore
     configureBuilder |> Option.iter (fun f -> f builder)
     let app = builder.Build()
     app.UseRouting() |> ignore
@@ -205,10 +205,7 @@ let startAlpsTypeServer (config: DiscoveryConfig) =
                "/games/{id}"
                [| "POST" |]
                [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
-                 box (
-                     AcceptsMetadata([| "application/json" |], typeof<MoveRequestFixture>, false)
-                     :> IAcceptsMetadata
-                 ) ]
+                 box (AcceptsMetadata([| "application/json" |], typeof<MoveRequestFixture>, false) :> IAcceptsMetadata) ]
            routeEndpoint
                "/widgets/{id}"
                [| "PUT" |]

@@ -291,7 +291,7 @@ type DiscoveryMiddleware
         next: RequestDelegate,
         config: DiscoveryConfig,
         endpointDataSource: EndpointDataSource,
-        resourceEndpointDataSource: Frank.Builder.ResourceEndpointDataSource,
+        resourceEndpointDataSource: Frank.Builder.IResourceEndpointDataSource,
         logger: ILogger<DiscoveryMiddleware>
     ) =
 
@@ -331,7 +331,7 @@ type DiscoveryMiddleware
     let cachedAlpsDescriptors =
         lazy
             (let methodsByRel, methodsByReq =
-                correlateMethodsByRelationAndRequestType (resourceEndpointDataSource :> EndpointDataSource)
+                correlateMethodsByRelationAndRequestType resourceEndpointDataSource.DataSource
 
              reconcileAlpsTypes methodsByRel methodsByReq config.AlpsDescriptors)
 

@@ -40,4 +40,16 @@
     </AssemblyAttribute>
   </ItemGroup>
 
+  <!-- ResourceEndpointDataSource's constructor is internal (#411 narrowed post-review):
+       only WebHostBuilder.Run constructs one in production. These two test assemblies
+       deliberately mirror that exact production wiring to test it directly. -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Frank.Discovery.Tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Frank.Provenance.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>

@@ -64,7 +64,7 @@ let private startRelationServer () =
     builder.Services.AddSingleton(config) |> ignore
     builder.Services.AddRouting() |> ignore
     let dataSource = ResourceEndpointDataSource(endpoints)
-    builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
+    builder.Services.AddSingleton<IResourceEndpointDataSource>(dataSource) |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
