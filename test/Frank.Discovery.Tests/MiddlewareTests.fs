@@ -361,7 +361,12 @@ let private alpsTypeConfig =
             ClassIri = Some "https://schema.org/Game"
             RequestClrTypeName = None }
           { Id = "MoveAction"
-            Type = "unsafe"
+            // Codegen default is deliberately WRONG ("idempotent") — reconciliation must
+            // override it to "unsafe" from the live POST's IAcceptsMetadata (#400: this
+            // used to coincidentally match "unsafe" already, which meant a test asserting
+            // "unsafe" here proved nothing about reconciliation actually running — see
+            // #400 AC2 E2E findings).
+            Type = "idempotent"
             Doc = None
             Href = Some "https://schema.org/MoveAction"
             Descriptors = []
@@ -431,7 +436,7 @@ let alpsTypeReconciliationTests =
               Expect.equal
                   (alpsTypeOf "MoveAction" body)
                   "unsafe"
-                  "MoveAction must be unsafe — resolved via the real POST endpoint's IAcceptsMetadata, not relation (no live relation exists for MoveAction)"
+                  "MoveAction must be unsafe, overriding the wrong codegen default 'idempotent' — resolved via the real POST endpoint's IAcceptsMetadata, not relation (no live relation exists for MoveAction)"
 
           testCase "PUT-only route -> served Type is idempotent"
           <| fun _ ->

@@ -284,6 +284,7 @@ let private startDiscoveryServer (discConfig: DiscoveryConfig) =
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(discConfig) |> ignore
     builder.Services.AddRouting() |> ignore
+    builder.Services.AddEndpointsApiExplorer() |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore

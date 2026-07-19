@@ -10,6 +10,7 @@ open VDS.RDF.Writing
 open Frank
 open Frank.Builder
 open Frank.Discovery
+open Frank.OpenApi
 open TicTacToe.Model
 open TicTacToe.GameStore
 
@@ -225,7 +226,18 @@ let private gameResource =
         entryPoint
         relation (TicTacToe.GeneratedSemantics.SemanticResource.Game.Iri.AbsoluteUri)
         get gameHandler
-        post moveHandler
+
+        // #400 AC2: accepts typeof<MoveRequest> stamps IAcceptsMetadata on this POST —
+        // without it, Frank.Discovery's live HTTP-method correlation has no way to
+        // resolve MoveAction's ALPS Type (its own ClassIri, ex:MoveAction, is never a
+        // declared route relation) and the codegen Rt-based fallback survives
+        // unreconciled. Mirrors the schema: sample's identical pattern (Program.fs).
+        post (
+            handler {
+                handle moveHandler
+                accepts typeof<MoveRequest>
+            }
+        )
     }
 
 let private exVocabResource =

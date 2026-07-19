@@ -33,6 +33,11 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Frank/Frank.fsproj" />
     <ProjectReference Include="../../src/Frank.Discovery/Frank.Discovery.fsproj" />
+    <!-- #400 AC2: attaches IAcceptsMetadata to the POST /games/{id} move handler so
+         Frank.Discovery's live HTTP-method correlation can resolve MoveAction's ALPS
+         Type genuinely — Ex's own stated purpose (fsproj comment above) excludes
+         LinkedData/Validation/Provenance CODEGEN breadth, not this framework metadata. -->
+    <ProjectReference Include="../../src/Frank.OpenApi/Frank.OpenApi.fsproj" />
     <ProjectReference Include="../../src/Frank.Semantic/Frank.Semantic.fsproj" />
     <!-- Build-only: provides the MSBuild tasks; not linked as a library at runtime -->
     <ProjectReference Include="../../src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.fsproj"

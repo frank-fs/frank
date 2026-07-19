@@ -130,6 +130,49 @@ type SemanticTests() =
         else
             None
 
+    /// Return the ALPS "type" of the descriptor whose id matches localId, or None.
+    /// Searches nested descriptors recursively; depth bounded by ALPS document structure.
+    /// #400 AC2: the live-derived counterpart to AlpsDescriptorHrefByLocalId — reads the
+    /// served (post-reconciliation) Type, not the codegen-time fallback baked at build time.
+    static member private AlpsDescriptorTypeByLocalId(alpsBody: string, localId: string) : string option =
+        use doc = JsonDocument.Parse alpsBody
+        let mutable alpsEl = Unchecked.defaultof<JsonElement>
+        let mutable descriptorEl = Unchecked.defaultof<JsonElement>
+
+        let matchType (d: JsonElement) : string option =
+            let mutable idEl = Unchecked.defaultof<JsonElement>
+            let mutable typeEl = Unchecked.defaultof<JsonElement>
+
+            if
+                d.TryGetProperty("id", &idEl)
+                && idEl.GetString() = localId
+                && d.TryGetProperty("type", &typeEl)
+            then
+                typeEl.GetString() |> Option.ofObj
+            else
+                None
+
+        let rec findIn (arr: JsonElement) : string option =
+            arr.EnumerateArray()
+            |> Seq.tryPick (fun d ->
+                match matchType d with
+                | Some t -> Some t
+                | None ->
+                    let mutable nestedEl = Unchecked.defaultof<JsonElement>
+
+                    if d.TryGetProperty("descriptor", &nestedEl) then
+                        findIn nestedEl
+                    else
+                        None)
+
+        if
+            doc.RootElement.TryGetProperty("alps", &alpsEl)
+            && alpsEl.TryGetProperty("descriptor", &descriptorEl)
+        then
+            findIn descriptorEl
+        else
+            None
+
     /// Find the non-agent input of the ALPS 'unsafe' (action) descriptor by role.
     /// Returns the origin-resolved absolute IRI of the nested field whose href is NOT agentIri.
     /// Relative hrefs are resolved using originBase. Returns None when no such field exists.
@@ -1400,6 +1443,78 @@ type SemanticTests() =
                     turn <- turn + 1
 
             Assert.That(finished, Is.True, "Discovery client could not finish game against ex: server")
+        }
+
+    // ── #400 AC2: ex: server's MoveAction ALPS Type is genuinely live-derived ───
+    //
+    // TicTacToe-v732.Ex had no Frank.OpenApi reference before #400 — its POST
+    // /games/{id} move handler carried no IAcceptsMetadata, so #397's HTTP-method
+    // reconciliation had no live signal to correlate MoveAction's ALPS Type against
+    // (its own ClassIri, ex:MoveAction, is never itself a declared route relation —
+    // only ex:Game is). The served Type fell back, unreconciled, to the codegen-time
+    // Rt-based default. #400 closes this gap for real: the ex: sample's POST now
+    // declares `accepts typeof<MoveRequest>` (Frank.OpenApi's HandlerDefinition),
+    // giving Frank.Discovery's Microsoft.AspNetCore.OpenApi-backed correlation
+    // (IApiDescriptionGroupCollectionProvider) a live IAcceptsMetadata signal to match.
+    //
+    // Falsifiability: MoveAction alone reading "unsafe" is also what the coincidentally-
+    // correct codegen default would produce (the old gap this issue closes), so this
+    // test additionally checks Game's Type is "safe" — genuinely live-derived from the
+    // SAME route's GET, but WRONG under the codegen default ("semantic", since Game
+    // declares no Rt) — a fact no static fallback could produce by coincidence — and
+    // grounds both classifications in an independently observed OPTIONS Allow header.
+    [<Test>]
+    member this.``AT-S9 ex: server's ALPS Types are genuinely live-derived from Microsoft.AspNetCore.OpenApi document generation``
+        ()
+        =
+        task {
+            use! ctx = this.Playwright.APIRequest.NewContextAsync(APIRequestNewContextOptions(BaseURL = ExServer.Url()))
+            let gameId = "at-s9"
+
+            let! opts = this.Options(ctx, sprintf "/games/%s" gameId)
+            let rels = SemanticTests.LinkRels opts
+            Assert.That(rels.ContainsKey "describedby", Is.True, "ex: server missing Link rel=describedby")
+            let alpsUrl = rels.["describedby"]
+            let! alpsResp = ctx.GetAsync alpsUrl
+            Assert.That(alpsResp.Status, Is.EqualTo 200, "ex: server ALPS not 200")
+            let! alpsBody = alpsResp.TextAsync()
+
+            let moveActionType =
+                SemanticTests.AlpsDescriptorTypeByLocalId(alpsBody, "MoveAction")
+
+            Assert.That(
+                moveActionType,
+                Is.EqualTo(Some "unsafe"),
+                "MoveAction must be served as 'unsafe', reconciled from the live POST /games/{id}'s IAcceptsMetadata (#400) — not left unresolved"
+            )
+
+            let gameType = SemanticTests.AlpsDescriptorTypeByLocalId(alpsBody, "Game")
+
+            Assert.That(
+                gameType,
+                Is.EqualTo(Some "safe"),
+                "Game must be served as 'safe', reconciled from the live GET on the same route — the codegen default ('semantic', since Game declares no Rt) would be WRONG if reconciliation were not genuinely running against live data"
+            )
+
+            // Ground both classifications in an independently observed live fact: the
+            // same route really does serve both GET and POST.
+            let allow =
+                opts.Headers
+                |> Seq.tryFind (fun kv -> kv.Key.ToLowerInvariant() = "allow")
+                |> Option.map (fun kv -> kv.Value)
+                |> Option.defaultValue ""
+
+            Assert.That(
+                allow.Contains "GET",
+                Is.True,
+                "OPTIONS Allow must list GET — grounds the Game=safe classification"
+            )
+
+            Assert.That(
+                allow.Contains "POST",
+                Is.True,
+                "OPTIONS Allow must list POST — grounds the MoveAction=unsafe classification"
+            )
         }
 
     // ── AT-S8: provenance complete-capture audit ───────────────────────────────────

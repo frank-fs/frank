@@ -22,6 +22,8 @@ open Frank.Discovery.Tests.TestHelpers
 let private emptyEndpoints =
     TestEndpointDataSource([||]) :> Microsoft.AspNetCore.Routing.EndpointDataSource
 
+let private emptyApiDescriptionProvider = apiDescriptionProviderFor emptyEndpoints
+
 /// Unlike sampleConfig (both Hrefs already absolute, schema.org), this descriptor carries a
 /// RELATIVE, app-owned href — the case whose resolved value actually differs per origin, so
 /// the "distinct origin ⇒ distinct resolved body" test below can observe a real difference.
@@ -63,6 +65,7 @@ let private newMiddleware (config: DiscoveryConfig) =
         next,
         config,
         emptyEndpoints,
+        emptyApiDescriptionProvider,
         NullLogger<DiscoveryMiddleware.DiscoveryMiddleware>.Instance
     )
 

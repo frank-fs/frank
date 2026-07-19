@@ -2,6 +2,7 @@ module Frank.Discovery.DiscoveryMiddleware
 
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Mvc.ApiExplorer
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.Logging
 
@@ -16,18 +17,22 @@ open Microsoft.Extensions.Logging
 val homeResourcesFromEndpoints:
     resourceHrefVars: Map<string, Map<string, string>> -> dataSource: EndpointDataSource -> JsonHomeResource list
 
-/// Real HTTP methods per relation IRI, from live endpoints' ResourceRelationMetadata +
-/// HttpMethodMetadata. Coarse correlation key: one `resource { relation X; ... }` block
-/// stamps the SAME relation on every verb it registers, so a route serving both GET and
-/// POST under one relation (#390) yields a multi-method set here.
-val internal methodsByRelation: dataSource: EndpointDataSource -> Map<string, Set<string>>
+/// Real HTTP methods per relation IRI, from live ApiDescriptions' ResourceRelationMetadata.
+/// Coarse correlation key: one `resource { relation X; ... }` block stamps the SAME
+/// relation on every verb it registers, so a route serving both GET and POST under one
+/// relation (#390) yields a multi-method set here. Sourced from
+/// IApiDescriptionGroupCollectionProvider — the shared, DI-cached provider
+/// Microsoft.AspNetCore.OpenApi's own document generation also reads, so the underlying
+/// endpoint-metadata scan runs once total when an app also references Frank.OpenApi,
+/// not once per component (#400).
+val internal methodsByRelation: provider: IApiDescriptionGroupCollectionProvider -> Map<string, Set<string>>
 
-/// Real HTTP methods per accepted request CLR type full name, from live endpoints'
-/// IAcceptsMetadata + HttpMethodMetadata. Precise correlation key: Frank.OpenApi's
-/// `accepts` operation is stamped only on the endpoint whose own HttpMethodMetadata
-/// matches, so this disambiguates an action's real method even when its route also
-/// serves other verbs (#397).
-val internal methodsByRequestType: dataSource: EndpointDataSource -> Map<string, Set<string>>
+/// Real HTTP methods per accepted request CLR type full name, from live ApiDescriptions'
+/// IAcceptsMetadata. Precise correlation key: Frank.OpenApi's `accepts` operation is
+/// stamped only on the endpoint whose own HttpMethodMetadata matches, so this
+/// disambiguates an action's real method even when its route also serves other verbs
+/// (#397/#400).
+val internal methodsByRequestType: provider: IApiDescriptionGroupCollectionProvider -> Map<string, Set<string>>
 
 /// ALPS §2.2 transition semantics from a resource's real registered HTTP method(s).
 /// GET present (however else the route is used) is safe; exactly {PUT} or {DELETE} is
@@ -73,6 +78,7 @@ type DiscoveryMiddleware =
         next: RequestDelegate *
         config: DiscoveryConfig *
         endpointDataSource: EndpointDataSource *
+        apiDescriptionProvider: IApiDescriptionGroupCollectionProvider *
         logger: ILogger<DiscoveryMiddleware> ->
             DiscoveryMiddleware
 

@@ -6,6 +6,7 @@ open Microsoft.AspNetCore.Http.Metadata
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.Routing.Patterns
 open Frank.Discovery
+open Frank.Discovery.Tests.TestHelpers
 open Frank.Tests.Shared.TestEndpointDataSource
 
 // ── #397 AC1: alpsTypeForMethods (pure) ───────────────────────────────────────
@@ -154,26 +155,27 @@ let reconcileAlpsTypesTests =
               Expect.equal result.Rt (Some "https://schema.org/Other") "Rt unchanged"
           } ]
 
-// ── #397 AC1: methodsByRelation / methodsByRequestType (pure, over a real EndpointDataSource) ──
+// ── #400 AC1: methodsByRelation / methodsByRequestType (over IApiDescriptionGroupCollectionProvider) ──
+// #397's original version of these tests drove EndpointDataSource directly; #400 sources
+// correlation from IApiDescriptionGroupCollectionProvider instead (the shared provider
+// Microsoft.AspNetCore.OpenApi's own document generation also reads — see
+// DiscoveryMiddleware.fs's module-level rationale comment). routeEndpoint here must stamp
+// a MethodInfo (mirroring Frank's real ResourceSpec.Build, which adds `handler.Method`) —
+// EndpointMetadataApiDescriptionProvider silently skips any endpoint lacking one.
 
 let private routeEndpoint (pattern: string) (methods: string[]) (metadata: obj list) : RouteEndpoint =
     let builder = RoutePatternFactory.Parse pattern
+    let handler = RequestDelegate(fun _ -> System.Threading.Tasks.Task.CompletedTask)
 
     let metadataCollection =
-        EndpointMetadataCollection((box (HttpMethodMetadata(methods))) :: metadata)
+        EndpointMetadataCollection(box (HttpMethodMetadata(methods)) :: box handler.Method :: metadata)
 
-    RouteEndpoint(
-        RequestDelegate(fun _ -> System.Threading.Tasks.Task.CompletedTask),
-        builder,
-        0,
-        metadataCollection,
-        null
-    )
+    RouteEndpoint(handler, builder, 0, metadataCollection, null)
 
 [<Tests>]
 let methodsByRelationTests =
     testList
-        "DiscoveryMiddleware — #397 methodsByRelation / methodsByRequestType (real EndpointDataSource)"
+        "DiscoveryMiddleware — #400 methodsByRelation / methodsByRequestType (IApiDescriptionGroupCollectionProvider)"
         [ test "methodsByRelation groups methods by relation IRI across multiple endpoints" {
               let ep1 =
                   routeEndpoint
@@ -188,7 +190,8 @@ let methodsByRelationTests =
                       [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata) ]
 
               let ds = TestEndpointDataSource([| ep1; ep2 |])
-              let result = DiscoveryMiddleware.methodsByRelation ds
+              let provider = apiDescriptionProviderFor ds
+              let result = DiscoveryMiddleware.methodsByRelation provider
 
               Expect.equal
                   (Map.find "https://schema.org/Game" result)
@@ -199,7 +202,8 @@ let methodsByRelationTests =
           test "methodsByRelation: endpoint without ResourceRelationMetadata is excluded" {
               let ep = routeEndpoint "/plain" [| "GET" |] []
               let ds = TestEndpointDataSource([| ep |])
-              let result = DiscoveryMiddleware.methodsByRelation ds
+              let provider = apiDescriptionProviderFor ds
+              let result = DiscoveryMiddleware.methodsByRelation provider
               Expect.isEmpty result "no relation metadata -> no entries"
           }
 
@@ -211,7 +215,8 @@ let methodsByRelationTests =
                       [ box (AcceptsMetadata([| "application/json" |], typeof<string>, false) :> obj) ]
 
               let ds = TestEndpointDataSource([| ep |])
-              let result = DiscoveryMiddleware.methodsByRequestType ds
+              let provider = apiDescriptionProviderFor ds
+              let result = DiscoveryMiddleware.methodsByRequestType provider
 
               Expect.equal
                   (Map.find typeof<string>.FullName result)
@@ -222,6 +227,7 @@ let methodsByRelationTests =
           test "methodsByRequestType: endpoint without IAcceptsMetadata is excluded" {
               let ep = routeEndpoint "/plain" [| "GET" |] []
               let ds = TestEndpointDataSource([| ep |])
-              let result = DiscoveryMiddleware.methodsByRequestType ds
+              let provider = apiDescriptionProviderFor ds
+              let result = DiscoveryMiddleware.methodsByRequestType provider
               Expect.isEmpty result "no accepts metadata -> no entries"
           } ]

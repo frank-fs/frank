@@ -4,11 +4,26 @@ open System
 open System.Net.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http.Metadata
+open Microsoft.AspNetCore.Mvc.ApiExplorer
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 open Frank.Discovery
+
+/// Build a real IApiDescriptionGroupCollectionProvider wired the same way
+/// AddEndpointsApiExplorer()/AddOpenApi() wires it in a real app (#400) — the exact
+/// shared, cached source both Frank.Discovery's ALPS-Type correlation and
+/// Microsoft.AspNetCore.OpenApi's document generation read. For tests that construct
+/// DiscoveryMiddleware directly (no TestServer/UseMiddleware<T> DI resolution).
+/// WebApplicationBuilder supplies IHostEnvironment/ILoggerFactory/ParameterPolicyFactory
+/// for free; only EndpointDataSource is overridden with the caller's test fixture.
+let apiDescriptionProviderFor (dataSource: EndpointDataSource) : IApiDescriptionGroupCollectionProvider =
+    let builder = WebApplication.CreateBuilder()
+    builder.Services.AddEndpointsApiExplorer() |> ignore
+    builder.Services.AddSingleton<EndpointDataSource>(dataSource) |> ignore
+    let app = builder.Build()
+    app.Services.GetRequiredService<IApiDescriptionGroupCollectionProvider>()
 
 /// Captures all log messages emitted through the logging pipeline.
 /// Add via builder.Logging.AddProvider to intercept middleware log output.
@@ -43,6 +58,10 @@ let private buildDiscoveryApp
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(config) |> ignore
     builder.Services.AddRouting() |> ignore
+    // #400: registers IApiDescriptionGroupCollectionProvider — DiscoveryMiddleware's
+    // shared HTTP-method correlation source, the same one useDiscoveryWith registers in
+    // production via AddOpenApi().
+    builder.Services.AddEndpointsApiExplorer() |> ignore
     configureBuilder |> Option.iter (fun f -> f builder)
     let app = builder.Build()
     app.UseRouting() |> ignore

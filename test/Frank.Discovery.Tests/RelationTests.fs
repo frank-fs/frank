@@ -50,13 +50,13 @@ let private startRelationServer () =
             ProfileUri = "/alps/test"
             HomeRoute = "/"
             ResourceHrefVars =
-              Map.ofList
-                  [ "https://schema.org/Game", Map.ofList [ "id", "https://schema.org/identifier" ] ] }
+                Map.ofList [ "https://schema.org/Game", Map.ofList [ "id", "https://schema.org/identifier" ] ] }
 
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(config) |> ignore
     builder.Services.AddRouting() |> ignore
+    builder.Services.AddEndpointsApiExplorer() |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore

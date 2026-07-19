@@ -5,6 +5,7 @@ open System.Collections.Concurrent
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Metadata
+open Microsoft.AspNetCore.Mvc.ApiExplorer
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.Routing.Template
 open Microsoft.Extensions.Logging
@@ -86,44 +87,72 @@ let homeResourcesFromEndpoints
           HrefVars = varMeanings })
     |> Seq.toList
 
-// ── #397: ALPS Type reconciliation against real registered HTTP methods ──────
+// ── #400: ALPS Type reconciliation against real registered HTTP methods ──────
 // Codegen (DiscoveryEmitter) bakes a Type fallback from lock-file Rt presence — it
 // cannot see the app's actual `resource { get/post/... }` registrations. Here, where
-// the ALPS profile is served, the real EndpointDataSource IS available (already
-// constructor-injected, same as JSON Home's homeResourcesFromEndpoints above) — so
-// the served Type is reconciled against ground truth, never left to a lock-file guess.
+// the ALPS profile is served, the served Type is reconciled against ground truth,
+// never left to a lock-file guess (#397).
+//
+// The ground truth is read from IApiDescriptionGroupCollectionProvider (registered by
+// AddOpenApi()/AddEndpointsApiExplorer(), TryAddSingleton — #400), NOT a direct
+// EndpointDataSource.Endpoints walk. This is the SAME cached, version-checked provider
+// Microsoft.AspNetCore.OpenApi's own OpenApiDocumentService reads to build
+// OpenApiDocument.Paths: when an app also references Frank.OpenApi, the underlying
+// endpoint-metadata scan (EndpointMetadataApiDescriptionProvider.OnProvidersExecuting)
+// runs once total, not once per component (AC1) — ApiDescriptionGroupCollectionProvider
+// recomputes only when IActionDescriptorCollectionProvider.ActionDescriptors.Version
+// changes (never, for Frank's fixed-after-startup endpoint set), so a second consumer
+// accessing .ApiDescriptionGroups after the first is served the cached result.
+// ApiDescription.ActionDescriptor.EndpointMetadata is a verbatim copy of the live
+// RouteEndpoint's own EndpointMetadataCollection (AddActionDescriptorEndpointMetadata),
+// so ResourceRelationMetadata/IAcceptsMetadata are exactly as available here as they
+// were from a direct EndpointDataSource walk — no correlation power is lost.
 
-/// Real HTTP methods per relation IRI, from live endpoints' ResourceRelationMetadata +
-/// HttpMethodMetadata. Coarse correlation key: one `resource { relation X; ... }` block
-/// stamps the SAME relation on every verb it registers, so a route serving both GET and
-/// POST under one relation (#390) yields a multi-method set here.
-let internal methodsByRelation (dataSource: EndpointDataSource) : Map<string, Set<string>> =
-    scanRouteEndpoints dataSource
-    |> Seq.choose (fun re ->
-        match relationOf re, httpMethodsOf re with
-        | Some relation, Some methods -> Some(relation, methods |> Set.ofList)
+/// All ApiDescriptions across every group — the flattened view of the shared,
+/// DI-cached provider both this module and Microsoft.AspNetCore.OpenApi's document
+/// generation read (#400).
+let private allApiDescriptions (provider: IApiDescriptionGroupCollectionProvider) : ApiDescription seq =
+    provider.ApiDescriptionGroups.Items |> Seq.collect (fun group -> group.Items)
+
+/// The first endpoint-metadata item of type 'T carried by an ApiDescription's copied
+/// EndpointMetadataCollection, or None — the ApiDescription-sourced counterpart to
+/// relationOf/httpMethodsOf's GetMetadata<T>() idiom above (#400).
+let private apiDescriptionMetadataOf<'T> (d: ApiDescription) : 'T option =
+    d.ActionDescriptor.EndpointMetadata
+    |> Seq.tryPick (function
+        | :? 'T as t -> Some t
         | _ -> None)
+
+/// Real HTTP methods per relation IRI, from live ApiDescriptions' ResourceRelationMetadata.
+/// Coarse correlation key: one `resource { relation X; ... }` block stamps the SAME
+/// relation on every verb it registers, so a route serving both GET and POST under one
+/// relation (#390) yields a multi-method set here.
+let internal methodsByRelation (provider: IApiDescriptionGroupCollectionProvider) : Map<string, Set<string>> =
+    allApiDescriptions provider
+    |> Seq.choose (fun d ->
+        apiDescriptionMetadataOf<ResourceRelationMetadata> d
+        |> Option.map (fun r -> r.Relation, d.HttpMethod))
     |> Seq.groupBy fst
-    |> Seq.map (fun (relation, entries) -> relation, entries |> Seq.collect snd |> Set.ofSeq)
+    |> Seq.map (fun (relation, entries) -> relation, entries |> Seq.map snd |> Set.ofSeq)
     |> Map.ofSeq
 
-/// Real HTTP methods per accepted request CLR type full name, from live endpoints'
-/// IAcceptsMetadata + HttpMethodMetadata. Precise correlation key: Frank.OpenApi's
-/// `accepts` operation is stamped only on the endpoint whose own HttpMethodMetadata
-/// matches (ResourceBuilderExtensions.addHandlerDefinition), so this disambiguates an
-/// action's real method even when its route also serves other verbs (e.g. POST
-/// /games/{id} accepting MoveRequest on a route that also serves GET for Game).
-let internal methodsByRequestType (dataSource: EndpointDataSource) : Map<string, Set<string>> =
-    scanRouteEndpoints dataSource
-    |> Seq.choose (fun re ->
-        match re.Metadata.GetMetadata<IAcceptsMetadata>() with
-        | null -> None
-        | accepts when isNull accepts.RequestType -> None
-        | accepts ->
-            httpMethodsOf re
-            |> Option.map (fun methods -> accepts.RequestType.FullName, methods |> Set.ofList))
+/// Real HTTP methods per accepted request CLR type full name, from live ApiDescriptions'
+/// IAcceptsMetadata. Precise correlation key: Frank.OpenApi's `accepts` operation is
+/// stamped only on the endpoint whose own HttpMethodMetadata matches
+/// (ResourceBuilderExtensions.addHandlerDefinition), so this disambiguates an action's
+/// real method even when its route also serves other verbs (e.g. POST /games/{id}
+/// accepting MoveRequest on a route that also serves GET for Game).
+let internal methodsByRequestType (provider: IApiDescriptionGroupCollectionProvider) : Map<string, Set<string>> =
+    allApiDescriptions provider
+    |> Seq.choose (fun d ->
+        apiDescriptionMetadataOf<IAcceptsMetadata> d
+        |> Option.bind (fun a ->
+            if isNull a.RequestType then
+                None
+            else
+                Some(a.RequestType.FullName, d.HttpMethod)))
     |> Seq.groupBy fst
-    |> Seq.map (fun (typeName, entries) -> typeName, entries |> Seq.collect snd |> Set.ofSeq)
+    |> Seq.map (fun (typeName, entries) -> typeName, entries |> Seq.map snd |> Set.ofSeq)
     |> Map.ofSeq
 
 /// ALPS §2.2 transition semantics from a resource's real registered HTTP method(s).
@@ -248,6 +277,7 @@ type DiscoveryMiddleware
         next: RequestDelegate,
         config: DiscoveryConfig,
         endpointDataSource: EndpointDataSource,
+        apiDescriptionProvider: IApiDescriptionGroupCollectionProvider,
         logger: ILogger<DiscoveryMiddleware>
     ) =
 
@@ -279,13 +309,13 @@ type DiscoveryMiddleware
 
     let cachedHomeResources = lazy (buildHomeResources ())
 
-    // #397: reconciled once, same lifetime/rationale as cachedHomeResources — the
+    // #397/#400: reconciled once, same lifetime/rationale as cachedHomeResources — the
     // endpoint set is fixed after startup.
     let cachedAlpsDescriptors =
         lazy
             (reconcileAlpsTypes
-                (methodsByRelation endpointDataSource)
-                (methodsByRequestType endpointDataSource)
+                (methodsByRelation apiDescriptionProvider)
+                (methodsByRequestType apiDescriptionProvider)
                 config.AlpsDescriptors)
 
     // #398: DescribedByLinks keyed by class IRI, so a matched route's own declared

@@ -18,6 +18,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- #400: document GENERATION only (never MapOpenApi()) — the shared, single source
+         for HTTP-method correlation when an app also references Frank.OpenApi. -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+    <!-- Microsoft.AspNetCore.OpenApi 10.0.0 transitively pulls Microsoft.OpenApi 2.0.0
+         (NU1903 known-vulnerability); pin the same fixed version Frank.OpenApi already
+         uses (#383). -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.9.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../Frank/Frank.fsproj" />
   </ItemGroup>
 
