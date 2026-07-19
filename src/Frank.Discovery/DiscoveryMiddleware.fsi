@@ -34,6 +34,14 @@ val internal methodsByRelation: provider: IApiDescriptionGroupCollectionProvider
 /// (#397/#400).
 val internal methodsByRequestType: provider: IApiDescriptionGroupCollectionProvider -> Map<string, Set<string>>
 
+/// Drift-detection diagnostic (#400 Fix 3): compares the (endpoint, HTTP method) pair
+/// count from a direct EndpointDataSource walk against the count
+/// IApiDescriptionGroupCollectionProvider produced, logging a warning (never throwing)
+/// when they diverge — a signal that some endpoint may be silently excluded from ALPS
+/// Type reconciliation (e.g. missing MethodInfo).
+val internal checkCorrelationSourcesAgree:
+    logger: ILogger -> dataSource: EndpointDataSource -> provider: IApiDescriptionGroupCollectionProvider -> unit
+
 /// ALPS §2.2 transition semantics from a resource's real registered HTTP method(s).
 /// GET present (however else the route is used) is safe; exactly {PUT} or {DELETE} is
 /// idempotent; exactly {POST} is unsafe. Anything else (no live match, or an otherwise

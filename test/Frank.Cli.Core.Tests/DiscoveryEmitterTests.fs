@@ -707,14 +707,17 @@ let private exDeclaredOnlyLock: LockFile =
 let nestingTests =
     testList
         "DiscoveryEmitter — #4 ALPS nesting (AC1)"
-        [ test "MoveAction descriptor type is unsafe (not semantic)" {
+        [ test "MoveAction descriptor codegen Type default is 'semantic', never 'unsafe' from Rt presence (#400 Fix 2)" {
               let src =
                   DiscoveryEmitter.emit "TicTacToe.Generated" "/alps" schemaRegistry ticTacToeLock
 
               Expect.isOk src "emit should succeed"
               let source = unwrapOk src
-              // In the generated F# record literal, the MoveAction entry must carry Type = "unsafe"
-              Expect.stringContains source "\"unsafe\"" "MoveAction descriptor type must be unsafe"
+              // Codegen never guesses Type="unsafe" from a declared Rt (#400 Fix 2 decoupling) —
+              // DiscoveryMiddleware reconciles the genuine Type from real HTTP methods at serve time.
+              Expect.isFalse
+                  (source.Contains "\"unsafe\"")
+                  "codegen never emits Type=unsafe; only runtime reconciliation does"
           }
 
           test "MoveAction has Rt pointing to schema:Game (return type)" {
@@ -766,7 +769,8 @@ let nestingTests =
               Expect.contains childIds "agent" "agent child present"
           }
 
-          test "MoveAction IsAction = true; Game IsAction = false" {
+          test
+              "alpsTypeDefault: MoveAction (Rt=Some) and Game (Rt=None) both default to 'semantic' — decoupled (#400 Fix 2)" {
               let model =
                   ResolvedModel.build schemaRegistry ticTacToeLock
                   |> function
@@ -786,8 +790,17 @@ let nestingTests =
                   |> List.tryFind (fun d -> d.Id = "MoveAction")
                   |> Option.defaultWith (fun () -> failwith "MoveAction not found")
 
-              Expect.isFalse game.IsAction "Game is not an action"
-              Expect.isTrue moveAction.IsAction "MoveAction is an action"
+              // Rt genuinely differs (Game has none, MoveAction points at Game) while the
+              // codegen-time Type default is identical for both — proof the two are
+              // independently computable, not conflated.
+              Expect.isNone game.Rt "Game has no Rt"
+              Expect.isSome moveAction.Rt "MoveAction has a genuine Rt link"
+              Expect.equal (DiscoveryEmitter.alpsTypeDefault game) "semantic" "Game's codegen Type default is semantic"
+
+              Expect.equal
+                  (DiscoveryEmitter.alpsTypeDefault moveAction)
+                  "semantic"
+                  "MoveAction's codegen Type default is ALSO semantic, despite having a declared Rt"
           }
 
           test "MoveAction Rt = Some schema:Game href; Game Rt = None" {
@@ -976,10 +989,11 @@ let nestingTests =
           } ]
 
 // ── Fixture: declared Rt on a class whose local name does NOT end in "Action" (M2) ─
-// Under the old suffix heuristic (isActionIri), "Submit" does not end in "Action",
-// so it would emit IsAction=false and drop the Rt entirely (silent data loss).
-// Under the declared-linkage fix (r.Rt.IsSome), it IS an unsafe transition because
-// it has a declared Rt, regardless of the class local name.
+// Under the old suffix heuristic (isActionIri), "Submit" does not end in "Action", so it
+// would drop the Rt entirely (silent data loss). Rt is emitted purely from declared
+// linkage (r.Rt), regardless of the class local name (M2) — and, per #400 Fix 2, that
+// declared linkage never influences the codegen-time Type default either: Rt is a
+// genuine ALPS return-type link, never an HTTP-safety-classification signal.
 
 let private nonActionNameWithRtLock: LockFile =
     { SchemaVersion = 1
@@ -1008,8 +1022,8 @@ let private nonActionNameWithRtLock: LockFile =
 [<Tests>]
 let m2DeclaredLinkageTests =
     testList
-        "DiscoveryEmitter — M2: isAction derived from declared Rt linkage not name suffix"
-        [ test "class with Rt=Some but name not ending in 'Action' → IsAction=true" {
+        "DiscoveryEmitter — M2/#400 Fix 2: Rt from declared linkage, never a Type-safety signal"
+        [ test "class with Rt=Some but name not ending in 'Action' → Rt is emitted (not dropped)" {
               let model =
                   ResolvedModel.build VocabularyRegistry.empty nonActionNameWithRtLock
                   |> function
@@ -1024,12 +1038,12 @@ let m2DeclaredLinkageTests =
                   |> List.tryFind (fun d -> d.Id = "Submit")
                   |> Option.defaultWith (fun () -> failwith "Submit descriptor not found")
 
-              Expect.isTrue
-                  submit.IsAction
-                  "Submit (Rt=Some) must be an action even though name doesn't end in 'Action'"
+              Expect.isSome
+                  submit.Rt
+                  "Submit (Rt=Some) must have Rt in the descriptor even though name doesn't end in 'Action'"
           }
 
-          test "class with Rt=Some but name not ending in 'Action' → type='unsafe' in emitted source" {
+          test "class with Rt=Some but name not ending in 'Action' → codegen Type default is 'semantic', not 'unsafe'" {
               let src =
                   DiscoveryEmitter.emit
                       "App.GeneratedDiscovery"
@@ -1038,28 +1052,13 @@ let m2DeclaredLinkageTests =
                       nonActionNameWithRtLock
 
               Expect.isOk src "emit should succeed"
-              Expect.stringContains (unwrapOk src) "\"unsafe\"" "Submit must emit type='unsafe' (declared Rt)"
+
+              Expect.isFalse
+                  ((unwrapOk src).Contains "\"unsafe\"")
+                  "Submit's declared Rt must never make codegen emit Type=unsafe (#400 Fix 2)"
           }
 
-          test "class with Rt=Some but name not ending in 'Action' → Rt is emitted (not dropped)" {
-              let model =
-                  ResolvedModel.build VocabularyRegistry.empty nonActionNameWithRtLock
-                  |> function
-                      | Ok m -> m
-                      | Error e -> failwith e
-
-              let bases = Set.ofList [ "https://example.org/ex#" ]
-              let descriptors, _ = DiscoveryEmitter.projectDiscovery bases model
-
-              let submit =
-                  descriptors
-                  |> List.tryFind (fun d -> d.Id = "Submit")
-                  |> Option.defaultWith (fun () -> failwith "Submit descriptor not found")
-
-              Expect.isSome submit.Rt "Submit (Rt=Some) must have Rt in the descriptor (not silently dropped)"
-          }
-
-          test "class with Rt=None and name not ending in 'Action' → IsAction=false (Target)" {
+          test "class with Rt=None and name not ending in 'Action' → Rt absent (Target)" {
               let model =
                   ResolvedModel.build VocabularyRegistry.empty nonActionNameWithRtLock
                   |> function
@@ -1074,10 +1073,10 @@ let m2DeclaredLinkageTests =
                   |> List.tryFind (fun d -> d.Id = "Target")
                   |> Option.defaultWith (fun () -> failwith "Target descriptor not found")
 
-              Expect.isFalse target.IsAction "Target (Rt=None) must not be an action"
+              Expect.isNone target.Rt "Target (Rt=None) must have no Rt"
           }
 
-          test "sample fixture unaffected: MoveAction (Rt=Some) → unsafe; Game (Rt=None) → semantic" {
+          test "sample fixture: MoveAction (Rt=Some) and Game (Rt=None) both default codegen Type to 'semantic'" {
               let model =
                   ResolvedModel.build schemaRegistry ticTacToeLock
                   |> function
@@ -1088,8 +1087,19 @@ let m2DeclaredLinkageTests =
 
               let moveAction = descriptors |> List.find (fun d -> d.Id = "MoveAction")
               let game = descriptors |> List.find (fun d -> d.Id = "Game")
-              Expect.isTrue moveAction.IsAction "MoveAction (Rt=Some) is action"
-              Expect.isFalse game.IsAction "Game (Rt=None) is not action"
+
+              Expect.isSome moveAction.Rt "MoveAction still carries its genuine Rt link to Game"
+              Expect.isNone game.Rt "Game has no Rt"
+
+              Expect.equal
+                  (DiscoveryEmitter.alpsTypeDefault moveAction)
+                  "semantic"
+                  "MoveAction (Rt=Some) codegen Type default is semantic"
+
+              Expect.equal
+                  (DiscoveryEmitter.alpsTypeDefault game)
+                  "semantic"
+                  "Game (Rt=None) codegen Type default is semantic"
           } ]
 
 // ── Fixture: union type with outcome cases (MoveResult analogue) ─────────────
@@ -1179,7 +1189,7 @@ let unionCaseDescriptorTests =
                   "Won href = schema:CompletedActionStatus"
           }
 
-          test "case children are not action descriptors" {
+          test "case children carry no Rt and default to Type 'semantic'" {
               let model =
                   ResolvedModel.build schemaRegistry outcomeUnionLock
                   |> function
@@ -1192,7 +1202,12 @@ let unionCaseDescriptorTests =
               let actionStatus = descriptors |> List.find (fun d -> d.Id = "ActionStatusType")
 
               for child in actionStatus.Children do
-                  Expect.isFalse child.IsAction $"case child '{child.Id}' must not be an action"
+                  Expect.isNone child.Rt $"case child '{child.Id}' must have no Rt"
+
+                  Expect.equal
+                      (DiscoveryEmitter.alpsTypeDefault child)
+                      "semantic"
+                      $"case child '{child.Id}' Type default is semantic"
           }
 
           test "emitted source contains CompletedActionStatus IRI" {

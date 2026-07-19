@@ -23,7 +23,6 @@ type internal ResolvedDescriptor =
     {
         Id: string
         Href: string option
-        IsAction: bool
         Rt: string option
         /// Full, un-relativized class IRI (Some for top-level class descriptors only).
         /// Runtime correlation key for HTTP-method reconciliation (#397) — never emitted
@@ -47,7 +46,6 @@ let private fieldDescriptor (bases: Set<string>) (f: ResolvedField) : ResolvedDe
 
         { Id = localName absolute
           Href = hrefOption (EmitterShared.hrefFor bases absolute)
-          IsAction = false
           Rt = None
           ClassIri = None
           RequestClrTypeName = None
@@ -59,7 +57,6 @@ let private caseDescriptor (bases: Set<string>) (c: ResolvedCase) : ResolvedDesc
 
     { Id = c.CaseName
       Href = hrefOption (EmitterShared.hrefFor bases absolute)
-      IsAction = false
       Rt = None
       ClassIri = None
       RequestClrTypeName = None
@@ -75,11 +72,14 @@ let private buildChildren (bases: Set<string>) (r: ResolvedResource) : ResolvedD
 /// Collect all class-level descriptors. Each class descriptor carries its children:
 /// - Union types: confirmed case descriptors (AC1 #17 — outcome terms discoverable).
 /// - Record types: field descriptors with IRIs (AC1 #4 nesting).
-/// A resource with a declared Rt is an unsafe transition (isAction = r.Rt.IsSome) —
-/// this codegen-time value is only the FALLBACK; DiscoveryMiddleware reconciles it
-/// against the resource's real registered HTTP method at serve time (#397), using
-/// ClassIri/RequestClrTypeName as correlation keys.
-/// Rt is the href of the declared return-type IRI, set explicitly in the lock file.
+/// Rt is the href of the declared return-type IRI, set explicitly in the lock file — a
+/// genuine ALPS return-type link, never a proxy for HTTP-safety classification (#400 Fix
+/// 2: "does this class declare an rt target" and "is this an unsafe/idempotent transition"
+/// are orthogonal ALPS concerns; conflating them made a resource's declared linkage the
+/// only lever available to control its codegen-time Type guess). The Type default itself
+/// comes from alpsTypeDefault, computed independently of Rt; DiscoveryMiddleware reconciles
+/// the real Type against the resource's actual registered HTTP method at serve time (#397),
+/// using ClassIri/RequestClrTypeName as correlation keys.
 let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource list) : ResolvedDescriptor list =
     resources
     |> List.choose (fun r ->
@@ -92,7 +92,6 @@ let private collectDescriptors (bases: Set<string>) (resources: ResolvedResource
 
             { Id = localName absolute
               Href = hrefOption (EmitterShared.hrefFor bases absolute)
-              IsAction = r.Rt.IsSome
               Rt = rt
               ClassIri = Some absolute
               RequestClrTypeName = Some r.FSharpType
@@ -197,10 +196,19 @@ let internal projectDiscovery
 
 // ── Source rendering via AstRender (no string concat) ────────────────────────
 
+/// Codegen-time ALPS Type fallback for any descriptor — always "semantic", deliberately
+/// independent of Rt (#400 Fix 2). Codegen cannot see an app's real `resource { get/post/
+/// ... }` registrations, so it never guesses "unsafe"/"idempotent"/"safe" from Rt presence
+/// or any other declared-mapping signal; DiscoveryMiddleware reconciles the genuine Type
+/// against the resource's actual registered HTTP method(s) at serve time (#397). Rt is
+/// carried through this function's input unread — proof, not just claim, that the two are
+/// independently computable.
+let internal alpsTypeDefault (_d: ResolvedDescriptor) : string = "semantic"
+
 let rec private descriptorExpr (d: ResolvedDescriptor) =
     AstRender.recordExpr
         [ "Id", AstRender.strExpr d.Id
-          "Type", AstRender.strExpr (if d.IsAction then "unsafe" else "semantic")
+          "Type", AstRender.strExpr (alpsTypeDefault d)
           "Doc", AstRender.noneExpr
           "Href", AstRender.optionExpr AstRender.strExpr d.Href
           "Descriptors", AstRender.listExpr (d.Children |> List.map descriptorExpr)

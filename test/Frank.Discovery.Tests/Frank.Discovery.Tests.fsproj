@@ -15,6 +15,7 @@
     <Compile Include="AlpsMemoizationTests.fs" />
     <Compile Include="AlpsTypeReconciliationTests.fs" />
     <Compile Include="OpenApiCorrelationTests.fs" />
+    <Compile Include="CorrelationDriftDiagnosticTests.fs" />
     <Compile Include="RelationTests.fs" />
     <Compile Include="ResolverTests.fs" />
     <Compile Include="ValidatorTests.fs" />

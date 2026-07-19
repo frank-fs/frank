@@ -5,7 +5,6 @@ open Frank.Semantic
 type internal ResolvedDescriptor =
     { Id: string
       Href: string option
-      IsAction: bool
       Rt: string option
       ClassIri: string option
       RequestClrTypeName: string option
@@ -17,6 +16,12 @@ type internal ResolvedDescriptor =
 /// declaredOnlyBases: set of base URI strings whose IRIs should be emitted as host-relative paths.
 val internal projectDiscovery:
     declaredOnlyBases: Set<string> -> model: ResolvedModel -> ResolvedDescriptor list * (string * string) list
+
+/// Codegen-time ALPS Type fallback for any descriptor — always "semantic", deliberately
+/// independent of Rt (#400 Fix 2: Rt is a genuine ALPS return-type link, never an
+/// HTTP-safety-classification signal). DiscoveryMiddleware reconciles the genuine Type
+/// against the resource's actual registered HTTP method(s) at serve time (#397).
+val internal alpsTypeDefault: d: ResolvedDescriptor -> string
 
 /// Emit a GeneratedDiscovery F# module from a lock file and vocabulary registry.
 ///

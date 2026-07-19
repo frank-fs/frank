@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generated": "2026-06-29T03:18:44+00:00",
-  "integrity": "3f1bd4c2547576683b1092cb8ff0f66da3aba1ace8e3433e916b5a0287691963",
+  "integrity": "6ee1785017ff02597a13ec67dfab405bd5280b9a29f377af5b5b4580b2c62e9c",
   "vocabularies": {},
   "declaredPrefixes": {
     "ex": "https://example.org/ex#",
@@ -415,7 +415,7 @@
       "confidence": 1,
       "source": "manual",
       "status": "confirmed",
-      "rt": null,
+      "rt": "ex:Game",
       "alternates": [],
       "shape": "record",
       "fields": [

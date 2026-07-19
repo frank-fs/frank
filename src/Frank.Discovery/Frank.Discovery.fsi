@@ -20,6 +20,14 @@ module DiscoveryExtensions =
 
     type WebHostBuilder with
 
+        /// Registers static semantic discovery (JSON Home, ALPS, OPTIONS/Allow, Link
+        /// rel=describedby) for live ALPS Type correlation against real registered HTTP
+        /// methods (#397/#400). Cost tradeoff (#400 Fix 4): this registers
+        /// AddEndpointsApiExplorer(), which walks the app's whole route table via
+        /// reflection once at startup to build IApiDescriptionGroupCollectionProvider —
+        /// not per-request — even for apps that never otherwise touch Frank.OpenApi. This
+        /// is an accepted, one-time cost for enabling genuine runtime Type reconciliation,
+        /// not a hidden one.
         [<CustomOperation("useDiscoveryWith")>]
         member UseDiscoveryWith: spec: WebHostSpec * config: DiscoveryConfig -> WebHostSpec
 

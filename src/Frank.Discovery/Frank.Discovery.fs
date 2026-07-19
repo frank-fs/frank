@@ -5,20 +5,6 @@ open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.DependencyInjection
 open Frank.Builder
 
-[<AutoOpen>]
-module private Constants =
-    /// Document name for Frank.Discovery's own internal, generate-only OpenAPI document
-    /// registration (#400). Deliberately distinct from Frank.OpenApi's default "v1"
-    /// document so the two never collide when an app references both — each owns its
-    /// own keyed OpenApiDocumentService registration. Frank.Discovery never serves this
-    /// document (no MapOpenApi()); it exists solely to register
-    /// IApiDescriptionGroupCollectionProvider (via AddOpenApi() -> AddEndpointsApiExplorer(),
-    /// TryAddSingleton), the shared, cached HTTP-method correlation source
-    /// DiscoveryMiddleware reads (AC1: single walk, not one per component, when
-    /// Frank.OpenApi is also present).
-    [<Literal>]
-    let FrankDiscoveryDocumentName = "frank-discovery-internal"
-
 /// Validates href-template variables in the JSON Home document by running the existing
 /// serializer check before the app starts serving. Reuses homeResourcesFromEndpoints and
 /// JsonHomeSerializer.serialize — the existing invalidOp fires on an unresolved variable,
@@ -43,10 +29,14 @@ module DiscoveryExtensions =
             let addServices (services: IServiceCollection) =
                 services.AddSingleton<DiscoveryConfig>(config) |> ignore
                 services.AddSingleton<IStartupValidator>(HrefVarsValidator(config)) |> ignore
-                // #400: document generation only — never MapOpenApi(). Registers
-                // IApiDescriptionGroupCollectionProvider (TryAddSingleton, shared with
-                // Frank.OpenApi's own AddOpenApi() call when the app references it).
-                services.AddOpenApi(FrankDiscoveryDocumentName) |> ignore
+                // #400: registers IApiDescriptionGroupCollectionProvider (TryAddSingleton),
+                // the shared, cached HTTP-method correlation source DiscoveryMiddleware
+                // reads. AddEndpointsApiExplorer() alone provides this — it ships in the
+                // Microsoft.AspNetCore.App shared framework (Microsoft.AspNetCore.Mvc.ApiExplorer),
+                // so Frank.Discovery needs no Microsoft.AspNetCore.OpenApi package reference just
+                // to reach this service. TryAddSingleton means this is a no-op when an app's own
+                // Frank.OpenApi AddOpenApi() call already registered the same provider first.
+                services.AddEndpointsApiExplorer() |> ignore
                 spec.Services services
 
             let addMiddleware (app: IApplicationBuilder) =

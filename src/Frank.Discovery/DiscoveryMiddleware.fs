@@ -94,8 +94,10 @@ let homeResourcesFromEndpoints
 // never left to a lock-file guess (#397).
 //
 // The ground truth is read from IApiDescriptionGroupCollectionProvider (registered by
-// AddOpenApi()/AddEndpointsApiExplorer(), TryAddSingleton — #400), NOT a direct
-// EndpointDataSource.Endpoints walk. This is the SAME cached, version-checked provider
+// useDiscoveryWith's AddEndpointsApiExplorer() call, TryAddSingleton — #400 Fix 1: no
+// Microsoft.AspNetCore.OpenApi package reference needed just to reach this service), NOT
+// a direct EndpointDataSource.Endpoints walk. This is the SAME cached, version-checked
+// provider
 // Microsoft.AspNetCore.OpenApi's own OpenApiDocumentService reads to build
 // OpenApiDocument.Paths: when an app also references Frank.OpenApi, the underlying
 // endpoint-metadata scan (EndpointMetadataApiDescriptionProvider.OnProvidersExecuting)
@@ -107,12 +109,48 @@ let homeResourcesFromEndpoints
 // RouteEndpoint's own EndpointMetadataCollection (AddActionDescriptorEndpointMetadata),
 // so ResourceRelationMetadata/IAcceptsMetadata are exactly as available here as they
 // were from a direct EndpointDataSource walk — no correlation power is lost.
+//
+// AC1's "single walk" claim rests on ApiDescriptionGroupCollectionProvider's current
+// (undocumented, internal) caching behavior in the installed ASP.NET Core SDK version,
+// not a guaranteed public contract (#400 Fix 5) — OpenApiCorrelationTests.fs's counting
+// test (CountingEndpointDataSource) is the safety net that would catch a future SDK
+// regression here.
 
 /// All ApiDescriptions across every group — the flattened view of the shared,
 /// DI-cached provider both this module and Microsoft.AspNetCore.OpenApi's document
 /// generation read (#400).
 let private allApiDescriptions (provider: IApiDescriptionGroupCollectionProvider) : ApiDescription seq =
     provider.ApiDescriptionGroups.Items |> Seq.collect (fun group -> group.Items)
+
+/// #400 Fix 3: drift-detection diagnostic between the two correlation sources. Allow
+/// (handleOptions) is built directly from EndpointDataSource.Endpoints — an unconditional
+/// walk that sees every endpoint. ALPS-Type reconciliation (cachedAlpsDescriptors) is
+/// built from allApiDescriptions, which is populated by ASP.NET Core's internal
+/// EndpointMetadataApiDescriptionProvider — an inclusion filter that silently skips any
+/// endpoint lacking a MethodInfo (TestHelpers.routeEndpoint's own doc comment). Every
+/// Frank-built endpoint currently stamps handler.Method, so this is dormant today; a
+/// future silent exclusion would otherwise surface only as a wrong served ALPS Type with
+/// no diagnostic trail (constitution rule 7: no silent middleware failures). Compares
+/// (endpoint, HTTP method) pair counts — the same granularity on both sides, since one
+/// route declaring N methods yields N ApiDescriptions — and only logs (never throws):
+/// this is observability, not a hard failure.
+let internal checkCorrelationSourcesAgree
+    (logger: ILogger)
+    (dataSource: EndpointDataSource)
+    (provider: IApiDescriptionGroupCollectionProvider)
+    : unit =
+    let routeMethodCount =
+        scanRouteEndpoints dataSource
+        |> Seq.sumBy (fun re -> httpMethodsOf re |> Option.map List.length |> Option.defaultValue 0)
+
+    let apiDescriptionCount = allApiDescriptions provider |> Seq.length
+
+    if routeMethodCount <> apiDescriptionCount then
+        logger.LogWarning(
+            "DiscoveryMiddleware: route-table (endpoint, HTTP method) count ({RouteMethodCount}) does not match the count IApiDescriptionGroupCollectionProvider produced ({ApiDescriptionCount}) — some endpoint(s) may be silently excluded from ALPS Type reconciliation (e.g. missing MethodInfo). The served OPTIONS Allow header and ALPS Type may disagree for the affected resource(s).",
+            routeMethodCount,
+            apiDescriptionCount
+        )
 
 /// The first endpoint-metadata item of type 'T carried by an ApiDescription's copied
 /// EndpointMetadataCollection, or None — the ApiDescription-sourced counterpart to
@@ -332,8 +370,10 @@ type DiscoveryMiddleware
     // endpoint set is fixed after startup.
     let cachedAlpsDescriptors =
         lazy
-            (let methodsByRel, methodsByReq =
-                correlateMethodsByRelationAndRequestType apiDescriptionProvider
+            (checkCorrelationSourcesAgree logger endpointDataSource apiDescriptionProvider
+
+             let methodsByRel, methodsByReq =
+                 correlateMethodsByRelationAndRequestType apiDescriptionProvider
 
              reconcileAlpsTypes methodsByRel methodsByReq config.AlpsDescriptors)
 
