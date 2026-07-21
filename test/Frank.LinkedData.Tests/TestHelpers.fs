@@ -24,9 +24,9 @@ let buildFixtureGraph () : IGraph =
 let schemaOrgContext = """{"@context":["https://schema.org"]}"""
 
 let sampleConfig =
-    { Graph = buildFixtureGraph ()
-      JsonLdContext = schemaOrgContext
-      GraphFactory = None }
+    { LinkedDataConfig.Empty with
+        Graph = buildFixtureGraph ()
+        JsonLdContext = schemaOrgContext }
 
 /// Build a fixture graph with a ttt:square term using the request origin from HttpContext.
 let buildTttGraphWithOrigin (ctx: HttpContext) : IGraph =
@@ -46,9 +46,10 @@ let buildTttGraphWithOrigin (ctx: HttpContext) : IGraph =
 /// Config with GraphFactory so the middleware builds an origin-resolved graph per request.
 /// No example.org placeholder — the factory receives the actual request HttpContext.
 let sampleConfigWithFactory =
-    { Graph = buildFixtureGraph ()
-      JsonLdContext = """{"@context":{"ttt":"/tictactoe#"}}"""
-      GraphFactory = Some buildTttGraphWithOrigin }
+    { LinkedDataConfig.Empty with
+        Graph = buildFixtureGraph ()
+        JsonLdContext = """{"@context":{"ttt":"/tictactoe#"}}"""
+        GraphFactory = Some buildTttGraphWithOrigin }
 
 /// Spin a TestServer with LinkedDataMiddleware installed.
 /// UseRouting is called before the middleware so ctx.GetEndpoint() resolves correctly.
@@ -57,6 +58,7 @@ let startServer (config: LinkedDataConfig) =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(config) |> ignore
+    builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore
@@ -98,9 +100,10 @@ let buildGraphWithNamespacesAndBaseUri (ctx: HttpContext) : IGraph =
 
 /// Config using a factory that sets namespace prefixes — for #16 and double-@base tests.
 let sampleConfigWithNamespaces =
-    { Graph = buildFixtureGraph ()
-      JsonLdContext = schemaOrgContext
-      GraphFactory = Some buildGraphWithNamespacesAndBaseUri }
+    { LinkedDataConfig.Empty with
+        Graph = buildFixtureGraph ()
+        JsonLdContext = schemaOrgContext
+        GraphFactory = Some buildGraphWithNamespacesAndBaseUri }
 
 /// Build a graph with an external-namespace predicate (schema:, off-origin) and a
 /// local-namespace predicate (ttt:, under origin/base') — #394: the inline @context[0]
@@ -131,9 +134,10 @@ let buildGraphWithExternalAndLocalNamespaces (ctx: HttpContext) : IGraph =
 
 /// Config for #394 — external (schema:) + local (ttt:) namespace prefixes, both used in triples.
 let sampleConfigWithExternalAndLocalNamespaces =
-    { Graph = buildFixtureGraph ()
-      JsonLdContext = schemaOrgContext
-      GraphFactory = Some buildGraphWithExternalAndLocalNamespaces }
+    { LinkedDataConfig.Empty with
+        Graph = buildFixtureGraph ()
+        JsonLdContext = schemaOrgContext
+        GraphFactory = Some buildGraphWithExternalAndLocalNamespaces }
 
 /// TestServer with a LinkedData-config endpoint (/data) AND a plain endpoint (/plain) without config.
 /// Used for MINOR-3: only LinkedData-owned endpoints should 406 for unsupported RDF Accept.
@@ -141,6 +145,7 @@ let startServerWithPlainRoute (config: LinkedDataConfig) =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(config) |> ignore
+    builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore
@@ -159,6 +164,7 @@ let startServerWithPlainRoute (config: LinkedDataConfig) =
 let startServerWithTttRoutes () =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore

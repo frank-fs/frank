@@ -37,6 +37,7 @@ let private endpointContext =
 let private startServerWithMetadata (endpointConfig: LinkedDataConfig) =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore
@@ -60,9 +61,9 @@ let private startServerWithMetadata (endpointConfig: LinkedDataConfig) =
 let endpointMetadataTests =
     let endpointGraph = buildEndpointGraph ()
     let endpointConfig =
-        { Graph = endpointGraph
-          JsonLdContext = endpointContext
-          GraphFactory = None }
+        { LinkedDataConfig.Empty with
+            Graph = endpointGraph
+            JsonLdContext = endpointContext }
 
     testList
         "LinkedDataMiddleware endpoint-metadata override"

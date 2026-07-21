@@ -19,3 +19,23 @@ type LinkedDataConfig =
     { Graph: IGraph
       JsonLdContext: string
       GraphFactory: (HttpContext -> IGraph) option }
+
+    /// Baseline with no per-request graph factory.
+    /// Callers override Graph/JsonLdContext (and GraphFactory where needed)
+    /// via `{ LinkedDataConfig.Empty with ... }` — adding a field here doesn't force every
+    /// existing construction site to be touched again.
+    static member Empty =
+        { Graph = new Graph()
+          JsonLdContext = ""
+          GraphFactory = None }
+
+/// App-wide vocabulary document route (mirrors DiscoveryConfig.HomeRoute/ProfileUri — set
+/// once per app, not per-resource). When Some, LinkedDataMiddleware emits a
+/// `Link: <route>; rel="describedby"` header on every safe-method (GET/HEAD) response for
+/// every endpoint carrying LinkedDataConfig metadata, regardless of negotiated
+/// representation — covering codegen-generated resources identically to hand-wired ones,
+/// since this is no longer a per-resource opt-in field (#420 expert-review follow-up).
+type LinkedDataVocabularyConfig =
+    { VocabularyRoute: string option }
+
+    static member None = { VocabularyRoute = None }

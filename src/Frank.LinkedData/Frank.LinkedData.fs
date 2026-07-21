@@ -2,31 +2,78 @@ namespace Frank.LinkedData
 
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Routing
+open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.DependencyInjection.Extensions
 open VDS.RDF
 open Frank.Builder
 
 [<AutoOpen>]
 module LinkedDataExtensions =
 
+    /// Registers the default (no describedby route) LinkedDataVocabularyConfig singleton —
+    /// required so LinkedDataMiddleware's constructor resolves from DI even when
+    /// useLinkedDataVocabulary is never called. Uses TryAddSingleton (only registers if
+    /// nothing of this type is already registered) while `useLinkedDataVocabulary` (below)
+    /// uses unconditional AddSingleton for its explicit override. This makes the pair
+    /// order-independent: if the override runs first, this TryAdd sees a registration
+    /// already exists and no-ops; if it runs second, it's simply the last registration,
+    /// which DI resolves for a single-instance request either way — mirrors
+    /// Frank.Validation's useValidation (TryAddSingleton)/useValidationWith (AddSingleton)
+    /// pattern.
+    let private addDefaultVocabularyConfig (services: IServiceCollection) =
+        services.TryAddSingleton<LinkedDataVocabularyConfig>(LinkedDataVocabularyConfig.None)
+        services
+
     type WebHostBuilder with
 
         [<CustomOperation("useLinkedDataWith")>]
         member _.UseLinkedDataWith(spec: WebHostSpec, _config: LinkedDataConfig) : WebHostSpec =
+            let addServices (services: IServiceCollection) =
+                spec.Services services |> addDefaultVocabularyConfig
+
             let addMiddleware (app: IApplicationBuilder) =
                 let configured = spec.Middleware app
                 configured.UseMiddleware<LinkedDataMiddleware>() |> ignore
                 configured
 
-            { spec with Middleware = addMiddleware }
+            { spec with
+                Services = addServices
+                Middleware = addMiddleware }
 
         [<CustomOperation("useLinkedData")>]
         member _.UseLinkedData(spec: WebHostSpec) : WebHostSpec =
+            let addServices (services: IServiceCollection) =
+                spec.Services services |> addDefaultVocabularyConfig
+
             let addMiddleware (app: IApplicationBuilder) =
                 let configured = spec.Middleware app
                 configured.UseMiddleware<LinkedDataMiddleware>() |> ignore
                 configured
 
-            { spec with Middleware = addMiddleware }
+            { spec with
+                Services = addServices
+                Middleware = addMiddleware }
+
+        /// App-wide vocabulary document route (mirrors useDiscoveryWith's HomeRoute/ProfileUri
+        /// singleton pattern) — set once per app, applies to every endpoint carrying
+        /// LinkedDataConfig metadata. Call order relative to useLinkedData/useLinkedDataWith
+        /// no longer matters: this registers via unconditional AddSingleton (the explicit
+        /// override) while the default path uses TryAddSingleton, so whichever runs first,
+        /// this override always wins (#420 expert-review follow-up).
+        [<CustomOperation("useLinkedDataVocabulary")>]
+        member _.UseLinkedDataVocabulary(spec: WebHostSpec, vocabularyRoute: string) : WebHostSpec =
+            if System.String.IsNullOrWhiteSpace vocabularyRoute then
+                invalidArg (nameof vocabularyRoute) "vocabularyRoute must not be null or whitespace"
+
+            let addServices (services: IServiceCollection) =
+                let configured = spec.Services services
+
+                configured.AddSingleton<LinkedDataVocabularyConfig>({ VocabularyRoute = Some vocabularyRoute })
+                |> ignore
+
+                configured
+
+            { spec with Services = addServices }
 
 /// Extends ResourceBuilder with a `linkedDataGraph` operation that stamps
 /// LinkedDataConfig onto every endpoint built by the resource CE block.
@@ -53,9 +100,9 @@ module ResourceLinkedDataExtensions =
                 spec,
                 fun (b: EndpointBuilder) ->
                     b.Metadata.Add(
-                        { Graph = graph
-                          JsonLdContext = jsonLdContext
-                          GraphFactory = None }
+                        { LinkedDataConfig.Empty with
+                            Graph = graph
+                            JsonLdContext = jsonLdContext }
                         : LinkedDataConfig
                     )
             )

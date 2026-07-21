@@ -14,6 +14,7 @@
     <Compile Include="EndpointMetadataTests.fs" />
     <Compile Include="PropertyTests.fs" />
     <Compile Include="ResolverTests.fs" />
+    <Compile Include="VocabularyConfigTests.fs" />
     <Compile Include="OntologyTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>

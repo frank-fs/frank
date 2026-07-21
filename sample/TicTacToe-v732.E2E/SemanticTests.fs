@@ -473,23 +473,32 @@ type SemanticTests() =
             else
                 base'.TrimEnd '/' + "/" + iri
 
+    /// rdfs:seeAlso may surface as the bare absolute IRI or compacted to its "rdfs:" CURIE.
+    /// Not resolvable via TryGetByEitherKey/ParseContextPrefixes here: this document's
+    /// @context lists rdf-schema as a bare namespace-URI string entry, not a named prefix
+    /// mapping, so no "rdfs" term ever enters the parsed prefix map to compact against (#420).
+    static member private TryGetSeeAlso(node: JsonElement) : JsonElement option =
+        [ "http://www.w3.org/2000/01/rdf-schema#seeAlso"; "rdfs:seeAlso" ]
+        |> List.tryPick (fun key ->
+            let mutable sa = Unchecked.defaultof<JsonElement>
+            if node.TryGetProperty(key, &sa) then Some sa else None)
+
     /// Extract rdfs:seeAlso target URIs from a JSON-LD @graph body.
     static member private SeeAlsoUris(ldBody: string) : string list =
         use doc = JsonDocument.Parse ldBody
         let acc = System.Collections.Generic.List<string>()
-        let seeAlsoKey = "http://www.w3.org/2000/01/rdf-schema#seeAlso"
         let mutable graph = Unchecked.defaultof<JsonElement>
 
         if doc.RootElement.TryGetProperty("@graph", &graph) then
             for node in graph.EnumerateArray() do
-                let mutable sa = Unchecked.defaultof<JsonElement>
-
-                if node.TryGetProperty(seeAlsoKey, &sa) then
+                match SemanticTests.TryGetSeeAlso node with
+                | Some sa ->
                     for target in sa.EnumerateArray() do
                         let mutable idEl = Unchecked.defaultof<JsonElement>
 
                         if target.TryGetProperty("@id", &idEl) then
                             acc.Add(idEl.GetString())
+                | None -> ()
 
         acc |> Seq.toList
 
@@ -958,22 +967,50 @@ type SemanticTests() =
                 "Game ld+json must not contain example.org — IRIs must be host-resolved"
             )
 
-            // seeAlso targets — game graph has none; loop is vacuous but not removed for structure.
-            // schema.org seeAlso URIs are rewritten to the stub; non-schema.org URIs are unchanged.
-            for seeAlsoUri in SemanticTests.SeeAlsoUris ldBody do
-                let fetchUri =
-                    if seeAlsoUri.StartsWith "https://schema.org/" then
-                        toStub seeAlsoUri
-                    else
-                        seeAlsoUri
+            // ── #420: two-hop seeAlso discovery — Game's seeAlso triples live on the
+            // class-level ontology, never inlined into the instance body (headers-only
+            // HATEOAS; vocab facts are not duplicated per-instance). The instance graph
+            // itself has none (asserted above: no example.org, only actionStatus/ttt:
+            // terms) — a naive client discovers Game's real-world identity by following
+            // the instance response's OWN Link rel="describedby" header to the
+            // vocabulary document, never by hardcoding "/vocabulary".
+            let ldRels = SemanticTests.LinkRels ldGame
 
-                let! r = httpClient.GetAsync fetchUri
+            Assert.That(
+                ldRels.ContainsKey "describedby",
+                Is.True,
+                "Game ld+json missing Link rel=describedby — seeAlso two-hop path unreachable"
+            )
 
-                Assert.That(
-                    int r.StatusCode,
-                    Is.InRange(200, 299),
-                    sprintf "seeAlso target did not resolve: %s" seeAlsoUri
-                )
+            let vocabHref = ldRels.["describedby"]
+
+            let vocabUrl =
+                if vocabHref.StartsWith "/" then
+                    originBase + vocabHref
+                else
+                    vocabHref
+
+            let! vocabResp =
+                ctx.GetAsync(vocabUrl, APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ]))
+
+            Assert.That(vocabResp.Status, Is.EqualTo 200, sprintf "describedby target '%s' not 200" vocabUrl)
+            let! vocabBody = vocabResp.TextAsync()
+            let actualSeeAlso = SemanticTests.SeeAlsoUris vocabBody |> Set.ofList
+
+            let expectedSeeAlso =
+                Set.ofList
+                    [ "http://www.wikidata.org/entity/Q210339"
+                      "http://www.wikidata.org/entity/Q573573"
+                      "http://www.wikidata.org/entity/Q573520" ]
+
+            Assert.That(
+                actualSeeAlso,
+                Is.EqualTo expectedSeeAlso,
+                sprintf
+                    "vocabulary document at '%s' does not carry Game's exact Wikidata seeAlso set; found: %s"
+                    vocabUrl
+                    (String.concat ", " actualSeeAlso)
+            )
 
             // ── Phase 5: Identify inputs by absolute IRI and structural role ────
             // agentIri is found by its well-known schema.org IRI.
