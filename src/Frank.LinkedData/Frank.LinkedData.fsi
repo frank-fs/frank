@@ -8,15 +8,12 @@ module LinkedDataExtensions =
 
     type WebHostBuilder with
 
-        [<CustomOperation("useLinkedDataWith")>]
-        member UseLinkedDataWith: spec: WebHostSpec * _config: LinkedDataConfig -> WebHostSpec
-
         [<CustomOperation("useLinkedData")>]
         member UseLinkedData: spec: WebHostSpec -> WebHostSpec
 
         /// App-wide vocabulary document route (mirrors useDiscoveryWith's HomeRoute/ProfileUri
         /// singleton pattern) — set once per app, applies to every endpoint carrying
-        /// LinkedDataConfig metadata. Call AFTER useLinkedData/useLinkedDataWith in the CE
+        /// LinkedDataConfig metadata. Call AFTER useLinkedData in the CE
         /// block so this registration is the one DI resolves (#420 expert-review follow-up).
         [<CustomOperation("useLinkedDataVocabulary")>]
         member UseLinkedDataVocabulary: spec: WebHostSpec * vocabularyRoute: string -> WebHostSpec

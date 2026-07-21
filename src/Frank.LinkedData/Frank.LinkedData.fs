@@ -26,20 +26,6 @@ module LinkedDataExtensions =
 
     type WebHostBuilder with
 
-        [<CustomOperation("useLinkedDataWith")>]
-        member _.UseLinkedDataWith(spec: WebHostSpec, _config: LinkedDataConfig) : WebHostSpec =
-            let addServices (services: IServiceCollection) =
-                spec.Services services |> addDefaultVocabularyConfig
-
-            let addMiddleware (app: IApplicationBuilder) =
-                let configured = spec.Middleware app
-                configured.UseMiddleware<LinkedDataMiddleware>() |> ignore
-                configured
-
-            { spec with
-                Services = addServices
-                Middleware = addMiddleware }
-
         [<CustomOperation("useLinkedData")>]
         member _.UseLinkedData(spec: WebHostSpec) : WebHostSpec =
             let addServices (services: IServiceCollection) =
@@ -56,7 +42,7 @@ module LinkedDataExtensions =
 
         /// App-wide vocabulary document route (mirrors useDiscoveryWith's HomeRoute/ProfileUri
         /// singleton pattern) — set once per app, applies to every endpoint carrying
-        /// LinkedDataConfig metadata. Call order relative to useLinkedData/useLinkedDataWith
+        /// LinkedDataConfig metadata. Call order relative to useLinkedData
         /// no longer matters: this registers via unconditional AddSingleton (the explicit
         /// override) while the default path uses TryAddSingleton, so whichever runs first,
         /// this override always wins (#420 expert-review follow-up).
