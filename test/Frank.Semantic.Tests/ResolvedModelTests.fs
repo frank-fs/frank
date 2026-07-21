@@ -95,10 +95,7 @@ let at_rm1 =
             Expect.equal res.GenericArity 0 "GenericArity"
             Expect.equal res.ClassIri (Some(Uri "https://schema.org/Game")) "ClassIri expanded"
 
-            Expect.equal
-                res.EquivalentClass
-                (Some(Uri "https://schema.org/VideoGame"))
-                "EquivalentClass from registry"
+            Expect.equal res.EquivalentClass (Some(Uri "https://schema.org/VideoGame")) "EquivalentClass from registry"
             Expect.equal res.SeeAlso [ Uri "https://www.wikidata.org/wiki/Q11907" ] "SeeAlso from registry"
             Expect.equal res.ProvClass (Some ProvOClass.Entity) "ProvClass from registry"
             let f = res.Fields |> List.head
@@ -166,6 +163,35 @@ let at_425 =
                       res.EquivalentClass
                       (Some(Uri "https://schema.org/Game"))
                       "distinct EquivalentClass unchanged"
+          }
+
+          test "AC3: same-base, different-fragment pair is NOT a tautology — EquivalentClass preserved" {
+              // Frank's own owned-vocab convention is host + '#LocalName' (e.g. .../tictactoe#Action).
+              // System.Uri structural equality ignores Fragment by default, so a naive `Some e <> classIri`
+              // comparison would wrongly treat these same-host, different-fragment IRIs as a tautology.
+              let actionType = "TicTacToe.Model.Action"
+
+              let registry =
+                  { baseRegistry with
+                      EquivalentClasses = Map.ofList [ actionType, Uri "http://example.com/vocab#OtherGame" ] }
+
+              let mapping = mkMapping actionType (Some "ex:Game") []
+
+              let lock =
+                  { lockWithSchemaAndEx with
+                      DeclaredPrefixes = Map.empty
+                      Mappings = [ mapping ] }
+
+              match ResolvedModel.build registry lock with
+              | Error e -> failwith $"Expected Ok but got Error: {e}"
+              | Ok model ->
+                  let res = model.Resources |> List.head
+                  Expect.equal res.ClassIri (Some(Uri "http://example.com/vocab#Game")) "ClassIri resolved"
+
+                  Expect.equal
+                      res.EquivalentClass
+                      (Some(Uri "http://example.com/vocab#OtherGame"))
+                      "distinct fragment EquivalentClass preserved, not suppressed"
           } ]
 
 // ── AT-RM2: LocalName / GenericArity parsing ─────────────────────────────────
