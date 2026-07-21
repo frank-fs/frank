@@ -459,17 +459,25 @@ let alpsTypeReconciliationTests =
               let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
               Expect.equal (alpsTypeOf "Gadget" body) "idempotent" "Gadget (DELETE) must be idempotent"
 
-          testCase "class never itself routed -> codegen default Type survives untouched"
+          testCase
+              "class never itself routed AND never referenced -> dropped entirely (#418), not merely Type-preserved"
           <| fun _ ->
+              // Superseded by #418: ActionStatusType (ClassIri Some, no live endpoint, never
+              // an `rt` target of anything live) is exactly the phantom-descriptor shape #418
+              // fixes — a served descriptor with zero backing route and zero embedding is a
+              // dead affordance, so it must not be served at all, not merely have its Type
+              // left unreconciled. reconcileAlpsTypes's own "no live match -> Type untouched"
+              // behavior is still covered directly and in isolation by
+              // AlpsTypeReconciliationTests.fs's pure unit test (which calls
+              // reconcileAlpsTypes without going through this serve-time filter).
               use app = startAlpsTypeServer alpsTypeConfig
               use client = app.GetTestClient()
               let resp = client.GetAsync("/alps/test").GetAwaiter().GetResult()
               let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
 
-              Expect.equal
-                  (alpsTypeOf "ActionStatusType" body)
-                  "semantic"
-                  "ActionStatusType has no live endpoint — codegen default (semantic) is untouched"
+              Expect.isNone
+                  (descriptorProperty "ActionStatusType" "type" body)
+                  "ActionStatusType has no live endpoint and is never an rt target — dropped entirely (#418), never served as a phantom affordance"
 
           testCase
               "OPTIONS/Allow on the multi-verb Game route still reports both GET and POST (unaffected by ALPS reconciliation)"

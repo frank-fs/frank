@@ -1,0 +1,280 @@
+module Frank.Discovery.Tests.PhantomDescriptorTests
+
+open System.Net.Http
+open System.Text.Json
+open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Http.Metadata
+open Microsoft.AspNetCore.TestHost
+open Expecto
+open Frank.Discovery
+open Frank.Discovery.Tests.TestHelpers
+
+/// #418: a served ALPS descriptor must correspond to something a client can actually
+/// reach — either backing a registered route (methodsByRel, via ResourceRelationMetadata),
+/// a registered accepted request type (methodsByType, via IAcceptsMetadata — the SAME two
+/// live-correlation maps #397/#398's reconcileAlpsTypes already established), a registered
+/// DECLARED RESPONSE type (producedTypes, via IProducesResponseTypeMetadata — e.g.
+/// `produces typeof<MoveResult> 200`), or being the `rt` target of a descriptor that IS
+/// live. A descriptor satisfying none of these is a phantom affordance (e.g.
+/// sample/TicTacToe-v732's MoveLog/ItemList, which backs zero route and is never embedded
+/// anywhere) and must be dropped at serve time, since codegen (DiscoveryEmitter, MSBuild
+/// time) cannot see which types end up routed/embedded — only the running app knows.
+let private mkDescriptor id classIri requestType rt =
+    { Id = id
+      Type = "semantic"
+      Doc = None
+      Href = Some $"https://example.org/{id}"
+      Descriptors = []
+      Rt = rt
+      ClassIri = classIri
+      RequestClrTypeName = requestType }
+
+[<Tests>]
+let filterReachableDescriptorsTests =
+    testList
+        "DiscoveryMiddleware — #418 filterReachableDescriptors (pure)"
+        [ test "descriptor live via methodsByRel (ClassIri) is kept" {
+              let methodsByRel = Map.ofList [ "https://schema.org/Game", Set.ofList [ "GET" ] ]
+              let d = mkDescriptor "Game" (Some "https://schema.org/Game") None None
+
+              let result =
+                  DiscoveryMiddleware.filterReachableDescriptors methodsByRel Map.empty Set.empty [ d ]
+
+              Expect.equal result [ d ] "live-by-relation descriptor is kept"
+          }
+
+          test "descriptor live via methodsByType (RequestClrTypeName, accepted request body) is kept" {
+              let methodsByType = Map.ofList [ "App.MoveRequest", Set.ofList [ "POST" ] ]
+              let d = mkDescriptor "MoveRequest" None (Some "App.MoveRequest") None
+
+              let result =
+                  DiscoveryMiddleware.filterReachableDescriptors Map.empty methodsByType Set.empty [ d ]
+
+              Expect.equal result [ d ] "live-by-request-type descriptor is kept"
+          }
+
+          test "descriptor live via producedTypes (RequestClrTypeName, declared response type, `produces`) is kept" {
+              // Mirrors the real regression: MoveResult (`produces typeof<MoveResult> 200`)
+              // is never accepted as a request body and never backs its own route by
+              // relation — only IProducesResponseTypeMetadata correlates it.
+              let producedTypes = Set.ofList [ "App.MoveResult" ]
+
+              let d =
+                  mkDescriptor "MoveResult" (Some "https://schema.org/MoveResult") (Some "App.MoveResult") None
+
+              let result =
+                  DiscoveryMiddleware.filterReachableDescriptors Map.empty Map.empty producedTypes [ d ]
+
+              Expect.equal result [ d ] "live-by-declared-response-type descriptor is kept"
+          }
+
+          test "descriptor with no live signal, and not an rt target of a live descriptor, is DROPPED (#418 core case)" {
+              // Mirrors MoveLog/ItemList: class-mapped (has a ClassIri) but backs zero route
+              // and is never referenced by anything.
+              let orphan = mkDescriptor "MoveLog" (Some "https://schema.org/ItemList") None None
+
+              let result =
+                  DiscoveryMiddleware.filterReachableDescriptors Map.empty Map.empty Set.empty [ orphan ]
+
+              Expect.isEmpty result "orphaned descriptor (no live signal, no rt reference) is dropped"
+          }
+
+          test
+              "descriptor with no live signal, but IS the rt target of a live descriptor, is kept (embedded-child regression guard)" {
+              let methodsByType = Map.ofList [ "App.MoveRequest", Set.ofList [ "POST" ] ]
+
+              let moveRequest =
+                  mkDescriptor "MoveRequest" None (Some "App.MoveRequest") (Some "https://example.org/Outcome")
+
+              // ClassIri Some — a genuinely class-mapped descriptor (like MoveResult) with NO
+              // live signal of its own, reachable ONLY via being MoveRequest's `rt` target.
+              // ClassIri=None would make this test vacuous (auto-kept regardless of rt-linkage).
+              let outcome = mkDescriptor "Outcome" (Some "https://example.org/Outcome") None None
+
+              let result =
+                  DiscoveryMiddleware.filterReachableDescriptors
+                      Map.empty
+                      methodsByType
+                      Set.empty
+                      [ moveRequest; outcome ]
+
+              Expect.contains result moveRequest "the live descriptor itself is kept"
+
+              Expect.contains
+                  result
+                  outcome
+                  "the rt TARGET of a live descriptor is kept even though it has no live signal of its own"
+          }
+
+          test
+              "unrelated non-live descriptor is still dropped even when SOME OTHER live descriptor exists (no false-positive keep-everything)" {
+              let methodsByRel = Map.ofList [ "https://schema.org/Game", Set.ofList [ "GET" ] ]
+              let game = mkDescriptor "Game" (Some "https://schema.org/Game") None None
+              let orphan = mkDescriptor "MoveLog" (Some "https://schema.org/ItemList") None None
+
+              let result =
+                  DiscoveryMiddleware.filterReachableDescriptors methodsByRel Map.empty Set.empty [ game; orphan ]
+
+              Expect.contains result game "live descriptor kept"
+
+              Expect.isFalse
+                  (result |> List.contains orphan)
+                  "unrelated orphan still dropped, not swept in by an unrelated live descriptor"
+          } ]
+
+// ── #418 AC1/AC2/AC4: serve-time filtering over a live EndpointDataSource ─────────
+
+let private phantomConfig: DiscoveryConfig =
+    { ProfileUri = "/alps/test"
+      HomeRoute = "/"
+      AlpsDescriptors =
+        [ { Id = "Game"
+            Type = "semantic"
+            Doc = None
+            Href = Some "https://schema.org/Game"
+            Descriptors = []
+            Rt = None
+            ClassIri = Some "https://schema.org/Game"
+            RequestClrTypeName = None }
+          { Id = "MoveRequest"
+            Type = "semantic"
+            Doc = None
+            Href = Some "https://schema.org/MoveAction"
+            Descriptors = []
+            Rt = Some "https://schema.org/Game"
+            ClassIri = Some "https://schema.org/MoveAction"
+            // FCS-style dotted form (matching Frank.ClrTypeName.normalizeFullName's output for
+            // a module-nested type), NOT typeof<MoveRequestFixture>.FullName's raw CLR '+' form
+            // — see AlpsTypeReconciliationTests.fs's moveRequestFixtureFcsStyleName for why the
+            // raw CLR form would mask the very correlation this fixture exists to exercise.
+            RequestClrTypeName = Some "Frank.Discovery.Tests.TestHelpers.MoveRequestFixture" }
+          // Real regression (#418): never accepted as a request body, never backs its own
+          // route by relation — reachable ONLY as the POST endpoint's DECLARED RESPONSE
+          // type (IProducesResponseTypeMetadata, `produces typeof<MoveResult> 200` in the
+          // real sample). Mirrors sample/TicTacToe-v732's MoveResult/"Won" case exactly.
+          { Id = "MoveResult"
+            Type = "semantic"
+            Doc = None
+            Href = Some "https://schema.org/MoveResult"
+            Descriptors = []
+            Rt = None
+            ClassIri = Some "https://schema.org/MoveResult"
+            RequestClrTypeName = Some "Frank.Discovery.Tests.PhantomDescriptorTests.MoveResultFixture" }
+          { Id = "MoveLog"
+            Type = "semantic"
+            Doc = None
+            Href = Some "https://schema.org/ItemList"
+            Descriptors = []
+            Rt = None
+            ClassIri = Some "https://schema.org/ItemList"
+            RequestClrTypeName = None } ]
+      DescribedByLinks = []
+      ResourceHrefVars = Map.empty }
+
+/// Fixture response type for IProducesResponseTypeMetadata — stands in for MoveResult.
+type private MoveResultFixture = { Status: string }
+
+let private startPhantomServer () =
+    let endpoints: Microsoft.AspNetCore.Http.Endpoint[] =
+        [| routeEndpoint
+               "/games/{id}"
+               [| "GET" |]
+               [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata) ]
+           routeEndpoint
+               "/games/{id}"
+               [| "POST" |]
+               [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
+                 box (AcceptsMetadata([| "application/json" |], typeof<MoveRequestFixture>, false) :> IAcceptsMetadata)
+                 box (ProducesResponseTypeMetadata(200, typeof<MoveResultFixture>, [| "application/json" |]) :> obj) ] |]
+
+    let app = buildDiscoveryApp None phantomConfig endpoints
+    app.StartAsync().GetAwaiter().GetResult()
+    app
+
+[<Tests>]
+let phantomServeTimeTests =
+    testList
+        "DiscoveryMiddleware — #418 phantom descriptor dropped at serve time"
+        [ testCase "GET ALPS profile: MoveLog/ItemList (zero backing route, unreferenced) is NOT served"
+          <| fun _ ->
+              use app = startPhantomServer ()
+              use client = app.GetTestClient()
+              let resp = client.GetAsync(phantomConfig.ProfileUri).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "ALPS profile served"
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+
+              use doc = JsonDocument.Parse body
+              let descriptors = doc.RootElement.GetProperty("alps").GetProperty("descriptor")
+
+              let ids =
+                  descriptors.EnumerateArray()
+                  |> Seq.map (fun d -> d.GetProperty("id").GetString())
+                  |> Seq.toList
+
+              Expect.isFalse
+                  (ids |> List.contains "MoveLog")
+                  "MoveLog descriptor must not be served — zero backing route, never embedded"
+
+              Expect.isFalse
+                  (body.Contains "ItemList")
+                  "ItemList class IRI must not appear anywhere in the served ALPS document"
+
+          testCase "GET ALPS profile: Game (live-routed) still served"
+          <| fun _ ->
+              use app = startPhantomServer ()
+              use client = app.GetTestClient()
+              let resp = client.GetAsync(phantomConfig.ProfileUri).GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+
+              use doc = JsonDocument.Parse body
+              let descriptors = doc.RootElement.GetProperty("alps").GetProperty("descriptor")
+
+              let ids =
+                  descriptors.EnumerateArray()
+                  |> Seq.map (fun d -> d.GetProperty("id").GetString())
+                  |> Seq.toList
+
+              Expect.contains ids "Game" "Game (live via ResourceRelationMetadata) is still served"
+
+          testCase
+              "GET ALPS profile: MoveRequest (embedded action, live via IAcceptsMetadata) still served — regression guard"
+          <| fun _ ->
+              use app = startPhantomServer ()
+              use client = app.GetTestClient()
+              let resp = client.GetAsync(phantomConfig.ProfileUri).GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+
+              use doc = JsonDocument.Parse body
+              let descriptors = doc.RootElement.GetProperty("alps").GetProperty("descriptor")
+
+              let ids =
+                  descriptors.EnumerateArray()
+                  |> Seq.map (fun d -> d.GetProperty("id").GetString())
+                  |> Seq.toList
+
+              Expect.contains
+                  ids
+                  "MoveRequest"
+                  "MoveRequest (live via IAcceptsMetadata — a route's request body type, not itself a top-level GET route) is still served: the filter must not drop legitimately-reachable-but-not-top-level-routed types"
+
+          testCase
+              "GET ALPS profile: MoveResult (declared response type, live via IProducesResponseTypeMetadata) still served — regression guard"
+          <| fun _ ->
+              use app = startPhantomServer ()
+              use client = app.GetTestClient()
+              let resp = client.GetAsync(phantomConfig.ProfileUri).GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+
+              use doc = JsonDocument.Parse body
+              let descriptors = doc.RootElement.GetProperty("alps").GetProperty("descriptor")
+
+              let ids =
+                  descriptors.EnumerateArray()
+                  |> Seq.map (fun d -> d.GetProperty("id").GetString())
+                  |> Seq.toList
+
+              Expect.contains
+                  ids
+                  "MoveResult"
+                  "MoveResult (never accepted as a request body, never backs its own route — reachable ONLY via `produces`, IProducesResponseTypeMetadata) is still served: the filter must recognize the response-type live signal too" ]

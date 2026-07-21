@@ -16,6 +16,7 @@
     <Compile Include="JsonHomeMemoizationTests.fs" />
     <Compile Include="RouteTemplateCacheTests.fs" />
     <Compile Include="AlpsTypeReconciliationTests.fs" />
+    <Compile Include="PhantomDescriptorTests.fs" />
     <Compile Include="CeOrderingTests.fs" />
     <Compile Include="RelationTests.fs" />
     <Compile Include="ResolverTests.fs" />

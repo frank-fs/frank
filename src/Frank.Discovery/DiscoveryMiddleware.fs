@@ -48,6 +48,29 @@ let private acceptedRequestTypeOf (re: RouteEndpoint) : string option =
         | null -> None
         | t -> Some(Frank.ClrTypeName.normalizeFullName t.FullName)
 
+/// Frank.OpenApi's `produces` operation stamps ProducesResponseTypeMetadata with
+/// typeof<Void> as its sentinel for "no declared response body type" (HandlerDefinition.fs)
+/// — never null. Mirrors Frank.Provenance.ProvenanceMiddleware's own sentinel-filtering
+/// convention (isSentinel) for the same metadata type.
+let private isVoidResponseType (t: Type) : bool =
+    t = typeof<Void> || t = typeof<unit> || t = typeof<obj>
+
+/// Declared response CLR type full names on an endpoint via IProducesResponseTypeMetadata
+/// (Frank.OpenApi's `produces`), normalized via Frank.ClrTypeName — the SAME correlation-key
+/// convention as acceptedRequestTypeOf, but for the response side (#418): a class-mapped
+/// resource can be legitimately reachable as an action's DECLARED RESPONSE type (e.g.
+/// `produces typeof<MoveResult> 200`) without ever being accepted as a request body or
+/// backing its own route by relation — methodsByRequestType (IAcceptsMetadata only) can't
+/// see this on its own.
+let private producedResponseTypesOf (re: RouteEndpoint) : string list =
+    re.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
+    |> Seq.choose (fun m ->
+        match m.Type with
+        | null -> None
+        | t when isVoidResponseType t -> None
+        | t -> Some(Frank.ClrTypeName.normalizeFullName t.FullName))
+    |> Seq.toList
+
 /// Top-level class descriptors' ClassIri → Href, e.g. "https://tictactoe.invalid/ex#Game"
 /// → "/ex#Game" — DiscoveryEmitter already computed this host-relative-for-declared-only
 /// href (EmitterShared.hrefFor) once at codegen time. Only descriptors carrying BOTH a
@@ -174,6 +197,18 @@ let private correlateMethodsByRelationAndRequestType
         |> Map.ofSeq
 
     toMethodsMap byRelation, toMethodsMap byRequestType
+
+/// Set of every declared response CLR type full name (normalized) across all live
+/// endpoints, from IProducesResponseTypeMetadata (#418's third live-correlation signal,
+/// alongside methodsByRelation/methodsByRequestType above — see producedResponseTypesOf).
+/// A separate, single-purpose walk rather than folded into
+/// correlateMethodsByRelationAndRequestType above: that function's 2-tuple return is a
+/// public-facing contract methodsByRelation/methodsByRequestType already destructure via
+/// fst/snd, and this signal has no per-method breakdown to preserve (existence only).
+let private producedResponseTypeNames (dataSource: EndpointDataSource) : Set<string> =
+    scanRouteEndpoints dataSource
+    |> Seq.collect producedResponseTypesOf
+    |> Set.ofSeq
 
 /// Real HTTP methods per relation IRI, from live endpoints' ResourceRelationMetadata.
 /// Coarse correlation key: one `resource { relation X; ... }` block stamps the SAME
@@ -310,6 +345,54 @@ let internal reconcileAlpsTypes
 
     descriptors |> List.map reconcile
 
+/// True iff a top-level descriptor is "live": its ClassIri backs a registered route
+/// (methodsByRel, via ResourceRelationMetadata), its RequestClrTypeName backs a registered
+/// accepted request type (methodsByType, via IAcceptsMetadata — reconcileAlpsTypes above
+/// already established both signals, #397/#398), OR its RequestClrTypeName is a registered
+/// DECLARED RESPONSE type (producedTypes, via IProducesResponseTypeMetadata — #418: an
+/// action's `produces typeof<MoveResult> 200` return type is reachable even though it is
+/// never itself accepted as a request body or backed by its own relation).
+let private isLiveDescriptor
+    (methodsByRel: Map<string, Set<string>>)
+    (methodsByType: Map<string, Set<string>>)
+    (producedTypes: Set<string>)
+    (d: AlpsDescriptor)
+    : bool =
+    (d.ClassIri |> Option.exists (fun c -> Map.containsKey c methodsByRel))
+    || (d.RequestClrTypeName |> Option.exists (fun t -> Map.containsKey t methodsByType))
+    || (d.RequestClrTypeName |> Option.exists (fun t -> Set.contains t producedTypes))
+
+/// #418: drop any top-level ALPS descriptor that (a) IS a class-mapped resource (ClassIri
+/// Some — DiscoveryEmitter.collectDescriptors only ever emits a top-level descriptor when
+/// the source resource carries a ClassIri, so this is never a real-world exclusion, only a
+/// guard against non-class-mapped top-level fixtures/descriptors this filter was never
+/// meant to touch) and (b) is neither live (isLiveDescriptor) nor the `rt` target (one hop —
+/// mirroring DiscoveryEmitter's own assertRtResolves reasoning: an `rt` value matches some
+/// descriptor's Href or Id) of a descriptor that IS live. Codegen (DiscoveryEmitter, MSBuild
+/// time) cannot see which types end up routed/embedded in Program.fs — that information
+/// only exists at runtime — so the running app is responsible for filtering its candidate
+/// descriptor set down to what a client can actually reach. A descriptor satisfying neither
+/// is a phantom affordance (e.g. a class-mapped type that exists only to exercise an
+/// `equivalentClass` declaration, never itself routed or embedded, #418) — a client
+/// following it would find nothing.
+let internal filterReachableDescriptors
+    (methodsByRel: Map<string, Set<string>>)
+    (methodsByType: Map<string, Set<string>>)
+    (producedTypes: Set<string>)
+    (descriptors: AlpsDescriptor list)
+    : AlpsDescriptor list =
+    let isLive = isLiveDescriptor methodsByRel methodsByType producedTypes
+
+    let liveRtTargets =
+        descriptors |> List.filter isLive |> List.choose (fun d -> d.Rt) |> Set.ofList
+
+    let isRtTargetOfLive (d: AlpsDescriptor) =
+        (d.Href |> Option.exists (fun h -> Set.contains h liveRtTargets))
+        || Set.contains d.Id liveRtTargets
+
+    descriptors
+    |> List.filter (fun d -> d.ClassIri.IsNone || isLive d || isRtTargetOfLive d)
+
 // ── #398/#421: per-request path matching shared by Allow and rel="type" scoping ───
 
 /// One endpoint paired with its pre-parsed, immutable RouteTemplate (src/CLAUDE.md:
@@ -421,10 +504,18 @@ type DiscoveryMiddleware
     // correlation should not see.
     let cachedAlpsDescriptors =
         lazy
-            (let methodsByRel, methodsByReq =
-                correlateMethodsByRelationAndRequestType (resourceEndpointDataSource :> EndpointDataSource)
+            (let narrowSource = resourceEndpointDataSource :> EndpointDataSource
 
-             reconcileAlpsTypes methodsByRel methodsByReq config.AlpsDescriptors)
+             let methodsByRel, methodsByReq =
+                 correlateMethodsByRelationAndRequestType narrowSource
+
+             let producedTypes = producedResponseTypeNames narrowSource
+
+             config.AlpsDescriptors
+             // #418: drop phantom top-level descriptors BEFORE Type reconciliation — a
+             // dropped descriptor never needs its Type reconciled.
+             |> filterReachableDescriptors methodsByRel methodsByReq producedTypes
+             |> reconcileAlpsTypes methodsByRel methodsByReq)
 
     // #398: DescribedByLinks keyed by class IRI, so a matched route's own declared
     // relation looks up only its own rel="type" link(s) — never every app resource's.
