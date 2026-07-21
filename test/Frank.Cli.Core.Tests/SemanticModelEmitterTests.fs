@@ -731,7 +731,9 @@ let declaredOnlyPrefixHostRelativeTests =
         "SemanticModelEmitter — #415 declared-only (owned) prefix emits host-relative Iri"
         [ test "ex: class Iri is host-relative (never bakes in example.org)" {
               let src =
-                  Expect.wantOk (SemanticModelEmitter.emit "Probe.Generated" VocabularyRegistry.empty exDeclaredOnlyLock) "emit"
+                  Expect.wantOk
+                      (SemanticModelEmitter.emit "Probe.Generated" VocabularyRegistry.empty exDeclaredOnlyLock)
+                      "emit"
 
               Expect.stringContains
                   src
@@ -743,7 +745,9 @@ let declaredOnlyPrefixHostRelativeTests =
 
           test "ex: case Iri is host-relative (never bakes in example.org)" {
               let src =
-                  Expect.wantOk (SemanticModelEmitter.emit "Probe.Generated" VocabularyRegistry.empty exDeclaredOnlyLock) "emit"
+                  Expect.wantOk
+                      (SemanticModelEmitter.emit "Probe.Generated" VocabularyRegistry.empty exDeclaredOnlyLock)
+                      "emit"
 
               Expect.stringContains
                   src

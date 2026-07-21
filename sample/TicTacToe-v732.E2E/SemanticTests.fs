@@ -1866,3 +1866,93 @@ type SemanticTests() =
                     sprintf "schema.org live deref failed: https://schema.org/%s" term
                 )
         }
+
+    // ── AT-S10: .Ex sample never leaks a placeholder domain (#415) ──────────────
+    //
+    // Mirrors RdfVerificationTests.AT-R7's methodology (absence check paired with a
+    // positive real-origin presence check, never absence-only — a false-green would
+    // pass an absence-only check even if some OTHER garbage domain leaked) but scoped
+    // to the .Ex sample and covering every live surface the #415 thesis names together
+    // in one standing regression test: /ex (Turtle), OPTIONS /games/{id} (Link headers),
+    // the ALPS profile reached via the OPTIONS describedby Link, and JSON Home. Turns
+    // the manual `curl` verification from the #415 fix into a persisting guard — Vocabulary.
+    // Ex.fs's ex:/ttt: prefixes are declared-only identity keys (RFC 2606 ".invalid"),
+    // never themselves served; every IRI must instead resolve host-relative against the
+    // live ExServer origin (EmitterShared.declaredOnlyBases + hrefFor, #396/#415).
+    [<Test>]
+    member this.``AT-S10 .Ex sample serves no placeholder domain across /ex, OPTIONS, ALPS, and JSON Home``() =
+        task {
+            use! ctx = this.Playwright.APIRequest.NewContextAsync(APIRequestNewContextOptions(BaseURL = ExServer.Url()))
+
+            let exOriginBase = (ExServer.Url()).TrimEnd('/')
+            let gameIri = exOriginBase + "/ex#Game"
+
+            let assertNoPlaceholder (label: string) (body: string) =
+                Assert.That(body.Contains "example.org", Is.False, sprintf "%s must not contain example.org" label)
+
+                Assert.That(
+                    body.Contains "tictactoe.invalid",
+                    Is.False,
+                    sprintf "%s must not contain the un-relativized declared-only identity domain" label
+                )
+
+            // ── OPTIONS /games/{id}: Link headers carry no placeholder domain ────
+            let gameId = "at-s10"
+            let! opts = this.Options(ctx, sprintf "/games/%s" gameId)
+            Assert.That(opts.Status, Is.EqualTo 200, "OPTIONS /games/{id} not 200")
+            let rels = SemanticTests.LinkRels opts
+            Assert.That(rels.ContainsKey "describedby", Is.True, ".Ex server missing Link rel=describedby")
+            Assert.That(rels.ContainsKey "type", Is.True, ".Ex server missing Link rel=type")
+
+            let linkHeaderRaw =
+                opts.Headers
+                |> Seq.filter (fun kv -> kv.Key.ToLowerInvariant() = "link")
+                |> Seq.map (fun kv -> kv.Value)
+                |> String.concat ", "
+
+            assertNoPlaceholder "OPTIONS Link headers" linkHeaderRaw
+
+            // Positive check (not absence-only): the type Link, resolved against the live
+            // origin, is EXACTLY the real ex:Game IRI — not merely free of "example.org".
+            let typeIri =
+                let h = rels.["type"]
+                if h.StartsWith "/" then exOriginBase + h else h
+
+            Assert.That(typeIri, Is.EqualTo gameIri, "OPTIONS Link rel=type must resolve to the real ex:Game IRI")
+
+            // ── GET /ex: Turtle body carries no placeholder domain, and DOES carry the
+            // real-origin ex:Game IRI (positive presence, not absence-only). ──────────
+            let! exResp = ctx.GetAsync "/ex"
+            Assert.That(exResp.Status, Is.EqualTo 200, "GET /ex not 200")
+            let! exBody = exResp.TextAsync()
+            assertNoPlaceholder "GET /ex Turtle body" exBody
+
+            Assert.That(
+                exBody.Contains gameIri,
+                Is.True,
+                sprintf "GET /ex must contain the real-origin ex:Game IRI '%s', got: %s" gameIri exBody
+            )
+
+            // ── ALPS profile (reached via the discovered describedby Link, never
+            // hardcoded): no placeholder domain, real-origin ex:Game IRI present. ────
+            let! alpsResp = ctx.GetAsync rels.["describedby"]
+            Assert.That(alpsResp.Status, Is.EqualTo 200, "ALPS profile not 200")
+            let! alpsBody = alpsResp.TextAsync()
+            assertNoPlaceholder "ALPS profile body" alpsBody
+
+            Assert.That(
+                alpsBody.Contains gameIri,
+                Is.True,
+                sprintf "ALPS profile must contain the real-origin ex:Game IRI '%s', got: %s" gameIri alpsBody
+            )
+
+            // ── JSON Home: no placeholder domain anywhere (#415 — the leak this AC
+            // specifically closes: the resource key used to be the un-relativized,
+            // un-dereferenceable identity IRI). ──────────────────────────────────────
+            let! homeResp =
+                ctx.GetAsync("/", APIRequestContextOptions(Headers = dict [ "Accept", "application/json-home" ]))
+
+            Assert.That(homeResp.Status, Is.EqualTo 200, "JSON Home not 200")
+            let! homeBody = homeResp.TextAsync()
+            assertNoPlaceholder "JSON Home body" homeBody
+        }

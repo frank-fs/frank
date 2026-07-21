@@ -154,8 +154,7 @@ let private declaredOnlyConfig: DiscoveryConfig =
             ClassIri = Some "https://tictactoe.invalid/ex#Game"
             RequestClrTypeName = None } ]
       DescribedByLinks = []
-      ResourceHrefVars =
-        Map.ofList [ "https://tictactoe.invalid/ex#Game", Map.ofList [ "id", "/ex#identifier" ] ] }
+      ResourceHrefVars = Map.ofList [ "https://tictactoe.invalid/ex#Game", Map.ofList [ "id", "/ex#identifier" ] ] }
 
 let private startDeclaredOnlyRelationServer () =
     let gameResource =
