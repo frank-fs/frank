@@ -10,6 +10,11 @@ open Newtonsoft.Json.Linq
 
 module internal RdfSerialization =
 
+    /// RDFS namespace ("http://www.w3.org/2000/01/rdf-schema#") — the single shared binding
+    /// for the consumers above, so it is never re-hardcoded as a duplicate string literal.
+    [<Literal>]
+    let RdfsNamespace = "http://www.w3.org/2000/01/rdf-schema#"
+
     let serializeGraphJsonLd (graph: IGraph) : string =
         use store = new TripleStore()
         store.Add(graph) |> ignore

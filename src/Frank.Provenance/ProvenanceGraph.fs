@@ -58,18 +58,7 @@ let usedPrefixContext (declared: (string * string) list) (g: IGraph) : (string *
 let private provDeclaredPrefixes: (string * string) list =
     [ "prov", ProvVocabulary.Namespace
       "http", ProvVocabulary.Http.Namespace
-      "rdfs", "http://www.w3.org/2000/01/rdf-schema#" ]
-
-let private compact (graph: IGraph) (extraContext: (string * string) list) : string =
-    let ctx = JObject()
-
-    for (k, v) in usedPrefixContext provDeclaredPrefixes graph do
-        ctx.[k] <- JToken.op_Implicit v
-
-    for (k, v) in extraContext do
-        ctx.[k] <- JToken.op_Implicit v
-
-    RdfSerialization.compactWithContext graph ctx
+      "rdfs", RdfSerialization.RdfsNamespace ]
 
 /// #424: compute the served @context entries (PROV-O's fixed prefixes ++ the app's
 /// DeclaredPrefixes), filtered to prefixes actually used in the graph, from a single shared
@@ -80,6 +69,17 @@ let internal usedContextEntries (declaredPrefixes: (string * string) list) (g: I
 
     filterUsedPrefixes provDeclaredPrefixes uris
     @ filterUsedPrefixes declaredPrefixes uris
+
+/// Compact `graph` to JSON-LD, filtering both PROV-O's fixed prefixes and `extraContext`
+/// to only those actually used in the graph (same discipline as compactGraph's #424 fix —
+/// no unconditional pass-through of a declared-but-unused @context entry).
+let private compact (graph: IGraph) (extraContext: (string * string) list) : string =
+    let ctx = JObject()
+
+    for (k, v) in usedContextEntries extraContext graph do
+        ctx.[k] <- JToken.op_Implicit v
+
+    RdfSerialization.compactWithContext graph ctx
 
 let private u (g: IGraph) (s: string) =
     g.CreateUriNode(UriFactory.Create s) :> INode
@@ -193,7 +193,7 @@ let private addAgent (g: IGraph) (record: ProvenanceRecord) (agent: INode) =
     |> Option.iter (assertT g agent rdfType)
 
     match record.Agent.Label with
-    | Some l -> assertT g agent (u g "http://www.w3.org/2000/01/rdf-schema#label") (plain g l)
+    | Some l -> assertT g agent (u g (RdfSerialization.RdfsNamespace + "label")) (plain g l)
     | None -> ()
 
 // Single-record snapshot graph (used by InvokeWithProv content negotiation path).

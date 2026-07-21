@@ -28,15 +28,11 @@ Reference for diagnostics emitted by `Frank.Analyzers` (`Frank.Analyzers.Underef
 
 **Remediation**: Run `frank semantic refresh` to re-validate vocabulary reachability and reset the staleness timer.
 
-## FRANK005 — Validation nudge
+## FRANK005 — Validation nudge (route path match)
 
 **Severity**: Info
 
-FRANK005 has two variants depending on how the vocabulary relates to the app:
-
-**Variant A — Route path match** (`makeRouteHint`): A route path in the current file matches the namespace path for a vocabulary that has not yet been validated. Message: "A route path matches the namespace path for vocabulary `<prefix>`; run 'frank semantic validate' to confirm reachability and remove this warning." This fires when the app appears to be serving the vocabulary namespace but has not yet run `frank semantic validate` to confirm it.
-
-**Variant B — Owned but unconfirmed** (`makeOwnershipNudge`): A vocabulary is recorded in the lock as `Owned = true` (same authority as the app's base URI) but no route in the current file covers its namespace path, and reachability has not been confirmed. Message: "Vocabulary `<prefix>` is recorded as owned but not yet confirmed reachable; run 'frank semantic validate'."
+**What it means** (`makeRouteHint`): A route path in the current file matches the namespace path for a vocabulary that has not yet been validated. Message: "A route path matches the namespace path for vocabulary `<prefix>`; run 'frank semantic validate' to confirm reachability and remove this warning." This fires when the app appears to be serving the vocabulary namespace but has not yet run `frank semantic validate` to confirm it.
 
 **Remediation**: Run `frank semantic validate` to confirm reachability. Once validated the FRANK005 note is removed.
 
@@ -47,3 +43,11 @@ FRANK005 has two variants depending on how the vocabulary relates to the app:
 **What it means**: A CURIE string (e.g. `schema:Game`) references a term that is not present in the confirmed term set stored in the semantic lock for that vocabulary namespace. Either the term name is misspelled, or the lock's term set does not include it (run `frank semantic validate` to refresh).
 
 **Remediation**: Verify the CURIE is spelled correctly. If the term is valid but missing from the lock, run `frank semantic validate` to re-fetch and update the term set.
+
+## FRANK007 — Validation nudge (owned but unconfirmed)
+
+**Severity**: Info
+
+**What it means** (`makeOwnershipNudge`): A vocabulary is recorded in the lock as `Owned = true` (same authority as the app's base URI) but no route in the current file covers its namespace path, and reachability has not been confirmed. Message: "Vocabulary `<prefix>` is recorded as owned but not yet confirmed reachable; run 'frank semantic validate'."
+
+**Remediation**: Run `frank semantic validate` to confirm reachability. Once validated the FRANK007 note is removed.

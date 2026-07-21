@@ -76,11 +76,15 @@ let tests =
               Expect.isFalse (g.Contains "\"TopLeft\"") "TopLeft must not appear as standalone plain literal"
           }
 
-          test "#16 listToJsonLd with extra context injects schema and ttt into @context" {
-              // Use a record with a schema body attribute so compaction is observable.
+          test "#16 listToJsonLd with extra context injects schema and ttt into @context when both are used" {
+              // Use a record with schema AND ttt body attributes so both extraContext
+              // prefixes are actually used in the graph (post-hollow-decoration-fix
+              // behavior: extraContext is filtered like declaredPrefixes/compactGraph).
               let r =
                   { rec0 None with
-                      BodyAttributes = [ "https://schema.org/actionStatus", Literal "Active" ] }
+                      BodyAttributes =
+                          [ "https://schema.org/actionStatus", Literal "Active"
+                            "http://localhost/tictactoe#square", IriNode "http://localhost/tictactoe#TopLeft" ] }
 
               let extra =
                   [ "schema", "https://schema.org/"; "ttt", "http://localhost/tictactoe#" ]
@@ -157,4 +161,25 @@ let tests =
 
               Expect.stringContains json "schema:agent" "used schema prefix compacts schema:agent"
               Expect.isFalse (json.Contains "wikidata") "unused wikidata prefix must be filtered out"
+          }
+
+          test
+              "extraContext entries unused in the graph are filtered out (converges compact with compactGraph's #424 discipline)" {
+              // Body attribute only uses schema -- ttt is declared in extraContext but never
+              // used in the produced graph, so it must be filtered out just like an unused
+              // declaredPrefixes entry is in compactGraph (#424).
+              let r =
+                  { rec0 None with
+                      BodyAttributes = [ "https://schema.org/actionStatus", Literal "Active" ] }
+
+              let extra =
+                  [ "schema", "https://schema.org/"; "ttt", "http://localhost/tictactoe#" ]
+
+              let json = ProvenanceGraph.toJsonLdWith extra r
+
+              Expect.stringContains json "schema:actionStatus" "used schema prefix still compacts"
+
+              Expect.isFalse
+                  (json.Contains "ttt")
+                  "unused ttt extraContext prefix must be filtered out, matching compactGraph's discipline"
           } ]

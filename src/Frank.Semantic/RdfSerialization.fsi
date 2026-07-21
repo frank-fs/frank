@@ -9,6 +9,11 @@ open Newtonsoft.Json.Linq
 /// three consumers via InternalsVisibleTo (#392).
 module internal RdfSerialization =
 
+    /// RDFS namespace ("http://www.w3.org/2000/01/rdf-schema#") — the single shared binding
+    /// for the consumers above, so it is never re-hardcoded as a duplicate string literal.
+    [<Literal>]
+    val RdfsNamespace: string
+
     val serializeGraphJsonLd: graph: IGraph -> string
 
     /// Compact the graph's JSON-LD representation against the given context object.

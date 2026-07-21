@@ -532,7 +532,7 @@ let analyzerV2Tests =
 
           testCase "FRANK010: Owned-unvalidated vocab with no covering route → Info nudge (not silent)"
           <| fun _ ->
-              // LocallyServedUnconfirmed + no route must emit a FRANK005 nudge, not [].
+              // LocallyServedUnconfirmed + no route must emit a FRANK007 nudge, not [].
               let entry =
                   { v1Empty with
                       Uri = "https://schema.org/"
@@ -554,20 +554,24 @@ let analyzerV2Tests =
 
               let tree = parseFixture (fixture "VocabSdoRef")
               let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
-              let frank005 = filterCode "FRANK005" msgs
+              let frank007 = filterCode "FRANK007" msgs
 
               Expect.isGreaterThanOrEqual
-                  frank005.Length
+                  frank007.Length
                   1
-                  "FRANK010: owned-unvalidated with no route → FRANK005 nudge emitted"
+                  "FRANK010: owned-unvalidated with no route → FRANK007 nudge emitted"
 
               Expect.isTrue
-                  (frank005
+                  (frank007
                    |> List.forall (fun m -> m.Severity = FSharp.Analyzers.SDK.Severity.Info))
                   "FRANK010 nudge must be Info severity"
 
+              Expect.isEmpty
+                  (filterCode "FRANK005" msgs)
+                  "ownership nudge must use its own FRANK007 code, not the route-hint FRANK005 code"
+
           testCase
-              "#419 AC3: declared-only prefix backed by the app's own Confirmed mapping identity (no Vocabularies entry, no base URI) -> FRANK005 nudge, not FRANK002 warning"
+              "#419 AC3: declared-only prefix backed by the app's own Confirmed mapping identity (no Vocabularies entry, no base URI) -> FRANK007 nudge, not FRANK002 warning"
           <| fun _ ->
               // sdo declared, NEVER fetched (no Vocabularies entry), but the lock's own
               // Mappings identify one of the app's own types via a sdo:-prefixed CURIE — the
@@ -599,22 +603,26 @@ let analyzerV2Tests =
                   (filterCode "FRANK002" msgs)
                   "#419 AC3: owned-but-unfetched must NOT produce the harsher FRANK002/makeUndereferenceable warning"
 
-              let frank005 = filterCode "FRANK005" msgs
+              let frank007 = filterCode "FRANK007" msgs
 
               Expect.isGreaterThanOrEqual
-                  frank005.Length
+                  frank007.Length
                   1
-                  "#419 AC3: owned-but-unfetched must produce the softer FRANK005/makeOwnershipNudge instead"
+                  "#419 AC3: owned-but-unfetched must produce the softer FRANK007/makeOwnershipNudge instead"
 
               Expect.isTrue
-                  (frank005
+                  (frank007
                    |> List.forall (fun m -> m.Severity = FSharp.Analyzers.SDK.Severity.Info))
                   "#419 AC3: ownership nudge is Info, not Warning"
 
               Expect.isTrue
-                  (frank005
+                  (frank007
                    |> List.exists (fun m -> m.Message.Contains "recorded as owned but not yet confirmed"))
                   "#419 AC3: message text is the ownership nudge, not the Undereferenceable warning"
+
+              Expect.isEmpty
+                  (filterCode "FRANK005" msgs)
+                  "#419 AC3: ownership nudge must use its own FRANK007 code, distinct from FRANK005 route-hint"
 
           testCase
               "#419: declared-only prefix with NO Mappings evidence of ownership -> still FRANK002 (analyzer needs zero flags either way)"

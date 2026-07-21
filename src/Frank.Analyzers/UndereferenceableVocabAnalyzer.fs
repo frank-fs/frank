@@ -28,6 +28,9 @@ let private RouteHintCode = "FRANK005"
 let private UnknownTermCode = "FRANK006"
 
 [<Literal>]
+let private OwnershipNudgeCode = "FRANK007"
+
+[<Literal>]
 let private LockFileName = ".frank/semantic-mappings.lock.json"
 
 [<Literal>]
@@ -104,7 +107,7 @@ let private makeOwnershipNudge (range: Range) (prefix: string) : Message =
     makeMsg
         "Validation nudge"
         $"Vocabulary '{prefix}' is recorded as owned but not yet confirmed reachable; run 'frank semantic validate'."
-        RouteHintCode
+        OwnershipNudgeCode
         Severity.Info
         range
 
