@@ -923,6 +923,96 @@ let tests =
               Expect.equal secondBody "" "304 response must have an empty body"
           }
 
+          testCaseAsync "different resources produce different ETags; the same resource is stable across requests"
+          <| async {
+              let recordA = mkRecord "http://localhost/provenance/act-a" "http://localhost/a"
+              let recordB = mkRecord "http://localhost/provenance/act-b" "http://localhost/b"
+              use app = startNodeServer [ recordA; recordB ]
+              use client = app.GetTestClient()
+
+              let! (respA1: HttpResponseMessage) =
+                  client.GetAsync("/provenance?resource=http://localhost/a") |> Async.AwaitTask
+
+              let! (respA2: HttpResponseMessage) =
+                  client.GetAsync("/provenance?resource=http://localhost/a") |> Async.AwaitTask
+
+              let! (respB: HttpResponseMessage) =
+                  client.GetAsync("/provenance?resource=http://localhost/b") |> Async.AwaitTask
+
+              let etagA1 = respA1.Headers.ETag.ToString()
+              let etagA2 = respA2.Headers.ETag.ToString()
+              let etagB = respB.Headers.ETag.ToString()
+
+              Expect.equal etagA2 etagA1 "same resource requested twice must yield a stable ETag"
+              Expect.notEqual etagB etagA1 "different resources must yield different ETags"
+          }
+
+          testCaseAsync
+              "matching If-None-Match short-circuits BEFORE JSON-LD compaction (timing proof over a large graph)"
+          <| async {
+              // #431 gap 3 follow-up: the original fix computed the ETag from the compacted
+              // JSON-LD body, so a 304 still paid the full compaction cost — only bandwidth was
+              // saved, not compute. This drives ProvenanceEndpoint.handle directly (no
+              // TestServer/HttpClient) against a large record set so compaction cost is
+              // measurable, and proves the 304 path is materially cheaper than the 200 path.
+              // (compactGraph's call site sits structurally inside serveJsonLd's else-branch —
+              // unreachable when If-None-Match matches — this test corroborates that empirically.)
+              let store =
+                  new MailboxProcessorProvenanceStore(
+                      { ProvenanceStoreConfig.defaults with
+                          MaxRecords = 5_000 },
+                      NullLogger.Instance
+                  )
+                  :> IProvenanceStore
+
+              let resourceUri = "http://localhost/big"
+
+              for i in 1..2000 do
+                  store.Append(mkRecord (sprintf "http://localhost/provenance/act-%d" i) resourceUri)
+
+              let makeCtx (ifNoneMatch: string option) : HttpContext =
+                  let ctx = DefaultHttpContext() :> HttpContext
+                  ctx.Request.Scheme <- "http"
+                  ctx.Request.Host <- HostString "localhost"
+                  ctx.Request.Path <- PathString "/provenance"
+                  ctx.Request.QueryString <- QueryString("?resource=" + resourceUri)
+
+                  match ifNoneMatch with
+                  | Some etag -> ctx.Request.Headers.IfNoneMatch <- StringValues etag
+                  | None -> ()
+
+                  ctx.Response.Body <- new MemoryStream()
+                  ctx
+
+              // Warm-up (JIT, first-graph-build) + capture the real ETag.
+              let warmCtx = makeCtx None
+              do! ProvenanceEndpoint.handle store defaultConfig warmCtx |> Async.AwaitTask
+              Expect.equal warmCtx.Response.StatusCode 200 "warm-up request status 200"
+              let etagValue = warmCtx.Response.Headers.ETag.ToString()
+
+              // Timed 200: mismatched If-None-Match still pays full compaction.
+              let mismatchCtx = makeCtx (Some "\"does-not-match\"")
+              let sw200 = System.Diagnostics.Stopwatch.StartNew()
+              do! ProvenanceEndpoint.handle store defaultConfig mismatchCtx |> Async.AwaitTask
+              sw200.Stop()
+              Expect.equal mismatchCtx.Response.StatusCode 200 "mismatched If-None-Match must still return 200"
+
+              // Timed 304: matching If-None-Match must short-circuit before compaction.
+              let matchCtx = makeCtx (Some etagValue)
+              let sw304 = System.Diagnostics.Stopwatch.StartNew()
+              do! ProvenanceEndpoint.handle store defaultConfig matchCtx |> Async.AwaitTask
+              sw304.Stop()
+              Expect.equal matchCtx.Response.StatusCode 304 "matching If-None-Match must return 304"
+
+              Expect.isLessThan
+                  sw304.Elapsed.TotalMilliseconds
+                  (sw200.Elapsed.TotalMilliseconds * 0.5)
+                  (sprintf
+                      "304 (%.2fms) must be materially cheaper than paying full JSON-LD compaction on 200 (%.2fms)"
+                      sw304.Elapsed.TotalMilliseconds
+                      sw200.Elapsed.TotalMilliseconds)
+          }
+
           testCaseAsync "#412 AC1: bare state-entity @context has prov only, http and rdfs absent"
           <| async {
               let resourceUri = "http://localhost/r"

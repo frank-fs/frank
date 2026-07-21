@@ -10,15 +10,45 @@ open Microsoft.Extensions.Primitives
 let private notFound (ctx: HttpContext) (typeUri: string) (title: string) (detail: string) : Task =
     Frank.ProblemJson.write ctx 404 typeUri title detail
 
+// Cheap content fingerprint over an already-built graph's triples — sorted (ordinal, so no
+// ICU/globalization dependency) for order-independence, then hashed via the same SHA-256
+// helper the rest of the codebase's ETag machinery uses. Computed from the graph directly,
+// NOT the serialized JSON-LD string, so it costs a single linear pass with no context
+// resolution / JSON-LD compaction — unlike ProvenanceGraph.compactGraph, which additionally
+// builds the @context (a triple-node scan of its own) and runs the full expand→compact
+// pipeline. Fingerprint stability across identical requests only requires the SAME
+// (config, records) to build the SAME triples, which every ProvenanceGraph builder already
+// guarantees deterministically.
+let private graphFingerprint (g: VDS.RDF.IGraph) : string =
+    g.Triples
+    |> Seq.map (fun t -> t.ToString())
+    |> Seq.sort
+    |> String.concat "\n"
+    |> System.Text.Encoding.UTF8.GetBytes
+    |> Frank.ETagFormat.computeFromBytes
+
 /// Single function backing every provenance JSON-LD 200 response (#424). Adds Vary: Accept
 /// (gap 2) and a content-derived ETag + immutable Cache-Control (gap 3) — provenance nodes
 /// represent a historical fact and never change once recorded, so the representation can be
 /// cached indefinitely and round-tripped via If-None-Match.
+///
+/// Deliberately inline rather than routed through Frank.ConditionalRequestMiddleware +
+/// IETagProviderFactory (src/Frank/ConditionalRequestMiddleware.fs), even though that
+/// mechanism already short-circuits to 304 before the handler runs: IETagProvider.ComputeETag
+/// only receives an opaque `instanceId: string` (from ETagMetadata.ResolveInstanceId, which
+/// only sees HttpContext) — it has no access to the graph the handler is about to build. To
+/// compute a matching ETag independently, a provider would have to re-derive the SAME
+/// resource/nodeId decoding this module already does (tryParseStateEntityKey, the "entity-"
+/// dispatch, origin resolution) and re-run the SAME store queries and SAME graph-build calls
+/// as handle/handleStateEntity/handleActivityNode — i.e. duplicate this module's dispatch
+/// logic into a second copy, with the attendant risk that the two copies drift and the
+/// provider's ETag stops matching what the handler would actually serve. Computing the
+/// fingerprint from the SAME `g: IGraph` the handler just built, in the SAME function that
+/// serves it, makes that drift structurally impossible — the tradeoff standard
+/// ConditionalRequestMiddleware makes (provider is authoritative, independent of the handler)
+/// doesn't hold here without re-solving the whole dispatch problem a second time.
 let private serveJsonLd (config: ProvenanceConfig) (g: VDS.RDF.IGraph) (ctx: HttpContext) : Task =
-    let body = ProvenanceGraph.compactGraph config.DeclaredPrefixes g
-
-    let etag =
-        Frank.ETagFormat.quote (Frank.ETagFormat.computeFromBytes (System.Text.Encoding.UTF8.GetBytes body))
+    let etag = Frank.ETagFormat.quote (graphFingerprint g)
 
     Frank.AcceptNegotiation.appendVaryAccept ctx.Response
     ctx.Response.Headers.ETag <- etag
@@ -30,9 +60,13 @@ let private serveJsonLd (config: ProvenanceConfig) (g: VDS.RDF.IGraph) (ctx: Htt
         not (System.String.IsNullOrEmpty ifNoneMatch)
         && Frank.ETagComparison.anyMatch (Some etag) ifNoneMatch
     then
+        // 304 short-circuit BEFORE compactGraph — the expensive step (@context resolution +
+        // full JSON-LD expand→compact) never runs when the client already has this
+        // representation. Only the cheap fingerprint above was paid for.
         ctx.Response.StatusCode <- 304
         Task.CompletedTask
     else
+        let body = ProvenanceGraph.compactGraph config.DeclaredPrefixes g
         ctx.Response.StatusCode <- 200
         ctx.Response.ContentType <- "application/ld+json"
         ctx.Response.WriteAsync(body)
