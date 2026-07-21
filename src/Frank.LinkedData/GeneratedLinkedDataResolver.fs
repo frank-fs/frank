@@ -16,10 +16,9 @@ module internal GeneratedLinkedDataResolver =
         match readStaticProp<IGraph> "graph" t, readStaticProp<string> "jsonLdContext" t with
         | Ok g, Ok ctx ->
             Ok
-                { Graph = g
-                  JsonLdContext = ctx
-                  GraphFactory = None
-                  VocabularyUri = None }
+                { LinkedDataConfig.Empty with
+                    Graph = g
+                    JsonLdContext = ctx }
         | Error e, _ -> Error e
         | _, Error e -> Error e
 

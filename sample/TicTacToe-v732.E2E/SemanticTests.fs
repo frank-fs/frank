@@ -473,9 +473,10 @@ type SemanticTests() =
             else
                 base'.TrimEnd '/' + "/" + iri
 
-    /// rdfs:seeAlso may surface as the bare absolute IRI or compacted to its "rdfs:" CURIE
-    /// (JSON-LD compaction resolves it via the rdf-schema @context document) — accept either
-    /// form rather than assuming one (#420).
+    /// rdfs:seeAlso may surface as the bare absolute IRI or compacted to its "rdfs:" CURIE.
+    /// Not resolvable via TryGetByEitherKey/ParseContextPrefixes here: this document's
+    /// @context lists rdf-schema as a bare namespace-URI string entry, not a named prefix
+    /// mapping, so no "rdfs" term ever enters the parsed prefix map to compact against (#420).
     static member private TryGetSeeAlso(node: JsonElement) : JsonElement option =
         [ "http://www.w3.org/2000/01/rdf-schema#seeAlso"; "rdfs:seeAlso" ]
         |> List.tryPick (fun key ->

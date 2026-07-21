@@ -66,10 +66,9 @@ let private buildLinkedDataConfig (classIri: string) : LinkedDataConfig =
 
     graph.Assert(Triple(subject, rdfType, rdfsClass)) |> ignore
 
-    { Graph = graph :> IGraph
-      JsonLdContext = """{"@context":{"schema":"https://schema.org/"}}"""
-      GraphFactory = None
-      VocabularyUri = None }
+    { LinkedDataConfig.Empty with
+        Graph = graph :> IGraph
+        JsonLdContext = """{"@context":{"schema":"https://schema.org/"}}""" }
 
 let private buildValidationConfig (classIri: string) (propIri: string) : ValidationConfig =
     let offlineLoader = JsonLdLoader.synthesizing [ "https://schema.org/" ]

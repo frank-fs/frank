@@ -26,3 +26,6 @@ type LinkedDataConfig =
       JsonLdContext: string
       GraphFactory: (HttpContext -> IGraph) option
       VocabularyUri: string option }
+
+    /// Baseline with no vocabulary describedby link and no per-request graph factory.
+    static member Empty: LinkedDataConfig

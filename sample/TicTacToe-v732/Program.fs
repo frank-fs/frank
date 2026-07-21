@@ -353,13 +353,13 @@ let private gameResource =
         relation (TicTacToe.GeneratedSemantics.SemanticResource.Game.Iri.AbsoluteUri)
 
         linkedDataGraphWith
-            { Graph = Unchecked.defaultof<IGraph>
-              JsonLdContext = """{"@context":["https://schema.org/version/latest/schemaorg-current-https.jsonld"]}"""
-              GraphFactory = Some gameGraphFactory
-              // #420: Game's class-level facts (rdfs:seeAlso Wikidata IRIs) live at
-              // /vocabulary, never duplicated into this instance body — the naive
-              // client follows this Link header, never a hardcoded path.
-              VocabularyUri = Some "/vocabulary" }
+            { LinkedDataConfig.Empty with
+                JsonLdContext = """{"@context":["https://schema.org/version/latest/schemaorg-current-https.jsonld"]}"""
+                GraphFactory = Some gameGraphFactory
+                // #420: Game's class-level facts (rdfs:seeAlso Wikidata IRIs) live at
+                // /vocabulary, never duplicated into this instance body — the naive
+                // client follows this Link header, never a hardcoded path.
+                VocabularyUri = Some "/vocabulary" }
 
         get gameHandler
 
@@ -377,11 +377,10 @@ let private tttVocabResource =
         name "TttVocabulary"
 
         linkedDataGraphWith
-            { Graph = Unchecked.defaultof<IGraph>
-              JsonLdContext =
-                """{"@context":["http://www.w3.org/1999/02/22-rdf-syntax-ns#","http://www.w3.org/2000/01/rdf-schema#","http://www.w3.org/2002/07/owl#","https://schema.org/version/latest/schemaorg-current-https.jsonld"]}"""
-              GraphFactory = Some loadTttVocabGraph
-              VocabularyUri = None }
+            { LinkedDataConfig.Empty with
+                JsonLdContext =
+                    """{"@context":["http://www.w3.org/1999/02/22-rdf-syntax-ns#","http://www.w3.org/2000/01/rdf-schema#","http://www.w3.org/2002/07/owl#","https://schema.org/version/latest/schemaorg-current-https.jsonld"]}"""
+                GraphFactory = Some loadTttVocabGraph }
 
         get (fun (ctx: HttpContext) ->
             task {
@@ -423,10 +422,9 @@ let private appVocabularyResource =
         name "AppVocabulary"
 
         linkedDataGraphWith
-            { Graph = Unchecked.defaultof<IGraph>
-              JsonLdContext = appVocabularyJsonLdContext
-              GraphFactory = Some appVocabularyGraphFactory
-              VocabularyUri = None }
+            { LinkedDataConfig.Empty with
+                JsonLdContext = appVocabularyJsonLdContext
+                GraphFactory = Some appVocabularyGraphFactory }
 
         get (fun (ctx: HttpContext) ->
             task {

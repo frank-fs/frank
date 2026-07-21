@@ -314,9 +314,9 @@ type LinkedDataMiddleware(next: RequestDelegate, logger: ILogger<LinkedDataMiddl
                 // #420: two-hop discovery — a class-level fact (rdfs:seeAlso, owl:equivalentClass)
                 // is never duplicated into an instance body; the client reaches it by following
                 // this response's OWN describedby Link header to the vocabulary document.
-                match effective.VocabularyUri with
-                | Some vocabUri -> ctx.Response.Headers.Append("Link", $"<{vocabUri}>; rel=\"describedby\"")
-                | None -> ()
+                effective.VocabularyUri
+                |> Option.iter (fun vocabUri ->
+                    ctx.Response.Headers.Append("Link", $"<{vocabUri}>; rel=\"describedby\""))
 
                 Serializers.respondWith mediaType (computeBody mediaType origin effective ctx) ctx
             | _ -> next.Invoke ctx

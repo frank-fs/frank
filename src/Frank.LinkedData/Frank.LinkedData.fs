@@ -53,10 +53,9 @@ module ResourceLinkedDataExtensions =
                 spec,
                 fun (b: EndpointBuilder) ->
                     b.Metadata.Add(
-                        { Graph = graph
-                          JsonLdContext = jsonLdContext
-                          GraphFactory = None
-                          VocabularyUri = None }
+                        { LinkedDataConfig.Empty with
+                            Graph = graph
+                            JsonLdContext = jsonLdContext }
                         : LinkedDataConfig
                     )
             )

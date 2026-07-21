@@ -26,3 +26,13 @@ type LinkedDataConfig =
       JsonLdContext: string
       GraphFactory: (HttpContext -> IGraph) option
       VocabularyUri: string option }
+
+    /// Baseline with no vocabulary describedby link and no per-request graph factory.
+    /// Callers override Graph/JsonLdContext (and GraphFactory/VocabularyUri where needed)
+    /// via `{ LinkedDataConfig.Empty with ... }` — adding a field here doesn't force every
+    /// existing construction site to be touched again.
+    static member Empty =
+        { Graph = new Graph()
+          JsonLdContext = ""
+          GraphFactory = None
+          VocabularyUri = None }
