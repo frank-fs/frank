@@ -12,12 +12,25 @@ let private toUriOption (node: INode) : Uri option =
     | :? IUriNode as n -> Some n.Uri
     | _ -> None
 
-let private graphUriNodes (g: IGraph) : Uri list =
-    g.Triples
-    |> Seq.collect (fun t ->
+/// Single walk over g.Triples yielding both the URI nodes (context-prefix filtering) and
+/// each triple's string representation (content fingerprinting) — #431 follow-up: shares
+/// ProvenanceEndpoint's cache-header fingerprint scan with compactGraph's context-entry
+/// filtering scan so a cache-miss (200) response pays one graph walk instead of two. The
+/// 304 short-circuit still only needs the reprs half (via graphFingerprint), never calling
+/// compactGraph/this uris half at all.
+let internal scanTriples (g: IGraph) : Uri list * string list =
+    let uris = ResizeArray<Uri>()
+    let reprs = ResizeArray<string>()
+
+    for t in g.Triples do
         [ toUriOption t.Subject; toUriOption t.Predicate; toUriOption t.Object ]
-        |> List.choose id)
-    |> Seq.toList
+        |> List.iter (Option.iter uris.Add)
+
+        reprs.Add(t.ToString())
+
+    List.ofSeq uris, List.ofSeq reprs
+
+let private graphUriNodes (g: IGraph) : Uri list = scanTriples g |> fst
 
 let private tryMatchRelativeNs (storedNs: string) (uris: Uri list) : string option =
     uris
@@ -60,15 +73,23 @@ let private provDeclaredPrefixes: (string * string) list =
       "http", ProvVocabulary.Http.Namespace
       "rdfs", RdfSerialization.RdfsNamespace ]
 
+/// #424/#431: filter PROV-O's fixed prefixes and the app's DeclaredPrefixes against an
+/// already-scanned URI-node list — extracted from usedContextEntries so a caller that
+/// already holds the scan (e.g. ProvenanceEndpoint's shared fingerprint walk) doesn't pay a
+/// second graph walk to get the same filtering.
+let internal usedContextEntriesFromUris
+    (declaredPrefixes: (string * string) list)
+    (uris: Uri list)
+    : (string * string) list =
+    filterUsedPrefixes provDeclaredPrefixes uris
+    @ filterUsedPrefixes declaredPrefixes uris
+
 /// #424: compute the served @context entries (PROV-O's fixed prefixes ++ the app's
 /// DeclaredPrefixes), filtered to prefixes actually used in the graph, from a single shared
 /// graphUriNodes walk — instead of ProvenanceEndpoint.serveJsonLd and this filtering each
 /// re-scanning the graph's triples independently.
 let internal usedContextEntries (declaredPrefixes: (string * string) list) (g: IGraph) : (string * string) list =
-    let uris = graphUriNodes g
-
-    filterUsedPrefixes provDeclaredPrefixes uris
-    @ filterUsedPrefixes declaredPrefixes uris
+    usedContextEntriesFromUris declaredPrefixes (graphUriNodes g)
 
 /// Compact `graph` to JSON-LD, filtering both PROV-O's fixed prefixes and `extraContext`
 /// to only those actually used in the graph (same discipline as compactGraph's #424 fix —
@@ -325,12 +346,18 @@ let buildStateEntityNodeGraph
 
     g
 
-/// Compact `g` to JSON-LD, with `declaredPrefixes` (raw, app-declared, unfiltered) and
-/// PROV-O's fixed prefixes both resolved against a single triple walk (#424).
-let compactGraph (declaredPrefixes: (string * string) list) (g: IGraph) : string =
+/// Compact `g` to JSON-LD from an already-scanned URI-node list (see scanTriples) — #431:
+/// lets a caller that already walked the graph (e.g. for a content fingerprint) reuse that
+/// walk's URI nodes for context-prefix filtering instead of compactGraph re-scanning.
+let compactGraphWithUris (declaredPrefixes: (string * string) list) (g: IGraph) (uris: Uri list) : string =
     let ctx = JObject()
 
-    for (k, v) in usedContextEntries declaredPrefixes g do
+    for (k, v) in usedContextEntriesFromUris declaredPrefixes uris do
         ctx.[k] <- JToken.op_Implicit v
 
     RdfSerialization.compactWithContext g ctx
+
+/// Compact `g` to JSON-LD, with `declaredPrefixes` (raw, app-declared, unfiltered) and
+/// PROV-O's fixed prefixes both resolved against a single triple walk (#424).
+let compactGraph (declaredPrefixes: (string * string) list) (g: IGraph) : string =
+    compactGraphWithUris declaredPrefixes g (graphUriNodes g)

@@ -146,6 +146,38 @@ let tests =
               Expect.contains entries ("schema", "https://schema.org/") "schema prefix present (used via schema:agent)"
           }
 
+          test
+              "#431 follow-up: sharing scanTriples's walk with compactGraphWithUris saves one full triple walk vs. an independent fingerprint scan + compactGraph on a cache-miss (200) response" {
+              let buildGraph () =
+                  let g = new CountingGraph()
+                  let activity = g.CreateUriNode(Uri "urn:uuid:act-1")
+                  let schemaAgent = g.CreateUriNode(Uri "https://schema.org/agent")
+                  let aliceLit = g.CreateLiteralNode "alice"
+                  g.Assert(Triple(activity, schemaAgent, aliceLit)) |> ignore
+                  g
+
+              // Baseline: the ProvenanceEndpoint.graphFingerprint shape BEFORE #431 follow-up
+              // (its own independent g.Triples walk) plus compactGraph, which internally
+              // re-walks via usedContextEntries/graphUriNodes AND again for serialization.
+              let unshared = buildGraph ()
+              unshared.Triples |> Seq.map (fun t -> t.ToString()) |> Seq.toList |> ignore
+              let unsharedJson = ProvenanceGraph.compactGraph [ "schema", "https://schema.org/" ] unshared
+
+              // #431 follow-up: scanTriples's single walk feeds both the fingerprint (reprs)
+              // and compactGraphWithUris's context filtering (uris) — only the serialization
+              // pass inside compactGraphWithUris re-walks the graph.
+              let shared = buildGraph ()
+              let uris, reprs = ProvenanceGraph.scanTriples shared
+              let sharedJson = ProvenanceGraph.compactGraphWithUris [ "schema", "https://schema.org/" ] shared uris
+
+              Expect.equal unshared.TriplesAccessCount 3 "unshared fingerprint + compactGraph pays 3 separate triple walks"
+              Expect.equal shared.TriplesAccessCount 2 "shared scanTriples + compactGraphWithUris pays only 2 (fingerprint scan + serialization)"
+
+              Expect.equal reprs.Length 1 "scanTriples returned the one asserted triple's string repr"
+              Expect.equal sharedJson unsharedJson "sharing the walk must not change the compacted JSON-LD output"
+              Expect.stringContains sharedJson "schema:agent" "compaction still produces the expected compacted term"
+          }
+
           test "#424: compactGraph's declaredPrefixes are filtered to only those used in the graph" {
               let g = new Graph() :> IGraph
               let activity = g.CreateUriNode(Uri "urn:uuid:act-1")
