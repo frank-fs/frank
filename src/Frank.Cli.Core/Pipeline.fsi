@@ -1,7 +1,6 @@
 module Frank.Cli.Core.Pipeline
 
 open System
-open System.Net.Http
 open Frank.Semantic
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -27,10 +26,7 @@ val internal curateSourceFiles: files: string list -> string list
 /// Pipeline core with the vocabulary fetcher and clock injected.
 /// `run` wraps this with the production HttpClient-backed fetcher and real clock.
 val internal runWithFetch:
-    fetch: VocabFetcher.Fetch ->
-    clock: (unit -> DateTimeOffset) ->
-    opts: ExtractOptions ->
-        Result<ExtractSummary, string>
+    fetch: ConnegFetch -> clock: (unit -> DateTimeOffset) -> opts: ExtractOptions -> Result<ExtractSummary, string>
 
 /// Run the extract pipeline.
 /// No child processes; all FCS evaluation is in-process.

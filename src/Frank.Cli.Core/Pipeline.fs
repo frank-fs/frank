@@ -1,12 +1,7 @@
 module Frank.Cli.Core.Pipeline
 
-// Pipeline.run uses VocabFetcher.httpFetch for cache-aware vocab discovery (fetchAndCache path).
-// Migrating to ConnegFetch is deferred pending fetchAndCache refactor. See V3 report.
-#nowarn "44"
-
 open System
 open System.IO
-open System.Net.Http
 open Frank.Semantic
 open Frank.Semantic.LockFile
 
@@ -125,9 +120,63 @@ let private accumulateTerms (acc: VocabTerms) g : VocabTerms =
 
 // ── Effectful steps ───────────────────────────────────────────────────────────
 
+/// Cache-aware, content-negotiated vocabulary fetch: same cache-hit/miss shape as
+/// VocabFetcher.fetchAndCache, but sources bytes via RdfConneg's ConnegFetch instead of a
+/// plain GET. A vocab source that responds successfully with non-RDF content (HTML, a
+/// redirect the server never resolves, a 4xx page) is classified via RdfConneg.buildEvidence
+/// — the same classification refresh/validate already report — instead of being handed to
+/// the RDF parser and surfacing an opaque parse exception.
+let private fetchAndCacheConneg
+    (fetch: ConnegFetch)
+    (clock: unit -> DateTimeOffset)
+    (cacheDir: string)
+    (name: string)
+    (uri: Uri)
+    : Async<Result<VocabFetcher.CachedVocab, string>> =
+    if String.IsNullOrWhiteSpace name then
+        invalidArg (nameof name) "name must not be empty"
+
+    async {
+        match VocabFetcher.loadCachedVocab cacheDir name with
+        | Some cached -> return cached
+        | None ->
+            let! result = fetch uri None None
+
+            match result with
+            | RdfContent r ->
+                let format = VocabFetcher.detectFormat (Some r.MediaType) uri
+
+                match VocabFetcher.parseGraph format r.Body with
+                | Error e -> return Error $"RDF parse failed: {e}"
+                | Ok graph ->
+                    let hash = VocabFetcher.sha256Hex r.Body
+                    let fileName = VocabFetcher.cacheFileName name hash format
+                    let filePath = Path.Combine(cacheDir, fileName)
+
+                    try
+                        File.WriteAllBytes(filePath, r.Body)
+
+                        let cached: VocabFetcher.CachedVocab =
+                            { Hash = hash
+                              Format = format
+                              CacheFilePath = filePath
+                              Graph = graph }
+
+                        return Ok cached
+                    with ex ->
+                        return Error $"could not write cache file: {ex.Message}"
+            | _ ->
+                match RdfConneg.buildEvidence uri (clock ()) result with
+                | UnverifiableNonRdf reason -> return Error $"unverifiable-non-rdf: {reason}"
+                | Undereferenceable reason -> return Error $"undereferenceable: {reason}"
+                | TransientFailure reason -> return Error $"transient: {reason}"
+                | Unchanged -> return Error "unexpected 304 Not Modified for an uncached vocab"
+                | Updated _ -> return failwith "unreachable: buildEvidence returned Updated for a non-RdfContent result"
+    }
+
 /// Fetch all in-scope vocabularies and return merged VocabTerms with per-prefix entries.
 let private fetchVocabTerms
-    (fetch: VocabFetcher.Fetch)
+    (fetch: ConnegFetch)
     (clock: unit -> DateTimeOffset)
     (projectDir: string)
     (registry: VocabularyRegistry)
@@ -143,7 +192,7 @@ let private fetchVocabTerms
 
         let! results =
             inScopePrefixes
-            |> List.map (fun (n, u) -> VocabFetcher.fetchAndCache fetch cacheDir n u)
+            |> List.map (fun (n, u) -> fetchAndCacheConneg fetch clock cacheDir n u)
             |> Async.Parallel
 
         let firstError =
@@ -238,7 +287,7 @@ let private resolveSources
             vocabFile, curated, domain))
 
 let private buildMappings
-    (fetch: VocabFetcher.Fetch)
+    (fetch: ConnegFetch)
     (clock: unit -> DateTimeOffset)
     (opts: ExtractOptions)
     (projectFile: string)
@@ -263,7 +312,7 @@ let private buildMappings
 /// Pipeline core with the vocabulary fetcher and clock injected.
 /// `run` wraps this with the production HttpClient-backed fetcher and real clock.
 let internal runWithFetch
-    (fetch: VocabFetcher.Fetch)
+    (fetch: ConnegFetch)
     (clock: unit -> DateTimeOffset)
     (opts: ExtractOptions)
     : Result<ExtractSummary, string> =
@@ -287,5 +336,5 @@ let internal runWithFetch
 /// Run the extract pipeline.
 /// No child processes; all FCS evaluation is in-process.
 let run (opts: ExtractOptions) : Result<ExtractSummary, string> =
-    use client = new HttpClient()
-    runWithFetch (VocabFetcher.httpFetch client) (fun () -> DateTimeOffset.UtcNow) opts
+    use client = RdfConneg.makeNoRedirectClient ()
+    runWithFetch (RdfConneg.rdfFetch client) (fun () -> DateTimeOffset.UtcNow) opts

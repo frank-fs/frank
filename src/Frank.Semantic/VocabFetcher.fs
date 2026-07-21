@@ -177,6 +177,28 @@ module VocabFetcher =
 
     // ── Effectful: fetch and cache ────────────────────────────────────────────
 
+    /// Cache-only lookup: same semantics as fetchAndCache's cache-hit branch, without
+    /// invoking any fetch. Returns None if no cache file for 'name' exists.
+    /// Shared by fetchAndCache and any alternate (e.g. content-negotiated) fetch boundary
+    /// that wants the same on-disk cache without re-deriving the lookup.
+    let loadCachedVocab (cacheDir: string) (name: string) : Result<CachedVocab, string> option =
+        match findCacheFile cacheDir name with
+        | None -> None
+        | Some filePath ->
+            match loadCacheFile filePath with
+            | Error e -> Some(Error e)
+            | Ok(bytes, format) ->
+                match parseGraph format bytes with
+                | Error e -> Some(Error e)
+                | Ok graph ->
+                    Some(
+                        Ok
+                            { Hash = sha256Hex bytes
+                              Format = format
+                              CacheFilePath = filePath
+                              Graph = graph }
+                    )
+
     /// Fetch a vocabulary URI, parse it, and write it to cacheDir.
     /// Returns CachedVocab on success.
     /// Cache hit (file matching <name>.*) returns cached result without invoking fetch.
@@ -186,20 +208,8 @@ module VocabFetcher =
             invalidArg (nameof name) "name must not be empty"
 
         async {
-            match findCacheFile cacheDir name with
-            | Some filePath ->
-                match loadCacheFile filePath with
-                | Error e -> return Error e
-                | Ok(bytes, format) ->
-                    match parseGraph format bytes with
-                    | Error e -> return Error e
-                    | Ok graph ->
-                        return
-                            Ok
-                                { Hash = sha256Hex bytes
-                                  Format = format
-                                  CacheFilePath = filePath
-                                  Graph = graph }
+            match loadCachedVocab cacheDir name with
+            | Some cached -> return cached
             | None ->
                 let! fetchResult = fetch uri
 

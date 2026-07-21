@@ -58,6 +58,12 @@ module VocabFetcher =
     /// Returns Some (Ok graph) on success; Some (Error msg) if the file is corrupt.
     val loadCachedGraph: cacheDir: string -> name: string -> Result<IGraph, string> option
 
+    /// Cache-only lookup: same semantics as fetchAndCache's cache-hit branch, without
+    /// invoking any fetch. Returns None if no cache file for 'name' exists.
+    /// Shared by fetchAndCache and any alternate (e.g. content-negotiated) fetch boundary
+    /// that wants the same on-disk cache without re-deriving the lookup.
+    val loadCachedVocab: cacheDir: string -> name: string -> Result<CachedVocab, string> option
+
     /// Fetch a vocabulary URI, parse it, and write it to cacheDir.
     /// Returns CachedVocab on success.
     /// Cache hit (file matching <name>.*) returns cached result without invoking fetch.
