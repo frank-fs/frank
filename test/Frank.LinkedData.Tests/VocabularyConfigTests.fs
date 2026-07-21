@@ -174,4 +174,30 @@ let tests =
 
               Expect.throwsT<ArgumentException>
                   (fun () -> builder.UseLinkedDataVocabulary(WebHostSpec.Empty, "   ") |> ignore)
-                  "whitespace vocabularyRoute must raise invalidArg" ]
+                  "whitespace vocabularyRoute must raise invalidArg"
+
+          testCase
+              "useLinkedDataVocabulary called BEFORE useLinkedData (reversed order) still yields describedby — TryAdd-default/Add-override must be order-independent (#420)"
+          <| fun _ ->
+              let builder = WebHostBuilder([||])
+
+              // Reversed order vs every other test in this file: the vocabulary route is
+              // configured FIRST, then useLinkedData second. Prior to the TryAddSingleton
+              // fix, useLinkedData's unconditional AddSingleton<LinkedDataVocabularyConfig>
+              // ran last and clobbered the override back to LinkedDataVocabularyConfig.None.
+              let spec =
+                  WebHostSpec.Empty
+                  |> fun s -> builder.UseLinkedDataVocabulary(s, "/vocabulary")
+                  |> fun s -> builder.UseLinkedData(s)
+
+              use app = startServerWithSpec spec sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/vocab")
+              req.Headers.Add("Accept", "text/turtle")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "200 OK, RDF served"
+
+              Expect.equal
+                  (describedByTarget resp)
+                  (Some "/vocabulary")
+                  "describedby Link present even when useLinkedDataVocabulary is called before useLinkedData" ]

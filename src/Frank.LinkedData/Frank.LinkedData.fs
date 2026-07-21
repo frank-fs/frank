@@ -3,6 +3,7 @@ namespace Frank.LinkedData
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.DependencyInjection.Extensions
 open VDS.RDF
 open Frank.Builder
 
@@ -11,14 +12,16 @@ module LinkedDataExtensions =
 
     /// Registers the default (no describedby route) LinkedDataVocabularyConfig singleton —
     /// required so LinkedDataMiddleware's constructor resolves from DI even when
-    /// useLinkedDataVocabulary is never called. `useLinkedDataVocabulary` (below) overrides
-    /// this by registering a second singleton after this one; DI resolves the LAST
-    /// registration for a single-instance request, so ordering in the CE block matters —
-    /// mirrors DiscoveryConfig's DI-singleton pattern (Frank.Discovery.fs's addServices).
+    /// useLinkedDataVocabulary is never called. Uses TryAddSingleton (only registers if
+    /// nothing of this type is already registered) while `useLinkedDataVocabulary` (below)
+    /// uses unconditional AddSingleton for its explicit override. This makes the pair
+    /// order-independent: if the override runs first, this TryAdd sees a registration
+    /// already exists and no-ops; if it runs second, it's simply the last registration,
+    /// which DI resolves for a single-instance request either way — mirrors
+    /// Frank.Validation's useValidation (TryAddSingleton)/useValidationWith (AddSingleton)
+    /// pattern.
     let private addDefaultVocabularyConfig (services: IServiceCollection) =
-        services.AddSingleton<LinkedDataVocabularyConfig>(LinkedDataVocabularyConfig.None)
-        |> ignore
-
+        services.TryAddSingleton<LinkedDataVocabularyConfig>(LinkedDataVocabularyConfig.None)
         services
 
     type WebHostBuilder with
@@ -53,8 +56,10 @@ module LinkedDataExtensions =
 
         /// App-wide vocabulary document route (mirrors useDiscoveryWith's HomeRoute/ProfileUri
         /// singleton pattern) — set once per app, applies to every endpoint carrying
-        /// LinkedDataConfig metadata. Call AFTER useLinkedData/useLinkedDataWith in the CE
-        /// block so this registration is the one DI resolves (#420 expert-review follow-up).
+        /// LinkedDataConfig metadata. Call order relative to useLinkedData/useLinkedDataWith
+        /// no longer matters: this registers via unconditional AddSingleton (the explicit
+        /// override) while the default path uses TryAddSingleton, so whichever runs first,
+        /// this override always wins (#420 expert-review follow-up).
         [<CustomOperation("useLinkedDataVocabulary")>]
         member _.UseLinkedDataVocabulary(spec: WebHostSpec, vocabularyRoute: string) : WebHostSpec =
             if System.String.IsNullOrWhiteSpace vocabularyRoute then
