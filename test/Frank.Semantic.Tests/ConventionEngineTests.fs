@@ -665,8 +665,7 @@ let explicitEquivalentClassTests =
                   { VocabularyRegistry.empty with
                       Prefixes = Map.ofList [ "schema", Uri("https://schema.org/") ]
                       Using = Set.ofList [ "schema" ]
-                      EquivalentClasses =
-                          Map.ofList [ "TicTacToe.Model.MoveLog`1", Uri("https://schema.org/ItemList") ] }
+                      EquivalentClasses = Map.ofList [ "TicTacToe.Model.MoveLog`1", Uri("https://schema.org/ItemList") ] }
 
               let mapping, notice = ConventionEngine.scoreDetailed terms registry typeInfo
 
@@ -706,6 +705,57 @@ let explicitEquivalentClassTests =
 
               Expect.equal mapping.Iri (Some "schema:Product") "class IRI still overridden by explicit target"
               Expect.isNone notice "no notice: type had its own independent convention match"
+          }
+
+          test "real schema.org-scale noise match still surfaces a notice (TicTacToe-v732 fixture)" {
+              // Reproduces the real motivating case (sample/TicTacToe-v732/Vocabulary.fs):
+              // `equivalentClass typedefof<MoveLog<_>> "schema:ItemList"`. Against the full
+              // ~956-class schema.org term graph, MoveLog does NOT come back Unresolved —
+              // hasTokenHit fuzzy-matches "Move" against some class local name (e.g.
+              // "moveaction") at JW >= 0.85, producing a *spurious* Proposed candidate with
+              // Iri = Some _. A guard keyed on `Iri.IsNone` alone misses this: the type never
+              // had a genuine (Confirmed) independent identity, so the collapse is still the
+              // silent case the notice exists to catch.
+              let cacheDir =
+                  Path.Combine(__SOURCE_DIRECTORY__, "..", "..", "sample", "TicTacToe-v732", ".frank", "vocab")
+
+              match VocabFetcher.loadCachedGraph cacheDir "schema" with
+              | None ->
+                  skiptest "schema vocab cache not found — run frank semantic refresh in sample/TicTacToe-v732 first"
+              | Some(Error e) -> skiptest $"schema cache parse error: {e}"
+              | Some(Ok graph) ->
+                  let terms = ConventionEngine.extractVocabTerms graph
+
+                  Expect.isTrue
+                      (terms.Classes.Count > 500)
+                      $"sanity: real schema.org graph has hundreds of classes, got {terms.Classes.Count}"
+
+                  let typeInfo: TypeInfo =
+                      { FullName = "TicTacToe.Model.MoveLog`1"
+                        Namespace = "TicTacToe.Model"
+                        LocalName = "MoveLog"
+                        Shape = TypeShape.Record []
+                        Attributes = Map.empty
+                        DocComment = None }
+
+                  let registry =
+                      { VocabularyRegistry.empty with
+                          Prefixes = Map.ofList [ "schema", Uri("https://schema.org/") ]
+                          Using = Set.ofList [ "schema" ]
+                          EquivalentClasses =
+                              Map.ofList [ "TicTacToe.Model.MoveLog`1", Uri("https://schema.org/ItemList") ] }
+
+                  let mapping, notice = ConventionEngine.scoreDetailed terms registry typeInfo
+
+                  Expect.equal mapping.Iri (Some "schema:ItemList") "class IRI overridden to the explicit target"
+
+                  match notice with
+                  | None ->
+                      failwith
+                          "expected an EquivalentClassNotice: MoveLog had no Confirmed independent identity before the override, even against the real schema.org term graph"
+                  | Some n ->
+                      Expect.equal n.FSharpType "TicTacToe.Model.MoveLog`1" "notice names the collapsed type"
+                      Expect.equal n.ExplicitIri "schema:ItemList" "notice carries the explicit CURIE"
           } ]
 
 // ── Exact-identity confirm rule ───────────────────────────────────────────────

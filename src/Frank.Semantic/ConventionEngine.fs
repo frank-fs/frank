@@ -22,12 +22,14 @@ type VocabTermIris =
       IndividualIris: Set<string> }
 
 /// Diagnostic emitted when ConventionEngine.applyExplicitClass collapses a type's own
-/// ClassIri onto a declared equivalentClass target because the type had no independent
-/// convention match of its own. Without this notice the collapse is silent: an author who
-/// declared `equivalentClass typeof<Foo> "schema:Bar"` expecting Foo to keep its own class
-/// identity AND gain a genuine owl:equivalentClass link to Bar instead gets neither — Foo's
-/// ClassIri becomes Bar's IRI outright, and the resulting equivalentClass field then
-/// collapses to a no-op (see #425, ResolvedModel.buildResolvedResource).
+/// ClassIri onto a declared equivalentClass target because the type had no independently
+/// CONFIRMED convention match of its own (Unresolved, or only a fuzzy/Proposed candidate —
+/// a Proposed guess was never asserted as the type's identity, so it doesn't count as one).
+/// Without this notice the collapse is silent: an author who declared
+/// `equivalentClass typeof<Foo> "schema:Bar"` expecting Foo to keep its own class identity
+/// AND gain a genuine owl:equivalentClass link to Bar instead gets neither — Foo's ClassIri
+/// becomes Bar's IRI outright, and the resulting equivalentClass field then collapses to a
+/// no-op (see #425, ResolvedModel.buildResolvedResource).
 type EquivalentClassNotice =
     { FSharpType: string
       ExplicitIri: string }
@@ -525,8 +527,11 @@ module ConventionEngine =
     /// If registry.EquivalentClasses contains an entry for typeInfo.FullName,
     /// override the class IRI to the explicit one, keeping convention-scored fields.
     /// Also returns an EquivalentClassNotice when the override collapses a type that had
-    /// no independent convention match of its own (convention.Iri = None) — the case where
-    /// the author's "distinct-but-equivalent" intent silently degrades into identity collapse.
+    /// no independent CONFIRMED convention match of its own — the case where the author's
+    /// "distinct-but-equivalent" intent silently degrades into identity collapse. Guarding on
+    /// Status <> Confirmed (not just Iri.IsNone) matters against real vocabularies: a large
+    /// term graph routinely produces a spurious Proposed (Iri = Some _, fuzzy-matched) candidate
+    /// that was never asserted as the type's own identity, so it must still trigger the notice.
     let private applyExplicitClass
         (registry: VocabularyRegistry)
         (typeInfo: TypeInfo)
@@ -547,7 +552,7 @@ module ConventionEngine =
                     MappingShape.payloadFields convention.Shape
 
             let notice =
-                if convention.Iri.IsNone then
+                if convention.Status <> Confirmed then
                     Some
                         { FSharpType = typeInfo.FullName
                           ExplicitIri = curie }

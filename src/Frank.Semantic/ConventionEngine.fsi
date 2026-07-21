@@ -21,12 +21,14 @@ type VocabTermIris =
       IndividualIris: Set<string> }
 
 /// Diagnostic emitted when ConventionEngine.applyExplicitClass collapses a type's own
-/// ClassIri onto a declared equivalentClass target because the type had no independent
-/// convention match of its own. Without this notice the collapse is silent: an author who
-/// declared `equivalentClass typeof<Foo> "schema:Bar"` expecting Foo to keep its own class
-/// identity AND gain a genuine owl:equivalentClass link to Bar instead gets neither — Foo's
-/// ClassIri becomes Bar's IRI outright, and the resulting equivalentClass field then
-/// collapses to a no-op (see #425, ResolvedModel.buildResolvedResource).
+/// ClassIri onto a declared equivalentClass target because the type had no independently
+/// CONFIRMED convention match of its own (Unresolved, or only a fuzzy/Proposed candidate —
+/// a Proposed guess was never asserted as the type's identity, so it doesn't count as one).
+/// Without this notice the collapse is silent: an author who declared
+/// `equivalentClass typeof<Foo> "schema:Bar"` expecting Foo to keep its own class identity
+/// AND gain a genuine owl:equivalentClass link to Bar instead gets neither — Foo's ClassIri
+/// becomes Bar's IRI outright, and the resulting equivalentClass field then collapses to a
+/// no-op (see #425, ResolvedModel.buildResolvedResource).
 type EquivalentClassNotice =
     { FSharpType: string
       ExplicitIri: string }
