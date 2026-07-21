@@ -707,7 +707,220 @@ let tests =
               let! (resp: HttpResponseMessage) =
                   client.GetAsync(sprintf "/provenance/entity-%s" negativeKKey) |> Async.AwaitTask
 
+              let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
               Expect.equal (int resp.StatusCode) 404 "crafted negative-k key must return 404 not 500"
+
+              Expect.equal
+                  resp.Content.Headers.ContentType.MediaType
+                  "application/problem+json"
+                  "out-of-range index 404 must be RFC 9457 problem+json, not a bare status code"
+
+              Expect.stringContains body "State entity index out of range" "title in body"
+          }
+
+          testCaseAsync "GET /provenance/entity-<garbage> unknown state-entity key returns 404 problem+json"
+          <| async {
+              // RED before fix: handleStateEntity's None branch set only StatusCode <- 404,
+              // no body — a client dereferencing a wasDerivedFrom/specializationOf IRI that
+              // 404s got no machine-readable reason. GREEN: RFC 9457 problem+json body.
+              use app = startNodeServer []
+              use client = app.GetTestClient()
+
+              // Valid base64url, decodes cleanly, but the decoded string has no '|' separator
+              // — tryParseStateEntityKey returns None (distinct from the negative-k / out-of-
+              // range cases, which decode to a well-formed (resourceUri, k) pair).
+              let garbageKey =
+                  let bytes = System.Text.Encoding.UTF8.GetBytes("no-pipe-separator-here")
+
+                  System.Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=')
+
+              let! (resp: HttpResponseMessage) =
+                  client.GetAsync(sprintf "/provenance/entity-%s" garbageKey) |> Async.AwaitTask
+
+              let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 404 "unparseable state-entity key must return 404"
+
+              Expect.equal
+                  resp.Content.Headers.ContentType.MediaType
+                  "application/problem+json"
+                  "unknown state-entity key 404 must be RFC 9457 problem+json"
+
+              Expect.stringContains body "Unknown state entity" "title in body"
+
+              Expect.isFalse
+                  (body.Contains "State entity index out of range")
+                  "must use a message distinct from the out-of-range-index case"
+          }
+
+          testCaseAsync "GET /provenance/{nodeId} unknown activity id returns 404 problem+json"
+          <| async {
+              // RED before fix: handleActivityNode's recordOpt=None branch set only
+              // StatusCode <- 404, no body. GREEN: RFC 9457 problem+json body.
+              use app = startNodeServer []
+              use client = app.GetTestClient()
+
+              let! (resp: HttpResponseMessage) = client.GetAsync("/provenance/does-not-exist") |> Async.AwaitTask
+
+              let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 404 "unknown activity id must return 404"
+
+              Expect.equal
+                  resp.Content.Headers.ContentType.MediaType
+                  "application/problem+json"
+                  "unknown activity 404 must be RFC 9457 problem+json"
+
+              Expect.stringContains body "Unknown activity" "title in body"
+
+              Expect.isFalse
+                  (body.Contains "Unknown state entity")
+                  "must use a message distinct from the unknown-state-entity-key case"
+          }
+
+          testCaseAsync
+              "GET /provenance/{nodeId} activity found but absent from its own resource lineage returns 404 problem+json"
+          <| async {
+              // Defensive branch: QueryByActivityId returns a record whose ResourceUri's
+              // QueryByResource list does not contain it. Reproduced with a fake store so the
+              // discriminating message (distinct from the other two node-not-found cases) is
+              // observable even though real stores can't produce this inconsistency.
+              let record =
+                  { Id = "http://localhost/provenance/orphan"
+                    ResourceUri = "http://localhost/r"
+                    HttpMethod = "GET"
+                    StatusCode = 200
+                    DomainType = None
+                    Agent = { Id = "urn:agent:anon"; Label = None }
+                    StartedAt = DateTimeOffset.UnixEpoch
+                    EndedAt = DateTimeOffset.UnixEpoch
+                    BodyAttributes = [] }
+
+              let inconsistentStore =
+                  { new IProvenanceStore with
+                      member _.Append _ = ()
+
+                      member _.QueryByResource _ =
+                          System.Threading.Tasks.Task.FromResult []
+
+                      member _.QueryByAgent _ =
+                          System.Threading.Tasks.Task.FromResult []
+
+                      member _.QueryByActivityId _ =
+                          System.Threading.Tasks.Task.FromResult(Some record) }
+
+              let builder = WebApplication.CreateBuilder()
+              builder.WebHost.UseTestServer() |> ignore
+              builder.Services.AddSingleton<IProvenanceStore>(inconsistentStore) |> ignore
+              builder.Services.AddSingleton<ProvenanceConfig>(defaultConfig) |> ignore
+              let app = builder.Build()
+              let resolvedStore = app.Services.GetRequiredService<IProvenanceStore>()
+
+              app.MapGet(
+                  "/provenance/{nodeId}",
+                  Func<HttpContext, System.Threading.Tasks.Task>(
+                      ProvenanceEndpoint.handleNode resolvedStore defaultConfig
+                  )
+              )
+              |> ignore
+
+              app.StartAsync().GetAwaiter().GetResult()
+              use app = app
+              use client = app.GetTestClient()
+
+              let! (resp: HttpResponseMessage) = client.GetAsync("/provenance/orphan") |> Async.AwaitTask
+              let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 404 "activity absent from its own lineage must return 404"
+
+              Expect.equal
+                  resp.Content.Headers.ContentType.MediaType
+                  "application/problem+json"
+                  "activity-not-in-lineage 404 must be RFC 9457 problem+json"
+
+              Expect.stringContains body "Activity not found in resource lineage" "title in body"
+          }
+
+          testCaseAsync "handleNode with empty nodeId returns 404 problem+json"
+          <| async {
+              // RED before fix: the empty-nodeId guard set only StatusCode <- 404, no body.
+              let store =
+                  new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance)
+                  :> IProvenanceStore
+
+              let ctx = DefaultHttpContext() :> HttpContext
+              use responseBody = new MemoryStream()
+              ctx.Response.Body <- responseBody
+
+              do! ProvenanceEndpoint.handleNode store defaultConfig ctx |> Async.AwaitTask
+
+              Expect.equal ctx.Response.StatusCode 404 "empty nodeId must return 404"
+              Expect.equal ctx.Response.ContentType "application/problem+json" "must be RFC 9457 problem+json"
+
+              responseBody.Position <- 0L
+              use reader = new StreamReader(responseBody)
+              let body = reader.ReadToEnd()
+              Expect.stringContains body "Missing node identifier" "title in body"
+          }
+
+          testCaseAsync "GET /provenance and /provenance/{nodeId} carry Vary: Accept"
+          <| async {
+              // RED before fix: serveJsonLd never called appendVaryAccept, unlike
+              // ProvenanceMiddleware.InvokeWithProv which already does.
+              let record = mkRecord "http://localhost/provenance/act-1" "http://localhost/r"
+              use app = startNodeServer [ record ]
+              use client = app.GetTestClient()
+
+              let! (batchResp: HttpResponseMessage) =
+                  client.GetAsync("/provenance?resource=http://localhost/r") |> Async.AwaitTask
+
+              Expect.isTrue
+                  (batchResp.Headers.Vary |> Seq.exists (fun v -> v = "Accept"))
+                  "GET /provenance must carry Vary: Accept"
+
+              let! (nodeResp: HttpResponseMessage) = client.GetAsync("/provenance/act-1") |> Async.AwaitTask
+
+              Expect.isTrue
+                  (nodeResp.Headers.Vary |> Seq.exists (fun v -> v = "Accept"))
+                  "GET /provenance/{nodeId} must carry Vary: Accept"
+          }
+
+          testCaseAsync "GET /provenance carries a strong ETag and immutable Cache-Control"
+          <| async {
+              let record = mkRecord "http://localhost/provenance/act-1" "http://localhost/r"
+              use app = startNodeServer [ record ]
+              use client = app.GetTestClient()
+
+              let! (resp: HttpResponseMessage) =
+                  client.GetAsync("/provenance?resource=http://localhost/r") |> Async.AwaitTask
+
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+              Expect.isTrue (resp.Headers.ETag <> null) "ETag header must be present"
+              Expect.isFalse resp.Headers.ETag.IsWeak "ETag must be strong, not weak"
+
+              let cacheControl = resp.Headers.CacheControl.ToString()
+              Expect.stringContains cacheControl "immutable" "Cache-Control must mark the representation immutable"
+              Expect.stringContains cacheControl "max-age" "Cache-Control must include a max-age directive"
+          }
+
+          testCaseAsync "GET /provenance with matching If-None-Match returns 304 with no body"
+          <| async {
+              let record = mkRecord "http://localhost/provenance/act-1" "http://localhost/r"
+              use app = startNodeServer [ record ]
+              use client = app.GetTestClient()
+
+              let! (first: HttpResponseMessage) =
+                  client.GetAsync("/provenance?resource=http://localhost/r") |> Async.AwaitTask
+
+              Expect.equal (int first.StatusCode) 200 "first request status 200"
+              let etagValue = first.Headers.ETag.ToString()
+
+              use req =
+                  new HttpRequestMessage(HttpMethod.Get, "/provenance?resource=http://localhost/r")
+
+              req.Headers.TryAddWithoutValidation("If-None-Match", etagValue) |> ignore
+              let! (second: HttpResponseMessage) = client.SendAsync(req) |> Async.AwaitTask
+
+              Expect.equal (int second.StatusCode) 304 "matching If-None-Match must return 304"
+              let! secondBody = second.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.equal secondBody "" "304 response must have an empty body"
           }
 
           testCaseAsync "#412 AC1: bare state-entity @context has prov only, http and rdfs absent"
