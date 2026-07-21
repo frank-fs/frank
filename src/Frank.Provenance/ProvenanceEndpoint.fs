@@ -10,19 +10,19 @@ open Microsoft.Extensions.Primitives
 let private notFound (ctx: HttpContext) (typeUri: string) (title: string) (detail: string) : Task =
     Frank.ProblemJson.write ctx 404 typeUri title detail
 
-// Cheap content fingerprint over an already-built graph's triples — sorted (ordinal, so no
-// ICU/globalization dependency) for order-independence, then hashed via the same SHA-256
-// helper the rest of the codebase's ETag machinery uses. Computed from the graph directly,
-// NOT the serialized JSON-LD string, so it costs a single linear pass with no context
-// resolution / JSON-LD compaction — unlike ProvenanceGraph.compactGraph, which additionally
-// builds the @context (a triple-node scan of its own) and runs the full expand→compact
-// pipeline. Fingerprint stability across identical requests only requires the SAME
-// (config, records) to build the SAME triples, which every ProvenanceGraph builder already
-// guarantees deterministically.
-let private graphFingerprint (g: VDS.RDF.IGraph) : string =
-    g.Triples
-    |> Seq.map (fun t -> t.ToString())
-    |> Seq.sort
+// Cheap content fingerprint over an already-scanned graph's triple string representations —
+// sorted (ordinal, so no ICU/globalization dependency) for order-independence, then hashed
+// via the same SHA-256 helper the rest of the codebase's ETag machinery uses. `tripleReprs`
+// comes from ProvenanceGraph.scanTriples, the SAME single g.Triples walk serveJsonLd also
+// uses (on the 200 path) to filter @context prefixes — so a cache miss pays one graph walk,
+// not a fingerprint walk plus compactGraph's own separate one. Sorting is O(n log n)
+// comparisons, not linear, but is negligible at these graph sizes (hundreds of triples).
+// Fingerprint stability across identical requests only requires the SAME (config, records)
+// to build the SAME triples, which every ProvenanceGraph builder already guarantees
+// deterministically.
+let private graphFingerprint (tripleReprs: string list) : string =
+    tripleReprs
+    |> List.sort
     |> String.concat "\n"
     |> System.Text.Encoding.UTF8.GetBytes
     |> Frank.ETagFormat.computeFromBytes
@@ -48,7 +48,10 @@ let private graphFingerprint (g: VDS.RDF.IGraph) : string =
 /// ConditionalRequestMiddleware makes (provider is authoritative, independent of the handler)
 /// doesn't hold here without re-solving the whole dispatch problem a second time.
 let private serveJsonLd (config: ProvenanceConfig) (g: VDS.RDF.IGraph) (ctx: HttpContext) : Task =
-    let etag = Frank.ETagFormat.quote (graphFingerprint g)
+    // Single triple walk, shared by the fingerprint (always paid) and, only on cache-miss,
+    // compactGraph's @context filtering — instead of each independently re-scanning g.Triples.
+    let uris, tripleReprs = ProvenanceGraph.scanTriples g
+    let etag = Frank.ETagFormat.quote (graphFingerprint tripleReprs)
 
     Frank.AcceptNegotiation.appendVaryAccept ctx.Response
     ctx.Response.Headers.ETag <- etag
@@ -60,13 +63,13 @@ let private serveJsonLd (config: ProvenanceConfig) (g: VDS.RDF.IGraph) (ctx: Htt
         not (System.String.IsNullOrEmpty ifNoneMatch)
         && Frank.ETagComparison.anyMatch (Some etag) ifNoneMatch
     then
-        // 304 short-circuit BEFORE compactGraph — the expensive step (@context resolution +
-        // full JSON-LD expand→compact) never runs when the client already has this
-        // representation. Only the cheap fingerprint above was paid for.
+        // 304 short-circuit BEFORE compactGraph — the expensive step (JSON-LD expand→compact)
+        // never runs when the client already has this representation. Only the shared triple
+        // walk above was paid for.
         ctx.Response.StatusCode <- 304
         Task.CompletedTask
     else
-        let body = ProvenanceGraph.compactGraph config.DeclaredPrefixes g
+        let body = ProvenanceGraph.compactGraphWithUris config.DeclaredPrefixes g uris
         ctx.Response.StatusCode <- 200
         ctx.Response.ContentType <- "application/ld+json"
         ctx.Response.WriteAsync(body)
