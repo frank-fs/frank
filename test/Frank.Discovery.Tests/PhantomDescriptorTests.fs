@@ -101,6 +101,34 @@ let filterReachableDescriptorsTests =
           }
 
           test
+              "rt chain of depth 2 (A live --rt--> B --rt--> C): ALL THREE survive, not just the one-hop target B (#422 expert-review finding 1)" {
+              // A is live; B is reachable only as A's rt target; C is reachable only as B's
+              // rt target. Neither B nor C has any live signal of its own. A one-hop closure
+              // keeps B (one hop from A) but drops C (two hops from A) even though B — now
+              // served, live — publishes an `rt` link to C. A client following A -> B -> C's
+              // rt would hit a dead reference the server itself just served.
+              let liveKeys = Set.ofList [ "https://schema.org/A" ]
+
+              let a =
+                  mkDescriptor "A" (Some "https://schema.org/A") None (Some "https://example.org/B")
+
+              let b =
+                  mkDescriptor "B" (Some "https://schema.org/B") None (Some "https://example.org/C")
+
+              let c = mkDescriptor "C" (Some "https://schema.org/C") None None
+
+              let result = DiscoveryMiddleware.filterReachableDescriptors liveKeys [ a; b; c ]
+
+              Expect.contains result a "the live descriptor itself is kept"
+              Expect.contains result b "one-hop rt target (B) is kept"
+
+              Expect.contains
+                  result
+                  c
+                  "two-hop rt target (C, reachable via B's rt) must ALSO be kept — a fixed-point closure, not a one-hop check"
+          }
+
+          test
               "unrelated non-live descriptor is still dropped even when SOME OTHER live descriptor exists (no false-positive keep-everything)" {
               let liveKeys = Set.ofList [ "https://schema.org/Game" ]
               let game = mkDescriptor "Game" (Some "https://schema.org/Game") None None

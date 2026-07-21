@@ -374,34 +374,73 @@ let private isLiveDescriptor (liveKeys: Set<string>) (d: AlpsDescriptor) : bool 
     (d.ClassIri |> Option.exists (fun c -> Set.contains c liveKeys))
     || (d.RequestClrTypeName |> Option.exists (fun t -> Set.contains t liveKeys))
 
+/// Bounded fixed-point closure over the `rt` chain (#422 expert-review finding 1): a
+/// one-hop check keeps a live descriptor's direct `rt` target but drops that target's OWN
+/// `rt` target, even though the now-served target descriptor publishes a real link to it —
+/// a client following live -> target -> target's-rt would hit a dead reference the server
+/// itself just served. Repeatedly unions in newly-rt-reachable descriptors (same dual-match
+/// join as before: a candidate is rt-reachable if its OWN Href OR Id appears in the raw Rt
+/// STRING VALUES collected from currently-reachable descriptors) until no new descriptor is
+/// added. Capped at `List.length descriptors` iterations (Holzmann rule 10): each productive
+/// iteration adds at least one previously-unreached descriptor Id, and there are only that
+/// many descriptors total, so the loop provably converges within the cap — hitting the cap
+/// with `newlyReachable` still non-empty is structurally impossible, not a truncation risk.
+let rec private closeOverRtChain
+    (descriptors: AlpsDescriptor list)
+    (reachableIds: Set<string>)
+    (remaining: int)
+    : Set<string> =
+    if remaining <= 0 then
+        reachableIds
+    else
+        let rtValues =
+            descriptors
+            |> List.filter (fun d -> Set.contains d.Id reachableIds)
+            |> List.choose (fun d -> d.Rt)
+            |> Set.ofList
+
+        let isRtReachable (d: AlpsDescriptor) =
+            (d.Href |> Option.exists (fun h -> Set.contains h rtValues))
+            || Set.contains d.Id rtValues
+
+        let newlyReachable =
+            descriptors
+            |> List.filter (fun d -> not (Set.contains d.Id reachableIds) && isRtReachable d)
+            |> List.map (fun d -> d.Id)
+            |> Set.ofList
+
+        if Set.isEmpty newlyReachable then
+            reachableIds
+        else
+            closeOverRtChain descriptors (Set.union reachableIds newlyReachable) (remaining - 1)
+
 /// #418: drop any top-level ALPS descriptor that (a) IS a class-mapped resource (ClassIri
 /// Some — DiscoveryEmitter.collectDescriptors only ever emits a top-level descriptor when
 /// the source resource carries a ClassIri, so this is never a real-world exclusion, only a
 /// guard against non-class-mapped top-level fixtures/descriptors this filter was never
-/// meant to touch) and (b) is neither live (isLiveDescriptor) nor the `rt` target (one hop —
-/// mirroring DiscoveryEmitter's own assertRtResolves reasoning: an `rt` value matches some
-/// descriptor's Href or Id) of a descriptor that IS live. Codegen (DiscoveryEmitter, MSBuild
-/// time) cannot see which types end up routed/embedded in Program.fs — that information
-/// only exists at runtime — so the running app is responsible for filtering its candidate
-/// descriptor set down to what a client can actually reach. A descriptor satisfying neither
-/// is a phantom affordance (e.g. a class-mapped type that exists only to exercise an
-/// `equivalentClass` declaration, never itself routed or embedded, #418) — a client
-/// following it would find nothing.
+/// meant to touch) and (b) is neither live (isLiveDescriptor) nor `rt`-reachable, via a
+/// bounded fixed-point closure (closeOverRtChain, #422 expert-review finding 1), from a
+/// descriptor that IS live — an `rt` chain of ANY depth, not just one hop. Codegen
+/// (DiscoveryEmitter, MSBuild time) cannot see which types end up routed/embedded in
+/// Program.fs — that information only exists at runtime — so the running app is responsible
+/// for filtering its candidate descriptor set down to what a client can actually reach. A
+/// descriptor satisfying neither is a phantom affordance (e.g. a class-mapped type that
+/// exists only to exercise an `equivalentClass` declaration, never itself routed or
+/// embedded, #418) — a client following it would find nothing.
 let internal filterReachableDescriptors
     (liveKeys: Set<string>)
     (descriptors: AlpsDescriptor list)
     : AlpsDescriptor list =
-    let isLive = isLiveDescriptor liveKeys
+    let liveIds =
+        descriptors
+        |> List.filter (isLiveDescriptor liveKeys)
+        |> List.map (fun d -> d.Id)
+        |> Set.ofList
 
-    let liveRtTargets =
-        descriptors |> List.filter isLive |> List.choose (fun d -> d.Rt) |> Set.ofList
-
-    let isRtTargetOfLive (d: AlpsDescriptor) =
-        (d.Href |> Option.exists (fun h -> Set.contains h liveRtTargets))
-        || Set.contains d.Id liveRtTargets
+    let reachableIds = closeOverRtChain descriptors liveIds (List.length descriptors)
 
     descriptors
-    |> List.filter (fun d -> d.ClassIri.IsNone || isLive d || isRtTargetOfLive d)
+    |> List.filter (fun d -> d.ClassIri.IsNone || Set.contains d.Id reachableIds)
 
 // ── #398/#421: per-request path matching shared by Allow and rel="type" scoping ───
 

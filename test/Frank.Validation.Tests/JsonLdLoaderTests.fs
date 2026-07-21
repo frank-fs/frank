@@ -78,4 +78,39 @@ let tests =
 
               Expect.isFalse
                   (resolves loader "https://evil.example/fake-schema-context.jsonld")
-                  "an unrelated authority must still fail closed, even if it superficially resembles a context doc" ]
+                  "an unrelated authority must still fail closed, even if it superficially resembles a context doc"
+
+          // #422 expert-review finding 2: two DISTINCT registered namespaces that happen to
+          // share a normalized authority (host+port, path dropped) would otherwise make the
+          // authority-fallback silently pick "first namespace in list order" with zero
+          // diagnostic if that guess is wrong. Must fail fast at CONSTRUCTION time, naming
+          // both colliding namespaces, rather than resolving requests against a guess.
+          testCase
+              "constructing synthesizing with two DISTINCT namespaces sharing an authority throws, naming both"
+          <| fun _ ->
+              let vocabA = "https://example.org/vocab-a/"
+              let vocabB = "https://example.org/vocab-b/"
+
+              try
+                  JsonLdLoader.synthesizing [ vocabA; vocabB ] |> ignore
+                  failtest "expected synthesizing to throw for two distinct namespaces sharing an authority"
+              with ex ->
+                  Expect.stringContains ex.Message vocabA "error names the first colliding namespace"
+                  Expect.stringContains ex.Message vocabB "error names the second colliding namespace"
+
+          // Regression guard: rdf/rdfs/owl are a known, deliberate, already-safe exception —
+          // all three share the w3.org authority but are resolved via EXACT match in `index`,
+          // never via authority-fallback. A normal real-world app vocab set (rdf/rdfs/owl +
+          // one app vocab + schema.org, all on DISTINCT authorities) must still construct.
+          testCase
+              "synthesizing with rdf/rdfs/owl + a single app vocab + schema.org constructs successfully (no false-positive collision)"
+          <| fun _ ->
+              let loader =
+                  JsonLdLoader.synthesizing [ "https://example.org/app-vocab/"; "https://schema.org/" ]
+
+              Expect.isTrue (resolves loader "https://example.org/app-vocab/") "app vocab resolves"
+              Expect.isTrue (resolves loader "https://schema.org/") "schema.org resolves"
+
+              Expect.isTrue
+                  (resolves loader rdfNs)
+                  "rdf resolves alongside app namespaces, no false-positive collision raised" ]

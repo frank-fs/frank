@@ -40,13 +40,55 @@ let private buildDocument (requestedUri: Uri) (ns: string) : RemoteDocument =
 /// document served, since the resolved @vocab is always the known namespace, never the
 /// document URL itself. Fails closed (throws) for any OTHER-authority context IRI — a
 /// validator must never let missing context look like conforming data.
+/// Fails fast at `synthesizing` CONSTRUCTION time (not per-request) if two DISTINCT
+/// app-declared namespaces normalize to the same authority (#422 expert-review finding 2):
+/// the authority-fallback below would otherwise silently pick "first namespace in list
+/// order sharing this authority" with zero diagnostic if that guess is wrong. rdf/rdfs/owl
+/// are a KNOWN, deliberate, already-safe exception — all three share the w3.org authority
+/// but are resolved via EXACT match in `index`, never via authority-fallback — so they never
+/// collide with each other here; an APP namespace colliding with their authority is still an
+/// error, since it would never reach the exact-match path either.
+let private assertNoAuthorityCollisions (wellKnownAuthorities: Set<string>) (appNamespaces: string list) : unit =
+    appNamespaces
+    |> List.choose (fun ns -> VocabClassifier.normalizeAuthority ns |> Option.map (fun a -> a, ns))
+    |> List.fold
+        (fun (seenByAuthority: Map<string, string>) (authority, ns) ->
+            if Set.contains authority wellKnownAuthorities then
+                failwithf
+                    "Frank.Validation: declared vocabulary namespace '%s' shares its authority ('%s') with the \
+                     built-in rdf/rdfs/owl namespaces; the authority-based @context fallback cannot distinguish them \
+                     — declare it under a different host"
+                    ns
+                    authority
+
+            match Map.tryFind authority seenByAuthority with
+            | Some existing when existing <> ns ->
+                failwithf
+                    "Frank.Validation: declared vocabulary namespaces '%s' and '%s' share the same authority \
+                     ('%s'); the authority-based @context fallback cannot distinguish them — declare each under a \
+                     unique host"
+                    existing
+                    ns
+                    authority
+            | _ -> Map.add authority ns seenByAuthority)
+        Map.empty
+    |> ignore
+
 let synthesizing (namespaces: string seq) : JsonLdDocumentLoader =
-    let allNamespaces = Seq.append wellKnownNamespaces namespaces |> Seq.toList
+    let appNamespaces = namespaces |> Seq.toList
+    let allNamespaces = Seq.append wellKnownNamespaces appNamespaces |> Seq.toList
     let index = Dictionary<string, string>(StringComparer.Ordinal)
 
     for ns in allNamespaces do
         index.[ns] <- ns
         index.[ns.TrimEnd('/')] <- ns
+
+    let wellKnownAuthorities =
+        wellKnownNamespaces
+        |> List.choose VocabClassifier.normalizeAuthority
+        |> Set.ofList
+
+    assertNoAuthorityCollisions wellKnownAuthorities appNamespaces
 
     // Precomputed once per synthesizing call (not per request): normalizing each candidate
     // namespace's authority up front lets the per-request fallback below normalize only the
