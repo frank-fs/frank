@@ -201,16 +201,7 @@ webHost args {
 
 Frank's origin-keyed caches (Discovery, LinkedData, Provenance) are bounded (LRU-evicted), so a flood of requests with distinct `Host` headers can't grow them unboundedly. But bounding a cache doesn't stop the flood requests from being *processed* — each one still runs Frank's middleware pipeline before anything evicts it.
 
-ASP.NET Core's native host filtering rejects requests with an unrecognized `Host` header before they reach any application middleware. Register it via `plugBeforeRouting` — ahead of everything else — and set `AllowedHosts` in `appsettings.json` to the specific hosts your deployment serves (never leave it at the wide-open default `"*"`):
-
-```fsharp
-open Microsoft.AspNetCore.Builder
-
-webHost args {
-    plugBeforeRouting HostFilteringBuilderExtensions.UseHostFiltering
-    resource myResource
-}
-```
+ASP.NET Core's shared framework (`Microsoft.AspNetCore.App`) auto-registers host filtering from the `AllowedHosts` configuration key for *any* builder flavor — `WebApplication.CreateBuilder` or `CreateSlimBuilder` — with no code wiring required. It rejects requests with an unrecognized `Host` header before any application middleware runs. Set `AllowedHosts` in `appsettings.json` (or another config source) to the specific hosts your deployment serves — the wide-open default is `"*"`, which allows any host and provides no protection:
 
 ```json
 {

@@ -118,9 +118,10 @@ type OriginRobustnessTests() =
     /// host this deployment serves — "evil-flood-attempt.example" parses as a valid absolute
     /// URI, so Frank.OriginValidation.tryValidateOrigin (which only ever rejects a Host value
     /// Uri.TryCreate can't parse) would let it straight through to Frank's own middleware.
-    /// The 400 here must instead come from ASP.NET Core's native host filtering
-    /// (UseHostFiltering, configured via AllowedHosts in appsettings.json) rejecting the
-    /// request BEFORE it reaches UseRouting or any Frank middleware — closing the
+    /// The 400 here must instead come from ASP.NET Core's shared framework, which
+    /// auto-registers host filtering from the AllowedHosts configuration key for any
+    /// builder flavor — no UseHostFiltering() call or other code wiring required — rejecting
+    /// the request BEFORE it reaches UseRouting or any Frank middleware. This closes the
     /// Host-header-flood vector at its true source, independent of and complementing
     /// Frank's own bounded-cache mitigation (#405 part 1).
     [<Test>]
@@ -134,7 +135,8 @@ type OriginRobustnessTests() =
                 statusCode,
                 Is.EqualTo 400,
                 "a syntactically valid Host header not on AllowedHosts must be rejected by ASP.NET Core's \
-                 UseHostFiltering — Frank's own OriginValidation only rejects unparseable Host values, never a \
-                 valid-looking host that's merely off the allow-list, so this 400 proves framework-level filtering"
+                 shared-framework host filtering (auto-registered from AllowedHosts, no code wiring) — Frank's \
+                 own OriginValidation only rejects unparseable Host values, never a valid-looking host that's \
+                 merely off the allow-list, so this 400 proves framework-level filtering"
             )
         }
