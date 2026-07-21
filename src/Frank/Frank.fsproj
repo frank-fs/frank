@@ -15,6 +15,7 @@
     <Compile Include="ClrTypeName.fs" />
     <Compile Include="UriResolution.fs" />
     <Compile Include="OriginValidation.fs" />
+    <Compile Include="BoundedCache.fs" />
     <Compile Include="GeneratedModuleReflection.fs" />
     <Compile Include="Builder.fs" />
   </ItemGroup>
@@ -49,6 +50,17 @@
     </AssemblyAttribute>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>Frank.Provenance.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <!-- BoundedCache (#405) is tested directly in isolation, mirroring the pattern above, and
+       its DefaultCapacity constant is asserted against from both consumer test suites. -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Frank.Tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Frank.LinkedData.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
 

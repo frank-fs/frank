@@ -1,7 +1,6 @@
 module Frank.Discovery.DiscoveryMiddleware
 
 open System
-open System.Collections.Concurrent
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Metadata
@@ -269,26 +268,25 @@ let resolveHref (origin: string) (href: string) : string = resolveHrefAgainst (U
 /// cachedResolvedHomeResources below (#398 /simplify item 6 was duplicated verbatim
 /// between the two; this is the single extraction). `cache`/`onBuild` are owned by the
 /// calling DiscoveryMiddleware instance so this function stays free of module-level
-/// mutable state (Rule 13) — the caller supplies its own dictionary and build-count
-/// callback. The `Lazy` value under each key guarantees `build` runs at most once per
-/// origin, even if two requests race on a brand-new origin simultaneously. Mirrors
+/// mutable state (Rule 13) — the caller supplies its own cache and build-count callback.
+/// `cache` is a Frank.BoundedCache (#405: bounds retained memory to a hard ceiling
+/// independent of how many distinct Host header values a client sends — an unauthenticated
+/// client varying Host could otherwise mint unbounded permanent entries) — build still
+/// runs at most once per origin even if two requests race on a brand-new one. Mirrors
 /// ValidationMiddleware's getOrBuildShapesGraph shape (src/Frank.Validation/
 /// ValidationMiddleware.fs).
 let private getOrBuildByOrigin
-    (cache: ConcurrentDictionary<string, Lazy<'T>>)
+    (cache: Frank.BoundedCache<string, 'T>)
     (onBuild: unit -> unit)
     (origin: string)
     (build: unit -> 'T)
     : 'T =
-    cache
-        .GetOrAdd(
-            origin,
-            (fun _ ->
-                Lazy<'T>(fun () ->
-                    onBuild ()
-                    build ()))
-        )
-        .Value
+    cache.GetOrAdd(
+        origin,
+        (fun () ->
+            onBuild ()
+            build ())
+    )
 
 /// Resolve every Href/Rt in a descriptor tree (top-level and nested children) against a
 /// pre-parsed live request origin Uri (#398) — parsed ONCE by the caller and threaded
@@ -555,11 +553,18 @@ type DiscoveryMiddleware
     // re-walk the whole descriptor tree on every request regardless of origin repetition.
     // DiscoveryConfig (unlike LinkedDataConfig) is a single constructor-injected value —
     // one per middleware instance, never looked up per-endpoint per-request — so a plain
-    // instance-level dictionary keyed by origin alone is the right-sized mirror of the
-    // same idea (LinkedDataMiddleware additionally keys by config via ConditionalWeakTable
-    // because ONE of its middleware instances serves MANY distinct LinkedDataConfig values,
-    // one per endpoint; DiscoveryMiddleware never does).
-    let resolvedAlpsCache = ConcurrentDictionary<string, Lazy<AlpsDescriptor list>>()
+    // instance-level cache keyed by origin alone is the right-sized mirror of the same idea
+    // (LinkedDataMiddleware additionally keys by config via ConditionalWeakTable because ONE
+    // of its middleware instances serves MANY distinct LinkedDataConfig values, one per
+    // endpoint; DiscoveryMiddleware never does). #405: Frank.BoundedCache bounds retained
+    // memory to a hard ceiling regardless of how many distinct Host header values a client
+    // sends — the origin string is only ever validated for SYNTACTIC well-formedness
+    // (Frank.OriginValidation.tryValidateOrigin), never checked against a configured
+    // allowlist, so an unbounded cache here would let an unauthenticated client mint
+    // unlimited permanent entries.
+    let resolvedAlpsCache =
+        Frank.BoundedCache<string, AlpsDescriptor list>(Frank.BoundedCache.DefaultCapacity)
+
     let mutable resolvedAlpsBuildCount = 0
 
     let cachedResolvedAlps (origin: string) : AlpsDescriptor list =
@@ -572,11 +577,11 @@ type DiscoveryMiddleware
                 |> List.map (resolveDescriptorHrefsAgainst (Uri origin)))
 
     // Mirrors resolvedAlpsCache/cachedResolvedAlps exactly, applied to JSON Home's
-    // resources instead of the ALPS descriptor tree — same instance-level-dictionary
-    // rationale (one DiscoveryConfig per middleware instance, never per-endpoint) and same
-    // build-once-per-distinct-origin discipline.
+    // resources instead of the ALPS descriptor tree — same instance-level-cache rationale
+    // (one DiscoveryConfig per middleware instance, never per-endpoint), same
+    // build-once-per-distinct-origin discipline, and the SAME bounded-cache fix (#405).
     let resolvedHomeResourcesCache =
-        ConcurrentDictionary<string, Lazy<JsonHomeResource list>>()
+        Frank.BoundedCache<string, JsonHomeResource list>(Frank.BoundedCache.DefaultCapacity)
 
     let mutable resolvedHomeBuildCount = 0
 
@@ -689,6 +694,16 @@ type DiscoveryMiddleware
     /// TemplateParser.Parse was actually invoked — proves parse-once-per-endpoint at
     /// cache-build time, not once per OPTIONS request (#421).
     member internal _.RouteTemplateParseCount = routeTemplateParseCount
+
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of
+    /// distinct origins currently retained in the resolved-ALPS cache — proves the
+    /// Host-header-flood cache-DoS fix (#405): bounded at Frank.BoundedCache.DefaultCapacity
+    /// regardless of how many distinct Host header values a client sends.
+    member internal _.ResolvedAlpsCacheSize = resolvedAlpsCache.Count
+
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): mirrors
+    /// ResolvedAlpsCacheSize above, for the resolved-JSON-Home cache (#405).
+    member internal _.ResolvedHomeCacheSize = resolvedHomeResourcesCache.Count
 
     member _.Invoke(ctx: HttpContext) : Task =
         let path = ctx.Request.Path.Value
