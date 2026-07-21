@@ -1955,4 +1955,31 @@ type SemanticTests() =
             Assert.That(homeResp.Status, Is.EqualTo 200, "JSON Home not 200")
             let! homeBody = homeResp.TextAsync()
             assertNoPlaceholder "JSON Home body" homeBody
+
+            // Positive check (not absence-only): JSON Home serves the relation as its own
+            // host-relative AlpsDescriptor.Href — "/ex#Game" — never the un-relativized
+            // absolute identity key (confirmed live: DiscoveryMiddleware.classIriHrefMap
+            // resolves it, #415). An empty/broken `{"resources":{}}` response is free of
+            // "example.org"/"tictactoe.invalid" too — this positive assertion is what
+            // actually falsifies that false-green.
+            use homeDoc = JsonDocument.Parse homeBody
+            let resources = homeDoc.RootElement.GetProperty "resources"
+
+            let gameEntry =
+                resources.EnumerateObject()
+                |> Seq.tryFind (fun p -> p.Name = "/ex#Game")
+                |> Option.defaultWith (fun () ->
+                    failwith (
+                        sprintf
+                            "JSON Home must key the Game resource by the host-relative '/ex#Game' href, got: %s"
+                            homeBody
+                    ))
+
+            let hrefVars = gameEntry.Value.GetProperty "href-vars"
+
+            Assert.That(
+                hrefVars.GetProperty("id").GetString(),
+                Is.EqualTo "/ex#identifier",
+                "JSON Home href-vars.id must be the host-relative '/ex#identifier' meaning IRI"
+            )
         }
