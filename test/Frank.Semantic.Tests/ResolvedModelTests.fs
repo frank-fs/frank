@@ -70,7 +70,9 @@ let at_rm1 =
 
         let registry =
             { baseRegistry with
-                EquivalentClasses = Map.ofList [ gameType, Uri "https://schema.org/Game" ]
+                // Genuinely distinct from mapping's classIri (schema:Game below) — a
+                // tautological pair (same IRI on both) is #425's own AC1, tested separately.
+                EquivalentClasses = Map.ofList [ gameType, Uri "https://schema.org/VideoGame" ]
                 SeeAlso = Map.ofList [ gameType, [ Uri "https://www.wikidata.org/wiki/Q11907" ] ]
                 ProvClasses = Map.ofList [ gameType, ProvOClass.Entity ]
                 FieldSeeAlso = Map.ofList [ (gameType, "Board"), [ Uri "https://schema.org/board" ] ]
@@ -92,7 +94,11 @@ let at_rm1 =
             Expect.equal res.LocalName "Game" "LocalName"
             Expect.equal res.GenericArity 0 "GenericArity"
             Expect.equal res.ClassIri (Some(Uri "https://schema.org/Game")) "ClassIri expanded"
-            Expect.equal res.EquivalentClass (Some(Uri "https://schema.org/Game")) "EquivalentClass from registry"
+
+            Expect.equal
+                res.EquivalentClass
+                (Some(Uri "https://schema.org/VideoGame"))
+                "EquivalentClass from registry"
             Expect.equal res.SeeAlso [ Uri "https://www.wikidata.org/wiki/Q11907" ] "SeeAlso from registry"
             Expect.equal res.ProvClass (Some ProvOClass.Entity) "ProvClass from registry"
             let f = res.Fields |> List.head
@@ -101,6 +107,66 @@ let at_rm1 =
             Expect.equal f.SeeAlso [ Uri "https://schema.org/board" ] "field SeeAlso from registry"
             Expect.equal f.ConstraintPattern (Some @"^\d{9}$") "field ConstraintPattern"
     }
+
+// ── AT-425: EquivalentClass tautology suppressed upstream at build time ──────
+// #425: move the #417 tautology-prevention check upstream from Ontology.addClass
+// into ResolvedModel.buildResolvedResource itself, so every consumer of
+// ResolvedResource.EquivalentClass (not just Ontology.addClass) sees None instead
+// of a self-referential equivalentClass.
+
+[<Tests>]
+let at_425 =
+    testList
+        "AT-425: EquivalentClass tautology suppressed in ResolvedModel.buildResolvedResource"
+        [ test "AC1: ClassIri resolving equal to declared equivalentClass yields EquivalentClass = None" {
+              let moveLogType = "TicTacToe.Model.MoveLog"
+
+              // Mirrors applyExplicitClass having already overridden ClassIri to the same
+              // explicit equivalentClass target (schema:ItemList) — the #417 MoveLog scenario.
+              let registry =
+                  { baseRegistry with
+                      EquivalentClasses = Map.ofList [ moveLogType, Uri "https://schema.org/ItemList" ] }
+
+              let mapping = mkMapping moveLogType (Some "schema:ItemList") []
+
+              let lock =
+                  { lockWithSchema with
+                      DeclaredPrefixes = Map.empty
+                      Mappings = [ mapping ] }
+
+              match ResolvedModel.build registry lock with
+              | Error e -> failwith $"Expected Ok but got Error: {e}"
+              | Ok model ->
+                  let res = model.Resources |> List.head
+                  Expect.equal res.ClassIri (Some(Uri "https://schema.org/ItemList")) "ClassIri resolved"
+                  Expect.equal res.EquivalentClass None "tautological EquivalentClass suppressed to None"
+          }
+
+          test "AC2: genuinely distinct ClassIri/equivalentClass pair still produces Some equivalentClass" {
+              let gameType = "TicTacToe.Model.Game"
+
+              let registry =
+                  { baseRegistry with
+                      EquivalentClasses = Map.ofList [ gameType, Uri "https://schema.org/Game" ] }
+
+              let mapping = mkMapping gameType (Some "ex:Game") []
+
+              let lock =
+                  { lockWithSchemaAndEx with
+                      DeclaredPrefixes = Map.empty
+                      Mappings = [ mapping ] }
+
+              match ResolvedModel.build registry lock with
+              | Error e -> failwith $"Expected Ok but got Error: {e}"
+              | Ok model ->
+                  let res = model.Resources |> List.head
+                  Expect.equal res.ClassIri (Some(Uri "http://example.com/vocab#Game")) "ClassIri resolved"
+
+                  Expect.equal
+                      res.EquivalentClass
+                      (Some(Uri "https://schema.org/Game"))
+                      "distinct EquivalentClass unchanged"
+          } ]
 
 // ── AT-RM2: LocalName / GenericArity parsing ─────────────────────────────────
 

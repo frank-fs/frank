@@ -243,7 +243,16 @@ module ResolvedModel =
             match buildFields prefixes registry m.FSharpType includedFields with
             | Error e -> Error e
             | Ok fields ->
-                let equivalentClass = registry.EquivalentClasses |> Map.tryFind m.FSharpType
+                // #425: suppress a declared equivalentClass that resolves equal to classIri —
+                // e.g. when ConventionEngine.applyExplicitClass already overrode ClassIri to the
+                // same explicit equivalentClass target, nothing distinct is left to assert.
+                // Root-cause fix upstream of Ontology.addClass's #417 defensive guard, which stays
+                // in place for hand-constructed ClassDecl values.
+                let equivalentClass =
+                    registry.EquivalentClasses
+                    |> Map.tryFind m.FSharpType
+                    |> Option.filter (fun e -> Some e <> classIri)
+
                 let seeAlso = registry.SeeAlso |> Map.tryFind m.FSharpType |> Option.defaultValue []
                 let provClass = registry.ProvClasses |> Map.tryFind m.FSharpType
 
