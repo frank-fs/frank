@@ -17,6 +17,12 @@ type ExtractOptions =
 
 type ExtractSummary = LockFile.StatusCounts
 
+/// Result of the extract pipeline: the status-count summary plus any
+/// EquivalentClassNotices raised while scoring types against the registry.
+type ExtractResult =
+    { Summary: ExtractSummary
+      EquivalentClassNotices: EquivalentClassNotice list }
+
 /// Exclude files that FCS cannot typecheck in the pipeline's reduced assembly context.
 /// Mirrors the MSBuild _FrankVocabSource item exclusion in Frank.Cli.MSBuild.targets:
 ///   Extension != '.fsi'  AND  Filename+Extension != 'Program.fs'  AND  NOT StartsWith('Generated').
@@ -26,8 +32,8 @@ val internal curateSourceFiles: files: string list -> string list
 /// Pipeline core with the vocabulary fetcher and clock injected.
 /// `run` wraps this with the production HttpClient-backed fetcher and real clock.
 val internal runWithFetch:
-    fetch: ConnegFetch -> clock: (unit -> DateTimeOffset) -> opts: ExtractOptions -> Result<ExtractSummary, string>
+    fetch: ConnegFetch -> clock: (unit -> DateTimeOffset) -> opts: ExtractOptions -> Result<ExtractResult, string>
 
 /// Run the extract pipeline.
 /// No child processes; all FCS evaluation is in-process.
-val run: opts: ExtractOptions -> Result<ExtractSummary, string>
+val run: opts: ExtractOptions -> Result<ExtractResult, string>

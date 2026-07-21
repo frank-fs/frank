@@ -19,6 +19,12 @@ type ExtractOptions =
 
 type ExtractSummary = LockFile.StatusCounts
 
+/// Result of the extract pipeline: the status-count summary plus any
+/// EquivalentClassNotices raised while scoring types against the registry.
+type ExtractResult =
+    { Summary: ExtractSummary
+      EquivalentClassNotices: EquivalentClassNotice list }
+
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
 let private lockFilePath (projectFile: string) : string =
@@ -274,7 +280,7 @@ let private buildMappings
     (projectFile: string)
     (curated: string list)
     (domain: string list)
-    : Result<Map<string, VocabularyEntry> * Mapping list * VocabularyRegistry, string> =
+    : Result<Map<string, VocabularyEntry> * Mapping list * VocabularyRegistry * EquivalentClassNotice list, string> =
     tryEvalRegistry opts.AssemblyRefs curated
     |> Result.mapError (fun e -> $"registry eval failed: {e}")
     |> Result.bind (fun registry ->
@@ -287,8 +293,10 @@ let private buildMappings
             |> Async.RunSynchronously
             |> Result.mapError (fun e -> $"vocab fetch failed: {e}")
             |> Result.map (fun (terms, vocabEntries) ->
-                let fresh = typeInfos |> List.map (ConventionEngine.score terms registry)
-                vocabEntries, fresh, registry)))
+                let scored = typeInfos |> List.map (ConventionEngine.scoreDetailed terms registry)
+                let fresh = scored |> List.map fst
+                let notices = scored |> List.choose snd
+                vocabEntries, fresh, registry, notices)))
 
 /// Pipeline core with the vocabulary fetcher and clock injected.
 /// `run` wraps this with the production HttpClient-backed fetcher and real clock.
@@ -296,7 +304,7 @@ let internal runWithFetch
     (fetch: ConnegFetch)
     (clock: unit -> DateTimeOffset)
     (opts: ExtractOptions)
-    : Result<ExtractSummary, string> =
+    : Result<ExtractResult, string> =
     let projectFile = Path.GetFullPath opts.ProjectFile
 
     if not (File.Exists projectFile) then
@@ -305,17 +313,21 @@ let internal runWithFetch
         resolveSources opts projectFile
         |> Result.bind (fun (_vocabFile, curated, domain) ->
             buildMappings fetch clock opts projectFile curated domain
-            |> Result.map (fun (vocabEntries, fresh, registry) ->
+            |> Result.map (fun (vocabEntries, fresh, registry, notices) ->
                 let lockPath = lockFilePath projectFile
                 let existingLock = readOrEmptyLock lockPath
 
                 let declaredPrefixes =
                     registry.Prefixes |> Map.map (fun _ (u: Uri) -> u.AbsoluteUri)
 
-                writeLock lockPath clock existingLock fresh vocabEntries declaredPrefixes))
+                let summary =
+                    writeLock lockPath clock existingLock fresh vocabEntries declaredPrefixes
+
+                { Summary = summary
+                  EquivalentClassNotices = notices }))
 
 /// Run the extract pipeline.
 /// No child processes; all FCS evaluation is in-process.
-let run (opts: ExtractOptions) : Result<ExtractSummary, string> =
+let run (opts: ExtractOptions) : Result<ExtractResult, string> =
     use client = RdfConneg.makeNoRedirectClient ()
     runWithFetch (RdfConneg.rdfFetch client) (fun () -> DateTimeOffset.UtcNow) opts

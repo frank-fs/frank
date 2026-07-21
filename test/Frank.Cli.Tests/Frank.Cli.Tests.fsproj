@@ -12,6 +12,7 @@
     <Compile Include="ValidateCliTests.fs" />
     <Compile Include="FinalizeCliTests.fs" />
     <Compile Include="VocabWarnCliTests.fs" />
+    <Compile Include="ExtractCliTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

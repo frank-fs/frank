@@ -63,6 +63,52 @@ let registry =
     let lockFilePath = Path.Combine(tmpDir, ".frank", "semantic-mappings.lock.json")
     projectFile, lockFilePath
 
+/// Writes a fixture where `type Order` has a declared `equivalentClass` but no
+/// in-scope vocabulary terms (no 'using' — no network fetch needed), so it collapses
+/// with no independent match. Used to prove EquivalentClassNotices flows end-to-end
+/// through Pipeline.run/runWithFetch.
+let private writeFixtureProjectWithEquivalentClass (tmpDir: string) : string * string =
+    let domainSource =
+        """namespace FixtureApp
+
+type Order = { Id: int; Total: decimal }
+"""
+
+    let vocabSource =
+        """module Vocabulary
+open Frank.Semantic
+open FixtureApp
+
+// No 'using' declared — no network fetch needed in tests. Order has no in-scope
+// convention candidate of its own, so applyExplicitClass collapses it silently.
+let registry =
+    vocabulary {
+        prefix "schema" "https://schema.org/"
+        equivalentClass typeof<Order> "schema:Bar"
+    }
+"""
+
+    File.WriteAllText(Path.Combine(tmpDir, "Domain.fs"), domainSource)
+    File.WriteAllText(Path.Combine(tmpDir, "Vocabulary.fs"), vocabSource)
+
+    let fsprojContent =
+        """<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Domain.fs" />
+    <Compile Include="Vocabulary.fs" />
+  </ItemGroup>
+</Project>
+"""
+
+    let projectFile = Path.Combine(tmpDir, "FixtureApp.fsproj")
+    File.WriteAllText(projectFile, fsprojContent)
+    let lockFilePath = Path.Combine(tmpDir, ".frank", "semantic-mappings.lock.json")
+    projectFile, lockFilePath
+
 let private dllRefs () =
     [ frankSemanticDllPath (); fsharpCoreDllPath () ]
 
@@ -127,7 +173,8 @@ let at1PipelineTests =
                             AssemblyRefs = dllRefs ()
                             OutputFormat = Pipeline.Text }
 
-                  let summary = Expect.wantOk result "pipeline should succeed"
+                  let extractResult = Expect.wantOk result "pipeline should succeed"
+                  let summary = extractResult.Summary
                   Expect.isTrue (summary.Confirmed >= 0) "Confirmed >= 0"
                   Expect.isTrue (summary.Proposed >= 0) "Proposed >= 0"
                   Expect.isTrue (summary.Unresolved >= 0) "Unresolved >= 0"
@@ -162,6 +209,37 @@ let at1PipelineTests =
                       lf.Mappings |> List.filter (fun m -> m.Status = Unresolved) |> List.length
 
                   Expect.equal (confirmed + proposed + unresolved) total "counts must sum to total"
+              finally
+                  Directory.Delete(tmpDir, true)
+          }
+
+          test "extract pipeline surfaces an EquivalentClassNotice through ExtractResult" {
+              // End-to-end proof that ConventionEngine.scoreDetailed's notice channel flows
+              // through Pipeline.run/runWithFetch (Pipeline.ExtractResult), not just the
+              // pure ConventionEngine unit-level API.
+              let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+              Directory.CreateDirectory(tmpDir) |> ignore
+
+              try
+                  let projectFile, _ = writeFixtureProjectWithEquivalentClass tmpDir
+
+                  let result =
+                      Pipeline.run
+                          { ProjectFile = projectFile
+                            VocabularyFile = None
+                            AssemblyRefs = dllRefs ()
+                            OutputFormat = Pipeline.Text }
+
+                  let extractResult = Expect.wantOk result "pipeline should succeed"
+
+                  Expect.equal
+                      extractResult.EquivalentClassNotices.Length
+                      1
+                      $"expected exactly one notice, got {extractResult.EquivalentClassNotices}"
+
+                  let notice = extractResult.EquivalentClassNotices.[0]
+                  Expect.equal notice.FSharpType "FixtureApp.Order" "notice names the collapsed type"
+                  Expect.equal notice.ExplicitIri "schema:Bar" "notice carries the explicit CURIE"
               finally
                   Directory.Delete(tmpDir, true)
           } ]
