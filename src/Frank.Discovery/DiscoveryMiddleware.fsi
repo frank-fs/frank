@@ -84,4 +84,9 @@ type DiscoveryMiddleware =
     /// distinct-origin, not once per request (#398 /simplify item 6).
     member internal ResolvedAlpsBuildCount: int
 
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of times
+    /// the resolved JSON Home resources list was actually (re)built — proves build-once-
+    /// per-distinct-origin, not once per request, mirroring ResolvedAlpsBuildCount above.
+    member internal ResolvedHomeBuildCount: int
+
     member Invoke: ctx: HttpContext -> Task

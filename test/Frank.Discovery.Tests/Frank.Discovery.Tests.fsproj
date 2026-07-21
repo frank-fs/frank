@@ -13,6 +13,7 @@
     <Compile Include="SerializerTests.fs" />
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="AlpsMemoizationTests.fs" />
+    <Compile Include="JsonHomeMemoizationTests.fs" />
     <Compile Include="AlpsTypeReconciliationTests.fs" />
     <Compile Include="CeOrderingTests.fs" />
     <Compile Include="RelationTests.fs" />
