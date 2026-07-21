@@ -245,7 +245,8 @@ module private Serializers =
 /// representations: application/ld+json, text/turtle, application/rdf+xml.
 /// Only fires for GET/HEAD (safe-method guard) on endpoints that carry a
 /// LinkedDataConfig in their metadata. All other requests pass through.
-type LinkedDataMiddleware(next: RequestDelegate, logger: ILogger<LinkedDataMiddleware>) =
+type LinkedDataMiddleware
+    (next: RequestDelegate, logger: ILogger<LinkedDataMiddleware>, vocabularyConfig: LinkedDataVocabularyConfig) =
 
     /// Serialized static-graph bodies for the GraphFactory=None branch, keyed by the owning
     /// LinkedDataConfig instance (endpoints are configured once at startup and live for the
@@ -311,13 +312,6 @@ type LinkedDataMiddleware(next: RequestDelegate, logger: ILogger<LinkedDataMiddl
             | "text/turtle"
             | "application/rdf+xml"
             | "application/ld+json" ->
-                // #420: two-hop discovery — a class-level fact (rdfs:seeAlso, owl:equivalentClass)
-                // is never duplicated into an instance body; the client reaches it by following
-                // this response's OWN describedby Link header to the vocabulary document.
-                effective.VocabularyUri
-                |> Option.iter (fun vocabUri ->
-                    ctx.Response.Headers.Append("Link", $"<{vocabUri}>; rel=\"describedby\""))
-
                 Serializers.respondWith mediaType (computeBody mediaType origin effective ctx) ctx
             | _ -> next.Invoke ctx
 
@@ -338,6 +332,13 @@ type LinkedDataMiddleware(next: RequestDelegate, logger: ILogger<LinkedDataMiddl
             match endpointConfig with
             | None -> next.Invoke ctx
             | Some effective ->
+                // #420 expert-review follow-up: emitted for every safe-method response on any
+                // endpoint carrying LinkedDataConfig metadata, BEFORE representation negotiation,
+                // so it appears on Serve/PassThrough/NotAcceptable alike — including the naive
+                // plain-JSON/no-Accept client the #420 thesis targets (finding 3).
+                vocabularyConfig.VocabularyRoute
+                |> Option.iter (fun route -> ctx.Response.Headers.Append("Link", $"<{route}>; rel=\"describedby\""))
+
                 let acceptHeader =
                     match ctx.Request.Headers.TryGetValue "Accept" with
                     | true, v -> v.ToString()

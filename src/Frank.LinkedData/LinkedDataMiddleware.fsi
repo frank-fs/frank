@@ -9,7 +9,9 @@ open Microsoft.Extensions.Logging
 /// Only fires for GET/HEAD (safe-method guard) on endpoints that carry a
 /// LinkedDataConfig in their metadata. All other requests pass through.
 type LinkedDataMiddleware =
-    new: next: RequestDelegate * logger: ILogger<LinkedDataMiddleware> -> LinkedDataMiddleware
+    new:
+        next: RequestDelegate * logger: ILogger<LinkedDataMiddleware> * vocabularyConfig: LinkedDataVocabularyConfig ->
+            LinkedDataMiddleware
 
     /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of times a
     /// static-graph body was actually (re)built — proves build-once-per-(origin,mediaType) for

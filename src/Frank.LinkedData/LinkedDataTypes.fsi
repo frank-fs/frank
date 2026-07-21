@@ -15,17 +15,21 @@ open VDS.RDF
 ///   Provides access to the request origin AND route values (e.g. path id), enabling
 ///   per-resource instance graphs that host-resolve app-owned term IRIs.
 ///   Graph is ignored when GraphFactory is Some.
-/// VocabularyUri: when Some, LinkedDataMiddleware appends a `Link: <uri>; rel="describedby"`
-///   header to every RDF-negotiated response for this endpoint (#420). Enables the two-hop
-///   discovery path — an instance's own class-level facts (e.g. rdfs:seeAlso/owl:equivalentClass)
-///   live at the referenced vocabulary document, never duplicated into the instance body.
-///   A relative reference (e.g. "/vocabulary") is valid per RFC 8288 and is resolved by the
-///   client against the response's own request URI.
 type LinkedDataConfig =
     { Graph: IGraph
       JsonLdContext: string
-      GraphFactory: (HttpContext -> IGraph) option
-      VocabularyUri: string option }
+      GraphFactory: (HttpContext -> IGraph) option }
 
-    /// Baseline with no vocabulary describedby link and no per-request graph factory.
+    /// Baseline with no per-request graph factory.
     static member Empty: LinkedDataConfig
+
+/// App-wide vocabulary document route (mirrors DiscoveryConfig.HomeRoute/ProfileUri — set
+/// once per app, not per-resource). When Some, LinkedDataMiddleware emits a
+/// `Link: <route>; rel="describedby"` header on every safe-method (GET/HEAD) response for
+/// every endpoint carrying LinkedDataConfig metadata, regardless of negotiated
+/// representation — covering codegen-generated resources identically to hand-wired ones,
+/// since this is no longer a per-resource opt-in field (#420 expert-review follow-up).
+type LinkedDataVocabularyConfig =
+    { VocabularyRoute: string option }
+
+    static member None: LinkedDataVocabularyConfig

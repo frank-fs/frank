@@ -58,6 +58,7 @@ let startServer (config: LinkedDataConfig) =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(config) |> ignore
+    builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore
@@ -144,6 +145,7 @@ let startServerWithPlainRoute (config: LinkedDataConfig) =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(config) |> ignore
+    builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore
@@ -162,6 +164,7 @@ let startServerWithPlainRoute (config: LinkedDataConfig) =
 let startServerWithTttRoutes () =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore

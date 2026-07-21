@@ -133,6 +133,7 @@ let private startComposedServer () =
     |> ignore
 
     builder.Services.AddSingleton(valConfig) |> ignore
+    builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     // Outermost: Provenance (buffers for prov-profile; passes through otherwise).
@@ -183,6 +184,7 @@ let private startComposedServerLdOuter () =
         :> IProvenanceStore)
     |> ignore
 
+    builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     // LinkedData OUTERMOST — the previously-broken order.
@@ -246,6 +248,7 @@ let private startProvServer (provConfig: ProvenanceConfig) =
 let private startLinkedDataServer (ldConfig: LinkedDataConfig) =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
+    builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore

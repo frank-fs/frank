@@ -2,31 +2,73 @@ namespace Frank.LinkedData
 
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Routing
+open Microsoft.Extensions.DependencyInjection
 open VDS.RDF
 open Frank.Builder
 
 [<AutoOpen>]
 module LinkedDataExtensions =
 
+    /// Registers the default (no describedby route) LinkedDataVocabularyConfig singleton —
+    /// required so LinkedDataMiddleware's constructor resolves from DI even when
+    /// useLinkedDataVocabulary is never called. `useLinkedDataVocabulary` (below) overrides
+    /// this by registering a second singleton after this one; DI resolves the LAST
+    /// registration for a single-instance request, so ordering in the CE block matters —
+    /// mirrors DiscoveryConfig's DI-singleton pattern (Frank.Discovery.fs's addServices).
+    let private addDefaultVocabularyConfig (services: IServiceCollection) =
+        services.AddSingleton<LinkedDataVocabularyConfig>(LinkedDataVocabularyConfig.None)
+        |> ignore
+
+        services
+
     type WebHostBuilder with
 
         [<CustomOperation("useLinkedDataWith")>]
         member _.UseLinkedDataWith(spec: WebHostSpec, _config: LinkedDataConfig) : WebHostSpec =
+            let addServices (services: IServiceCollection) =
+                spec.Services services |> addDefaultVocabularyConfig
+
             let addMiddleware (app: IApplicationBuilder) =
                 let configured = spec.Middleware app
                 configured.UseMiddleware<LinkedDataMiddleware>() |> ignore
                 configured
 
-            { spec with Middleware = addMiddleware }
+            { spec with
+                Services = addServices
+                Middleware = addMiddleware }
 
         [<CustomOperation("useLinkedData")>]
         member _.UseLinkedData(spec: WebHostSpec) : WebHostSpec =
+            let addServices (services: IServiceCollection) =
+                spec.Services services |> addDefaultVocabularyConfig
+
             let addMiddleware (app: IApplicationBuilder) =
                 let configured = spec.Middleware app
                 configured.UseMiddleware<LinkedDataMiddleware>() |> ignore
                 configured
 
-            { spec with Middleware = addMiddleware }
+            { spec with
+                Services = addServices
+                Middleware = addMiddleware }
+
+        /// App-wide vocabulary document route (mirrors useDiscoveryWith's HomeRoute/ProfileUri
+        /// singleton pattern) — set once per app, applies to every endpoint carrying
+        /// LinkedDataConfig metadata. Call AFTER useLinkedData/useLinkedDataWith in the CE
+        /// block so this registration is the one DI resolves (#420 expert-review follow-up).
+        [<CustomOperation("useLinkedDataVocabulary")>]
+        member _.UseLinkedDataVocabulary(spec: WebHostSpec, vocabularyRoute: string) : WebHostSpec =
+            if System.String.IsNullOrWhiteSpace vocabularyRoute then
+                invalidArg (nameof vocabularyRoute) "vocabularyRoute must not be null or whitespace"
+
+            let addServices (services: IServiceCollection) =
+                let configured = spec.Services services
+
+                configured.AddSingleton<LinkedDataVocabularyConfig>({ VocabularyRoute = Some vocabularyRoute })
+                |> ignore
+
+                configured
+
+            { spec with Services = addServices }
 
 /// Extends ResourceBuilder with a `linkedDataGraph` operation that stamps
 /// LinkedDataConfig onto every endpoint built by the resource CE block.

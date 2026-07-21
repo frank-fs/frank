@@ -352,14 +352,14 @@ let private gameResource =
         entryPoint
         relation (TicTacToe.GeneratedSemantics.SemanticResource.Game.Iri.AbsoluteUri)
 
+        // #420: Game's class-level facts (rdfs:seeAlso Wikidata IRIs) live at /vocabulary,
+        // never duplicated into this instance body — the naive client follows this
+        // response's describedby Link header, never a hardcoded path. The route is
+        // configured once, app-wide, via useLinkedDataVocabulary below (not per-resource).
         linkedDataGraphWith
             { LinkedDataConfig.Empty with
                 JsonLdContext = """{"@context":["https://schema.org/version/latest/schemaorg-current-https.jsonld"]}"""
-                GraphFactory = Some gameGraphFactory
-                // #420: Game's class-level facts (rdfs:seeAlso Wikidata IRIs) live at
-                // /vocabulary, never duplicated into this instance body — the naive
-                // client follows this Link header, never a hardcoded path.
-                VocabularyUri = Some "/vocabulary" }
+                GraphFactory = Some gameGraphFactory }
 
         get gameHandler
 
@@ -442,6 +442,7 @@ let main args =
         useValidation
         useDiscoveryWith TicTacToe.GeneratedDiscovery.discoveryConfig
         useLinkedData
+        useLinkedDataVocabulary "/vocabulary"
         resource homeResource
         resource gameResource
         resource tttVocabResource
