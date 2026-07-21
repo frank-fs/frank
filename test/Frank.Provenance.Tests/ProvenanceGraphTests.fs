@@ -3,8 +3,20 @@ module Frank.Provenance.Tests.ProvenanceGraphTests
 open System
 open System.Text.Json
 open Expecto
+open VDS.RDF
 open Frank.Semantic
 open Frank.Provenance
+
+/// #424: counts how many times the graph's Triples collection is accessed, so tests can
+/// prove a scan happens exactly once instead of asserting on wall-clock timing.
+type private CountingGraph() =
+    inherit Graph()
+    let mutable triplesAccessCount = 0
+    member _.TriplesAccessCount = triplesAccessCount
+
+    override this.Triples =
+        triplesAccessCount <- triplesAccessCount + 1
+        base.Triples
 
 let private rec0 dt =
     { Id = "urn:uuid:act-1"
@@ -105,4 +117,44 @@ let tests =
               Expect.isFalse
                   (json.Contains "\"https://schema.org/actionStatus\"")
                   "full schema.org property IRI must not appear as JSON key after compaction"
+          }
+
+          test
+              "#424 AC1: usedContextEntries scans the graph's triples exactly once for combined prov+declared filtering" {
+              let g = new CountingGraph()
+              let rdfType = g.CreateUriNode(Uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+              let activity = g.CreateUriNode(Uri "urn:uuid:act-1")
+              let provActivity = g.CreateUriNode(Uri(ProvVocabulary.Namespace + "Activity"))
+              g.Assert(Triple(activity, rdfType, provActivity)) |> ignore
+              let schemaAgent = g.CreateUriNode(Uri "https://schema.org/agent")
+              let aliceLit = g.CreateLiteralNode "alice"
+              g.Assert(Triple(activity, schemaAgent, aliceLit)) |> ignore
+
+              let entries =
+                  ProvenanceGraph.usedContextEntries [ "schema", "https://schema.org/" ] g
+
+              Expect.equal
+                  g.TriplesAccessCount
+                  1
+                  "graphUriNodes-equivalent triple walk must run exactly once, not once per prefix set"
+
+              Expect.contains entries ("prov", ProvVocabulary.Namespace) "prov prefix present (used via rdf:type)"
+              Expect.contains entries ("schema", "https://schema.org/") "schema prefix present (used via schema:agent)"
+          }
+
+          test "#424: compactGraph's declaredPrefixes are filtered to only those used in the graph" {
+              let g = new Graph() :> IGraph
+              let activity = g.CreateUriNode(Uri "urn:uuid:act-1")
+              let schemaAgent = g.CreateUriNode(Uri "https://schema.org/agent")
+              let aliceLit = g.CreateLiteralNode "alice"
+              g.Assert(Triple(activity, schemaAgent, aliceLit)) |> ignore
+
+              let json =
+                  ProvenanceGraph.compactGraph
+                      [ "schema", "https://schema.org/"
+                        "wikidata", "http://www.wikidata.org/entity/" ]
+                      g
+
+              Expect.stringContains json "schema:agent" "used schema prefix compacts schema:agent"
+              Expect.isFalse (json.Contains "wikidata") "unused wikidata prefix must be filtered out"
           } ]

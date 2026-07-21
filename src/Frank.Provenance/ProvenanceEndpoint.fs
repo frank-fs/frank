@@ -5,10 +5,9 @@ open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.Primitives
 
 let private serveJsonLd (config: ProvenanceConfig) (g: VDS.RDF.IGraph) (ctx: HttpContext) : Task =
-    let extraCtx = ProvenanceGraph.usedPrefixContext config.DeclaredPrefixes g
     ctx.Response.StatusCode <- 200
     ctx.Response.ContentType <- "application/ld+json"
-    ctx.Response.WriteAsync(ProvenanceGraph.compactGraph extraCtx g)
+    ctx.Response.WriteAsync(ProvenanceGraph.compactGraph config.DeclaredPrefixes g)
 
 let private handleStateEntity
     (store: IProvenanceStore)
