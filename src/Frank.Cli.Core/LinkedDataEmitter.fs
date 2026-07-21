@@ -98,7 +98,7 @@ let emit (moduleName: string) (registry: VocabularyRegistry) (lock: LockFile) : 
                 { projectOntology model with
                     ContextBases = ctxBases }
 
-            let bases = EmitterShared.declaredOnlyBases lock model
+            let bases = EmitterShared.declaredOnlyBases lock
 
             let someBaseUri =
                 AstRender.parenExpr (AstRender.someExpr (AstRender.rawExpr "baseUri"))

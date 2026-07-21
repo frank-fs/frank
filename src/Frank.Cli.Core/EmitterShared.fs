@@ -26,14 +26,15 @@ let computeKnownNamespaces (registry: VocabularyRegistry) : string list =
     inScope |> Seq.map (fun u -> u.AbsoluteUri) |> Seq.distinct |> Seq.toList
 
 /// Compute which prefixes are declared-only (in DeclaredPrefixes but not in Vocabularies) AND
-/// actually back the app's own resource identity — i.e. their authority matches at least one
-/// resource's ClassIri or field Iri in the resolved model (#396). A prefix that is declared-only
-/// but never used to identify a mapped resource (e.g. referenced only via seeAlso/equivalentClass,
-/// pointing at a genuinely external vocabulary such as Wikidata) is never classified as owned:
-/// VocabClassifier.isOwnedByAuthority is the single authority check — this only decides which
-/// candidate base URIs to test it against, derived from the produced ResolvedModel.
-/// Their base URIs are returned as a set; matching IRIs will be emitted as relative paths.
-let internal declaredOnlyBases (lock: LockFile) (model: ResolvedModel) : Set<string> =
+/// actually back the app's own resource identity. Ownership itself is decided by
+/// VocabClassifier.ownedIdentityAuthorities — the single function that defines "what counts as
+/// this app's own identity" (type IRI, field IRI, and Confirmed union-case IRI, #423); this only
+/// decides which declared-only base URIs to test against that authority set. A prefix that is
+/// declared-only but never used to identify a mapped resource (e.g. referenced only via
+/// seeAlso/equivalentClass, pointing at a genuinely external vocabulary such as Wikidata) is never
+/// classified as owned. Their base URIs are returned as a set; matching IRIs will be emitted as
+/// relative paths.
+let internal declaredOnlyBases (lock: LockFile) : Set<string> =
     let candidates =
         lock.DeclaredPrefixes
         |> Map.filter (fun k _ -> not (Map.containsKey k lock.Vocabularies))
@@ -41,19 +42,9 @@ let internal declaredOnlyBases (lock: LockFile) (model: ResolvedModel) : Set<str
         |> Seq.map snd
         |> Set.ofSeq
 
-    let identityUris =
-        model.Resources
-        |> List.collect (fun r -> (r.ClassIri |> Option.toList) @ (r.Fields |> List.choose (fun f -> f.Iri)))
+    let ownAuthorities = VocabClassifier.ownedIdentityAuthorities lock
 
-    // Precompute each identity URI's normalized authority once, so membership testing
-    // per candidateBase below is O(1) instead of re-normalizing every (candidate, identity)
-    // pair via isOwnedByAuthority — see VocabClassifier.normalizeAuthority.
-    let identityAuthorities =
-        identityUris
-        |> List.choose (fun u -> VocabClassifier.normalizeAuthority u.AbsoluteUri)
-        |> Set.ofList
-
-    candidates |> Set.filter (VocabClassifier.authorityInSet identityAuthorities)
+    candidates |> Set.filter (VocabClassifier.authorityInSet ownAuthorities)
 
 /// For a declared-only IRI, extract the host-relative path+fragment.
 /// For external vocab IRIs, return the absolute URI unchanged.

@@ -10,6 +10,6 @@ val isExternalIri: using: Set<string> -> prefixes: Map<string, Uri> -> iri: Uri 
 
 val computeKnownNamespaces: registry: VocabularyRegistry -> string list
 
-val declaredOnlyBases: lock: LockFile.LockFile -> model: ResolvedModel -> Set<string>
+val declaredOnlyBases: lock: LockFile.LockFile -> Set<string>
 
 val hrefFor: bases: Set<string> -> absoluteUri: string -> string
