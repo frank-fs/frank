@@ -504,14 +504,18 @@ let at5ExcludedPreservationTests =
 let private minimalTurtleBytes () : byte[] =
     System.Text.Encoding.UTF8.GetBytes "@prefix schema: <https://schema.org/> .\n"
 
-/// Stub fetch: returns minimal Turtle bytes for any URI (no network).
-let private stubFetch: Fetch =
-    fun _uri ->
+/// Stub ConnegFetch: returns minimal Turtle bytes for any URI (no network).
+let private stubFetch: ConnegFetch =
+    fun _uri _etag _lastMod ->
         async {
             return
-                Ok
-                    {| ContentType = Some "text/turtle"
-                       Body = minimalTurtleBytes () |}
+                RdfContent
+                    {| MediaType = "text/turtle"
+                       Body = minimalTurtleBytes ()
+                       HttpStatus = 200
+                       ETag = None
+                       LastModified = None
+                       CacheControlMaxAge = None |}
         }
 
 // ── AT8/AT9 stubs (rich turtle with class definitions) ───────────────────────
@@ -526,19 +530,23 @@ let private foafTurtleBytes () : byte[] =
     System.Text.Encoding.UTF8.GetBytes
         "@prefix foaf: <http://xmlns.com/foaf/0.1/> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\nfoaf:Person a rdfs:Class .\n"
 
-/// Stub fetch: returns rich schema turtle (includes schema:Game class) for any URI.
-let private richSchemaStubFetch: Fetch =
-    fun _uri ->
+/// Stub ConnegFetch: returns rich schema turtle (includes schema:Game class) for any URI.
+let private richSchemaStubFetch: ConnegFetch =
+    fun _uri _etag _lastMod ->
         async {
             return
-                Ok
-                    {| ContentType = Some "text/turtle"
-                       Body = richSchemaTurtleBytes () |}
+                RdfContent
+                    {| MediaType = "text/turtle"
+                       Body = richSchemaTurtleBytes ()
+                       HttpStatus = 200
+                       ETag = None
+                       LastModified = None
+                       CacheControlMaxAge = None |}
         }
 
 /// Dispatch stub: routes by URI host to serve independent turtle content per vocabulary.
-let private twoVocabStubFetch: Fetch =
-    fun (uri: Uri) ->
+let private twoVocabStubFetch: ConnegFetch =
+    fun (uri: Uri) _etag _lastMod ->
         async {
             let bytes =
                 if uri.Host = "schema.org" then richSchemaTurtleBytes ()
@@ -546,9 +554,13 @@ let private twoVocabStubFetch: Fetch =
                 else invalidArg "uri" $"unexpected host: {uri.Host}"
 
             return
-                Ok
-                    {| ContentType = Some "text/turtle"
-                       Body = bytes |}
+                RdfContent
+                    {| MediaType = "text/turtle"
+                       Body = bytes
+                       HttpStatus = 200
+                       ETag = None
+                       LastModified = None
+                       CacheControlMaxAge = None |}
         }
 
 /// Writes a fixture with `using "schema"` so the pipeline puts schema in inScopePrefixes.
@@ -705,6 +717,7 @@ let at6VocabulariesTests =
 
                   let expectedHash =
                       use sha = SHA256.Create()
+
                       sha.ComputeHash(minimalTurtleBytes ())
                       |> Array.map (fun b -> b.ToString("x2"))
                       |> String.concat ""
@@ -778,13 +791,13 @@ let at6VocabulariesTests =
 
                   let fixedClock = fun () -> DateTimeOffset.Parse("2026-01-01T00:00:00Z")
 
-                  let opts1 : Pipeline.ExtractOptions =
+                  let opts1: Pipeline.ExtractOptions =
                       { ProjectFile = projectFile1
                         VocabularyFile = None
                         AssemblyRefs = dllRefs ()
                         OutputFormat = Pipeline.Text }
 
-                  let opts2 : Pipeline.ExtractOptions =
+                  let opts2: Pipeline.ExtractOptions =
                       { ProjectFile = projectFile2
                         VocabularyFile = None
                         AssemblyRefs = dllRefs ()
@@ -856,12 +869,14 @@ let at8CurieRoundTripTests =
                       // Assert CURIE resolves via Vocabularies binding
                       let colon = curie.IndexOf(':')
                       Expect.isTrue (colon > 0) $"{m.FSharpType}: CURIE '{curie}' must contain ':'"
-                      let prefix = curie.[..colon - 1]
-                      let local = curie.[colon + 1..]
+                      let prefix = curie.[.. colon - 1]
+                      let local = curie.[colon + 1 ..]
 
                       let vocabEntry = Map.tryFind prefix lf.Vocabularies
 
-                      Expect.isSome vocabEntry $"prefix '{prefix}' from CURIE '{curie}' must exist in Vocabularies (no dangling CURIE)"
+                      Expect.isSome
+                          vocabEntry
+                          $"prefix '{prefix}' from CURIE '{curie}' must exist in Vocabularies (no dangling CURIE)"
 
                       let fullIri = vocabEntry.Value.Uri + local
 
@@ -871,7 +886,9 @@ let at8CurieRoundTripTests =
                           $"{m.FSharpType}: {prefix}:{local} must expand to {vocabEntry.Value.Uri}{local}"
 
                   // Specific assertion for schema:Game
-                  let gameMapping = lf.Mappings |> List.tryFind (fun m -> m.FSharpType = "FixtureApp.Game")
+                  let gameMapping =
+                      lf.Mappings |> List.tryFind (fun m -> m.FSharpType = "FixtureApp.Game")
+
                   Expect.isSome gameMapping "must have FixtureApp.Game mapping"
                   Expect.equal gameMapping.Value.Iri (Some "schema:Game") "Game must get schema:Game CURIE"
 
@@ -924,6 +941,7 @@ let at9TwoVocabulariesTests =
                   // Verify each hash matches the served bytes
                   let computeHash (bytes: byte[]) =
                       use sha = SHA256.Create()
+
                       sha.ComputeHash(bytes)
                       |> Array.map (fun b -> b.ToString("x2"))
                       |> String.concat ""
@@ -939,7 +957,9 @@ let at9TwoVocabulariesTests =
                       "foaf Hash must be sha256 of foaf turtle"
 
                   // CURIE resolution: schema:Game → schema.Uri + "Game"
-                  let gameMapping = lf.Mappings |> List.tryFind (fun m -> m.FSharpType = "FixtureApp.Game")
+                  let gameMapping =
+                      lf.Mappings |> List.tryFind (fun m -> m.FSharpType = "FixtureApp.Game")
+
                   Expect.isSome gameMapping "must have FixtureApp.Game mapping"
                   Expect.equal gameMapping.Value.Iri (Some "schema:Game") "Game must get schema:Game CURIE"
 

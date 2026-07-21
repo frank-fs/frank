@@ -17,18 +17,22 @@ open Frank.TestSupport.TempDir
 // mapping emerges Confirmed from the convention engine — no acceptance step
 // needed before the build gate.
 
-let private stubFor (turtle: string) : Fetch =
+let private stubFor (turtle: string) : ConnegFetch =
     let bytes = System.Text.Encoding.UTF8.GetBytes turtle
 
-    fun _ ->
+    fun _uri _etag _lastMod ->
         async {
             return
-                Ok
-                    {| ContentType = Some "text/turtle"
-                       Body = bytes |}
+                RdfContent
+                    {| MediaType = "text/turtle"
+                       Body = bytes
+                       HttpStatus = 200
+                       ETag = None
+                       LastModified = None
+                       CacheControlMaxAge = None |}
         }
 
-let private schemaStub: Fetch =
+let private schemaStub: ConnegFetch =
     stubFor
         """@prefix schema: <https://schema.org/> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -40,7 +44,7 @@ schema:square a rdf:Property .
 schema:agent a rdf:Property .
 """
 
-let private exStub: Fetch =
+let private exStub: ConnegFetch =
     stubFor
         """@prefix ex: <http://example.org/tictactoe#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -114,7 +118,7 @@ let private writeFixtureProject (dir: string) (vocabSrc: string) : string =
 
 /// Run the REAL extract pipeline with an injected stub fetch. Returns the generated lock.
 /// Pipeline.runWithFetch is internal but accessible via InternalsVisibleTo.
-let private extractLock (fetch: Fetch) (projPath: string) : LockFile =
+let private extractLock (fetch: ConnegFetch) (projPath: string) : LockFile =
     Pipeline.runWithFetch
         fetch
         (fun () -> DateTimeOffset.UtcNow)
