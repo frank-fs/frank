@@ -5,11 +5,11 @@ open System.IO
 open System.Text.Json.Nodes
 open Microsoft.AspNetCore.Http
 open VDS.RDF
-open VDS.RDF.Parsing
 open VDS.RDF.Writing
 open Frank
 open Frank.Builder
 open Frank.Discovery
+open Frank.LinkedData
 open Frank.OpenApi
 open TicTacToe.Model
 open TicTacToe.GameStore
@@ -109,6 +109,21 @@ let private findDescriptorHref (id: string) =
 let private agentRelIri = findDescriptorHref "agent"
 let private squareRelIri = findDescriptorHref "cell"
 
+/// The full, un-relativized class IRI DiscoveryEmitter baked for a top-level ALPS
+/// descriptor (AlpsDescriptor.ClassIri — never itself relativized, #397/#398/#411's
+/// correlation-key invariant). `relation`'s CE argument must equal this EXACT value so
+/// DiscoveryMiddleware's relation→ClassIri correlation (rel="type" Link header scoping,
+/// JSON Home grouping) keeps matching. Sourced from Discovery's own generated config —
+/// not from SemanticModelEmitter.SemanticResource.*.Iri, which is now genuinely
+/// host-relative for declared-only prefixes like ex: (#415) and cannot serve as an
+/// always-absolute correlation key.
+let private findDescriptorClassIri (id: string) =
+    TicTacToe.GeneratedDiscovery.discoveryConfig.AlpsDescriptors
+    |> List.tryPick (fun d -> if d.Id = id then d.ClassIri else None)
+    |> Option.defaultWith (fun () -> invalidOp $"ALPS descriptor '{id}' has no ClassIri in discoveryConfig")
+
+let private gameClassIri = findDescriptorClassIri "Game"
+
 let private isLdJson (ctx: HttpContext) =
     let ct = ctx.Request.ContentType
     ct <> null && ct.Contains("application/ld+json")
@@ -191,28 +206,35 @@ let private moveHandler (ctx: HttpContext) =
             do! performMove ctx origin id
     }
 
-let private exVocabTtl =
-    let path = Path.Combine(AppContext.BaseDirectory, "vocab", "ex.ttl")
-    File.ReadAllText(path)
-
-let private loadExVocabGraph (ctx: HttpContext) : IGraph =
-    let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
-    let g = new Graph()
-    g.BaseUri <- Uri origin
-    let parser = TurtleParser()
-    use reader = new StringReader(exVocabTtl)
-    parser.Load(g, reader)
-    g :> IGraph
-
-let private buildExTurtleBody (origin: string) (graph: IGraph) : string =
+/// Turtle serialization shared by every declared-only-vocab route — mirrors the
+/// schema: sample's identical helper (Program.fs). `graph.BaseUri` is already set by
+/// GeneratedLinkedData.graphFor (via Ontology.toGraph's baseUri resolution), so no
+/// hand-rolled "@base <origin>" injection is needed here (#415: that ad hoc mechanism
+/// is deleted, not reimplemented).
+let private buildTurtleBody (graph: IGraph) : string =
     use sw = new System.IO.StringWriter()
     let writer = CompressingTurtleWriter()
     writer.Save(graph, sw :> System.IO.TextWriter)
+    sw.ToString()
 
-    if isNull (box graph.BaseUri) then
-        "@base <" + origin + "> .\n" + sw.ToString()
-    else
-        sw.ToString()
+/// Per-request factory for the app's declared-vocabulary-mapping ontology (every
+/// resource→vocab class/property mapping declared in Vocabulary.Ex.fs), rebased against
+/// the real request origin — the SAME shared mechanism (EmitterShared.declaredOnlyBases +
+/// Ontology.toGraph's baseUri resolution via Frank.UriResolution.resolveAgainst) Discovery
+/// and LinkedData already use elsewhere (#415). Never bakes in a codegen-time placeholder
+/// domain — ex.ttl's hand-authored, hand-rebased duplicate of this same information is
+/// deleted (#415 AC4).
+let private exVocabularyGraphFactory (ctx: HttpContext) : IGraph =
+    let origin = Uri $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+    TicTacToe.GeneratedLinkedData.graphFor origin
+
+/// LinkedDataConfig.JsonLdContext is a fixed string (no per-request factory), so this is
+/// computed once at module load — mirrors the schema: sample's identical pattern.
+/// jsonLdContextFor's baseUri is never used to rebase ContextBases entries (ex: declares
+/// no `using` prefixes, so ContextBases is always empty here) — see Ontology.
+/// toJsonLdContext's own contract.
+let private exVocabularyJsonLdContext =
+    TicTacToe.GeneratedLinkedData.jsonLdContextFor (Uri "http://placeholder.invalid")
 
 let private homeResource =
     resource "/" {
@@ -224,7 +246,7 @@ let private gameResource =
     resource "/games/{id}" {
         name "Game"
         entryPoint
-        relation (TicTacToe.GeneratedSemantics.SemanticResource.Game.Iri.AbsoluteUri)
+        relation gameClassIri
         get gameHandler
 
         // #400 AC2: accepts typeof<MoveRequest> stamps IAcceptsMetadata on this POST —
@@ -244,12 +266,16 @@ let private exVocabResource =
     resource "/ex" {
         name "ExVocabulary"
 
+        linkedDataGraphWith
+            { Graph = Unchecked.defaultof<IGraph>
+              JsonLdContext = exVocabularyJsonLdContext
+              GraphFactory = Some exVocabularyGraphFactory }
+
         get (fun (ctx: HttpContext) ->
             task {
-                let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
-                let graph = loadExVocabGraph ctx
+                let graph = exVocabularyGraphFactory ctx
                 ctx.Response.ContentType <- "text/turtle"
-                do! ctx.Response.WriteAsync(buildExTurtleBody origin graph)
+                do! ctx.Response.WriteAsync(buildTurtleBody graph)
             })
     }
 
@@ -257,6 +283,7 @@ let private exVocabResource =
 let main args =
     webHost args {
         useDiscoveryWith TicTacToe.GeneratedDiscovery.discoveryConfig
+        useLinkedData
         resource homeResource
         resource gameResource
         resource exVocabResource

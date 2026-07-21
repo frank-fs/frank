@@ -8,17 +8,15 @@
     <FrankDiscoveryModuleName>TicTacToe.GeneratedDiscovery</FrankDiscoveryModuleName>
     <!-- Lock file produced by the CLI pipeline (frank semantic accept) -->
     <FrankLockFilePath>$(MSBuildProjectDirectory)/.frank/semantic-mappings.lock.json</FrankLockFilePath>
-    <!-- LinkedData/Validation/Provenance codegen not used in the ex: variant -->
+    <!-- Validation/Provenance codegen not used in the ex: variant -->
     <FrankVocabularyBinding>TicTacToe.VocabularyEx.registry</FrankVocabularyBinding>
     <!-- SemanticModel codegen: module name (vocabulary binding reuses FrankVocabularyBinding) -->
     <FrankSemanticsModuleName>TicTacToe.GeneratedSemantics</FrankSemanticsModuleName>
+    <!-- LinkedData codegen: serves /ex through the SAME shared declaredOnlyBases/hrefFor
+         mechanism as Discovery, replacing the hand-rolled ex.ttl parse + @base injection
+         (#415 AC4) — never a parallel, ad hoc resolution path. -->
+    <FrankLinkedDataModuleName>TicTacToe.GeneratedLinkedData</FrankLinkedDataModuleName>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Content Include="vocab/ex.ttl">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
 
   <ItemGroup>
     <!-- Share domain source files with the schema: sample — no shared project needed -->
@@ -36,9 +34,13 @@
     <!-- #400 AC2: attaches IAcceptsMetadata to the POST /games/{id} move handler so
          Frank.Discovery's live HTTP-method correlation can resolve MoveAction's ALPS
          Type genuinely — Ex's own stated purpose (fsproj comment above) excludes
-         LinkedData/Validation/Provenance CODEGEN breadth, not this framework metadata. -->
+         Validation/Provenance CODEGEN breadth, not this framework metadata. -->
     <ProjectReference Include="../../src/Frank.OpenApi/Frank.OpenApi.fsproj" />
     <ProjectReference Include="../../src/Frank.Semantic/Frank.Semantic.fsproj" />
+    <!-- #415: /ex is served through GeneratedLinkedData.graphFor/jsonLdContextFor — the
+         same shared declaredOnlyBases/hrefFor mechanism Discovery already uses — not a
+         hand-rolled Turtle parse + @base injection. -->
+    <ProjectReference Include="../../src/Frank.LinkedData/Frank.LinkedData.fsproj" />
     <!-- Build-only: provides the MSBuild tasks; not linked as a library at runtime -->
     <ProjectReference Include="../../src/Frank.Cli.MSBuild/Frank.Cli.MSBuild.fsproj"
                       ReferenceOutputAssembly="false"

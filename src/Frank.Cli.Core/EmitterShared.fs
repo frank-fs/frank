@@ -1,6 +1,9 @@
 module Frank.Cli.Core.EmitterShared
 
 open System
+open Fabulous.AST
+open Fantomas.Core.SyntaxOak
+open type Fabulous.AST.Ast
 open Frank.Semantic
 open Frank.Semantic.LockFile
 
@@ -67,3 +70,25 @@ let internal hrefFor (bases: Set<string>) (absoluteUri: string) : string =
     | Some _ ->
         let uri = Uri(absoluteUri)
         uri.PathAndQuery + uri.Fragment
+
+/// Emit a `System.Uri` AST expression for a class/case/property IRI, relativized for
+/// declared-only/owned prefixes (#396/#415) — the ONE place both LinkedDataEmitter and
+/// SemanticModelEmitter build this expression (constitution #8: no duplicated logic).
+/// `href = hrefFor bases u.AbsoluteUri`; when unchanged (external vocab, already absolute)
+/// emits `System.Uri "<href>"`; when relativized emits
+/// `System.Uri ("<href>", System.UriKind.Relative)` — the two-arg form is required because
+/// the single-arg Uri(string) constructor's UriKind.RelativeOrAbsolute inference treats a
+/// leading '/' as a Unix absolute file path on this platform (e.g. "/tictactoe#Game" →
+/// file:///tictactoe%23Game), not a relative Uri — silently defeating rebasing at request
+/// time via Frank.UriResolution.resolveAgainst (#396 round 5).
+let internal uriExprFor (bases: Set<string>) (u: Uri) : WidgetBuilder<Expr> =
+    let href = hrefFor bases u.AbsoluteUri
+
+    if href = u.AbsoluteUri then
+        AstRender.appExpr "System.Uri" (AstRender.strExpr href)
+    else
+        AstRender.appExpr
+            "System.Uri"
+            (AstRender.parenExpr (
+                AstRender.tupleExpr [ AstRender.strExpr href; AstRender.rawExpr "System.UriKind.Relative" ]
+            ))

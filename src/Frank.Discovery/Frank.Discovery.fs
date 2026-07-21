@@ -12,7 +12,10 @@ open Frank.Builder
 type HrefVarsValidator(config: DiscoveryConfig) =
     interface IStartupValidator with
         member _.Validate(ds) =
-            DiscoveryMiddleware.homeResourcesFromEndpoints config.ResourceHrefVars ds
+            DiscoveryMiddleware.homeResourcesFromEndpoints
+                config.ResourceHrefVars
+                (DiscoveryMiddleware.classIriHrefMap config.AlpsDescriptors)
+                ds
             |> JsonHomeSerializer.serialize
             |> ignore
 

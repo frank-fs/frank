@@ -19,6 +19,7 @@
     <Compile Include="Finalize.fs" />
     <Compile Include="AstRender.fs" />
     <Compile Include="EmitterShared.fs" />
+    <!-- EmitterShared depends on AstRender (uriExprFor) — must compile after it. -->
     <Compile Include="DiscoveryEmitter.fs" />
     <Compile Include="LinkedDataEmitter.fs" />
     <Compile Include="ValidationEmitter.fs" />
