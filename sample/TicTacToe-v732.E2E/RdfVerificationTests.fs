@@ -631,6 +631,77 @@ type RdfVerificationTests() =
             )
         }
 
+    // ── AT-417: /vocabulary never asserts a tautological owl:equivalentClass ────
+    //
+    // #417: MoveLog's ClassIri is overridden to schema:ItemList by
+    // ConventionEngine.applyExplicitClass (Vocabulary.fs's `equivalentClass typedefof<MoveLog<_>>
+    // "schema:ItemList"`), then ResolvedModel separately reads the SAME registry.EquivalentClasses
+    // entry into ResolvedResource.EquivalentClass — also schema:ItemList. Prior to the
+    // Ontology.addClass fix this served `schema:ItemList owl:equivalentClass schema:ItemList` live
+    // at /vocabulary (the only served response backed by GeneratedLinkedData.graphFor /
+    // Ontology.toGraph — every declared class, MoveLog included, is one "node" in this graph).
+    // Verified against real parsed graphs in both content types, not string-match.
+    [<Test>]
+    member this.``AT-417 vocabulary never serves a self-referential owl:equivalentClass triple``() =
+        task {
+            use! ctx = this.NewContext()
+
+            let equivalentClassUri = "http://www.w3.org/2002/07/owl#equivalentClass"
+            let itemListUri = "https://schema.org/ItemList"
+
+            let assertNoSelfLoop (g: IGraph) (label: string) =
+                let equivalentClassPred = g.CreateUriNode(UriFactory.Create equivalentClassUri)
+
+                // No triple with this predicate may be self-referential, regardless of subject.
+                let selfLoops =
+                    g.GetTriplesWithPredicate(equivalentClassPred)
+                    |> Seq.filter (fun t -> t.Subject.ToString() = t.Object.ToString())
+                    |> Seq.toList
+
+                Assert.That(
+                    selfLoops,
+                    Is.Empty,
+                    sprintf "%s: found self-referential owl:equivalentClass triple(s): %A" label selfLoops
+                )
+
+                // Exact-value check for the specific #417 tautology (MoveLog/ItemList) —
+                // an absence-only check above could miss a differently-shaped false-green.
+                let itemListSelfLoop =
+                    RdfVerificationTests.TriplesWithPred(g, equivalentClassUri)
+                    |> Seq.exists (fun t ->
+                        match t.Subject, t.Object with
+                        | (:? IUriNode as s), (:? IUriNode as o) ->
+                            s.Uri.AbsoluteUri = itemListUri && o.Uri.AbsoluteUri = itemListUri
+                        | _ -> false)
+
+                Assert.That(
+                    itemListSelfLoop,
+                    Is.False,
+                    sprintf "%s: schema:ItemList owl:equivalentClass schema:ItemList tautology present" label
+                )
+
+            let! turtleResp =
+                ctx.GetAsync("/vocabulary", APIRequestContextOptions(Headers = dict [ "Accept", "text/turtle" ]))
+
+            Assert.That(turtleResp.Status, Is.EqualTo 200, "GET /vocabulary text/turtle not 200")
+            let! turtleBody = turtleResp.TextAsync()
+
+            use turtleGraph = new Graph()
+            TurtleParser().Load(turtleGraph, new StringReader(turtleBody))
+            assertNoSelfLoop (turtleGraph :> IGraph) "text/turtle"
+
+            let! ldJsonResp =
+                ctx.GetAsync(
+                    "/vocabulary",
+                    APIRequestContextOptions(Headers = dict [ "Accept", "application/ld+json" ])
+                )
+
+            Assert.That(ldJsonResp.Status, Is.EqualTo 200, "GET /vocabulary ld+json not 200")
+            let! ldJsonBody = ldJsonResp.TextAsync()
+            use ldJsonGraph = RdfVerificationTests.ParseJsonLd ldJsonBody
+            assertNoSelfLoop ldJsonGraph "application/ld+json"
+        }
+
     // ── AT-R-live: live-network expansion against the real schema.org context ────
     //
     // Opt-in tier (#394). Expands the served body with the DEFAULT real-HTTP JSON-LD

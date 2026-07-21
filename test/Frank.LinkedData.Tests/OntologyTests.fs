@@ -29,6 +29,18 @@ let private enrichedOntology: OntologyDecl =
                   Domain = Uri "https://example.org/Thing" } ] } ]
       ContextBases = [] }
 
+// #417 AC1: a ClassDecl whose EquivalentClass resolves to the SAME IRI as its own Iri — the
+// applyExplicitClass/ResolvedModel collapse (MoveLog's ClassIri overridden to schema:ItemList,
+// then read again as EquivalentClass = schema:ItemList). Asserting owl:equivalentClass here would
+// be `schema:ItemList owl:equivalentClass schema:ItemList` — a tautology, not information.
+let private tautologicalEquivalentClassOntology: OntologyDecl =
+    { Classes =
+        [ { Iri = Uri "https://schema.org/ItemList"
+            EquivalentClass = Some(Uri "https://schema.org/ItemList")
+            SeeAlso = []
+            Properties = [] } ]
+      ContextBases = [] }
+
 // #396 AC2: a relative SeeAlso Uri (never emitted by a correct codegen path, but constructible
 // by hand, e.g. a future misclassification) must fail loud at graph-construction time — BEFORE
 // Ontology.toGraph ever calls the throwing .AbsoluteUri accessor on it — when no baseUri is
@@ -193,6 +205,33 @@ let tests =
               Expect.isNonEmpty
                   (g.GetTriplesWithPredicateObject(equivalentClass, schemaObj) |> Seq.toList)
                   "owl:equivalentClass triple present"
+          }
+          test "toGraph skips owl:equivalentClass when EquivalentClass equals the class Iri (#417 AC1)" {
+              let g = Ontology.toGraph None tautologicalEquivalentClassOntology
+
+              let equivalentClass =
+                  g.CreateUriNode(UriFactory.Create "http://www.w3.org/2002/07/owl#equivalentClass")
+
+              Expect.isEmpty
+                  (g.GetTriplesWithPredicate equivalentClass |> Seq.toList)
+                  "no owl:equivalentClass triple for a self-referential (Iri = EquivalentClass) class"
+          }
+          test "toGraph still emits owl:equivalentClass when Iri and EquivalentClass genuinely differ (#417 AC2)" {
+              let g = Ontology.toGraph None enrichedOntology
+
+              let equivalentClass =
+                  g.CreateUriNode(UriFactory.Create "http://www.w3.org/2002/07/owl#equivalentClass")
+
+              let subj = g.CreateUriNode(UriFactory.Create "https://example.org/Thing")
+              let obj = g.CreateUriNode(UriFactory.Create "https://schema.org/Thing")
+
+              Expect.isNonEmpty
+                  (g.GetTriplesWithSubjectPredicate(subj, equivalentClass) |> Seq.toList)
+                  "owl:equivalentClass triple present for genuinely distinct classes"
+
+              Expect.isNonEmpty
+                  (g.GetTriplesWithPredicateObject(equivalentClass, obj) |> Seq.toList)
+                  "owl:equivalentClass triple's object is the distinct target class"
           }
           test "toGraph emits rdfs:seeAlso for each SeeAlso entry" {
               let g = Ontology.toGraph None enrichedOntology
