@@ -5,7 +5,7 @@ open VDS.RDF
 open Frank.Semantic
 
 let private rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-let private rdfs = "http://www.w3.org/2000/01/rdf-schema#"
+let private rdfs = RdfSerialization.RdfsNamespace
 let private owl = "http://www.w3.org/2002/07/owl#"
 
 /// Resolve `u` to an absolute Uri.
