@@ -53,6 +53,7 @@ let private startRoundTripServer () =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(emptyValidationConfig ()) |> ignore
+    builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
     let app = builder.Build()
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore
     app.UseMiddleware<ValidationMiddleware>() |> ignore

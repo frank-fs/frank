@@ -43,7 +43,7 @@ let private newMiddleware () =
             ctx.Response.StatusCode <- 200
             Task.CompletedTask)
 
-    LinkedDataMiddleware(next, NullLogger<LinkedDataMiddleware>.Instance)
+    LinkedDataMiddleware(next, NullLogger<LinkedDataMiddleware>.Instance, LinkedDataVocabularyConfig.None)
 
 [<Tests>]
 let tests =
