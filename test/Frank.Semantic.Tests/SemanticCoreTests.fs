@@ -197,7 +197,7 @@ let ac10Tests =
               Expect.isOk (verifyIntegrity lf) "lock integrity valid"
 
               // Direct classifier call
-              let states = classifyReferencedVocab lf fixedNow [ "schema" ]
+              let states = classifyReferencedVocab lf fixedNow None [ "schema" ]
               Expect.equal (List.head states) VocabState.Confirmed "classifier: schema is Confirmed"
           }
 
@@ -212,7 +212,7 @@ let ac10Tests =
 
               let lf = withIntegrity lf
 
-              let states = classifyReferencedVocab lf fixedNow [ "ex" ]
+              let states = classifyReferencedVocab lf fixedNow None [ "ex" ]
               Expect.equal (List.head states) VocabState.Undereferenceable "classifier: ex is Undereferenceable"
           }
 
@@ -236,7 +236,7 @@ let ac10Tests =
                     DeclaredPrefixes = Map.empty
                     Mappings = [] }
 
-              let states = classifyReferencedVocab lf fixedNow [ "unknown" ]
+              let states = classifyReferencedVocab lf fixedNow None [ "unknown" ]
               Expect.equal (List.head states) VocabState.Undereferenceable "missing prefix is Undereferenceable"
           }
 
@@ -256,8 +256,67 @@ let ac10Tests =
                     DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/"; "ex", "https://example.org/" ]
                     Mappings = [] }
 
-              let states = classifyReferencedVocab lf fixedNow [ "schema"; "ex" ]
+              let states = classifyReferencedVocab lf fixedNow None [ "schema"; "ex" ]
               Expect.equal states [ VocabState.Confirmed; VocabState.Undereferenceable ] "correct states in order"
+          } ]
+
+// ── #419: LocallyServedUnconfirmed reachability via None-branch ownership check ────
+
+[<Tests>]
+let issue419Tests =
+    testList
+        "#419: classifyReferencedVocabWith None-branch ownership"
+        [ test "AC1: declared-only owned prefix (authority matches appBaseUri), no Vocabularies entry -> LocallyServedUnconfirmed" {
+              let lf: LockFile =
+                  { SchemaVersion = 2
+                    Generated = fixedNow
+                    Integrity = None
+                    Vocabularies = Map.empty
+                    DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ]
+                    Mappings = [] }
+
+              let states =
+                  classifyReferencedVocab lf fixedNow (Some "https://example.org") [ "ttt" ]
+
+              Expect.equal
+                  states
+                  [ VocabState.LocallyServedUnconfirmed ]
+                  "AC1: owned, unfetched, declared prefix must be LocallyServedUnconfirmed, not Undereferenceable"
+          }
+
+          test "AC2: declared-only foreign prefix (Wikidata, authority does NOT match appBaseUri) -> still Undereferenceable" {
+              let lf: LockFile =
+                  { SchemaVersion = 2
+                    Generated = fixedNow
+                    Integrity = None
+                    Vocabularies = Map.empty
+                    DeclaredPrefixes = Map.ofList [ "wd", "https://www.wikidata.org/entity/" ]
+                    Mappings = [] }
+
+              let states =
+                  classifyReferencedVocab lf fixedNow (Some "https://example.org") [ "wd" ]
+
+              Expect.equal
+                  states
+                  [ VocabState.Undereferenceable ]
+                  "AC2: genuinely external, uncached prefix stays Undereferenceable (correct — not yet confirmed)"
+          }
+
+          test "appBaseUri = None preserves prior behavior: owned-looking prefix still Undereferenceable" {
+              let lf: LockFile =
+                  { SchemaVersion = 2
+                    Generated = fixedNow
+                    Integrity = None
+                    Vocabularies = Map.empty
+                    DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ]
+                    Mappings = [] }
+
+              let states = classifyReferencedVocab lf fixedNow None [ "ttt" ]
+
+              Expect.equal
+                  states
+                  [ VocabState.Undereferenceable ]
+                  "No known appBaseUri -> cannot claim ownership -> Undereferenceable (unchanged behavior)"
           } ]
 
 // ── A-C11: integrity tamper detection ─────────────────────────────────────────
@@ -364,7 +423,7 @@ let slaTests =
                     DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/" ]
                     Mappings = [] }
 
-              let states = classifyReferencedVocab lf fixedNow [ "schema" ]
+              let states = classifyReferencedVocab lf fixedNow None [ "schema" ]
               Expect.equal (List.head states) VocabState.Stale "60d > 30d unowned threshold → Stale"
           }
 

@@ -118,13 +118,27 @@ module VocabClassifier =
         else
             Proposed
 
+    /// True iff `prefix` is declared in `lock.DeclaredPrefixes` and its IRI's authority
+    /// matches `appBaseUri` (#419: distinguishes "our own declared-but-unfetched vocab"
+    /// from "genuinely external, just not cached yet"). False when appBaseUri is None or
+    /// the prefix isn't declared — never guesses ownership.
+    let private isOwnedDeclaredPrefix (lock: LockFile) (appBaseUri: string option) (prefix: string) : bool =
+        match appBaseUri, Map.tryFind prefix lock.DeclaredPrefixes with
+        | Some baseUri, Some iri -> isOwnedByAuthority baseUri iri
+        | _ -> false
+
     /// Classify each referenced namespace prefix against a pre-built URI index.
     /// Prefer when byUri is already built at the call site to avoid redundant Map construction.
+    /// `appBaseUri` (#419): when the prefix has no `lock.Vocabularies` entry (never fetched),
+    /// distinguishes an app-owned declared prefix (LocallyServedUnconfirmed) from a genuinely
+    /// external, uncached one (Undereferenceable). None preserves prior behavior (always
+    /// Undereferenceable on miss) for callers with no known authority.
     /// Pure, deterministic, offline-safe. `now` is injected — never reads the system clock.
     let classifyReferencedVocabWith
         (lock: LockFile)
         (byUri: Map<string, VocabularyEntry>)
         (now: DateTimeOffset)
+        (appBaseUri: string option)
         (referencedNs: string list)
         : VocabState list =
         let policy = SlaPolicy.defaultPolicy
@@ -133,7 +147,11 @@ module VocabClassifier =
         |> List.map (fun prefix ->
             match lookupEntry lock byUri prefix with
             | Some entry -> classifyEntry policy prefix entry now
-            | None -> Undereferenceable)
+            | None ->
+                if isOwnedDeclaredPrefix lock appBaseUri prefix then
+                    LocallyServedUnconfirmed
+                else
+                    Undereferenceable)
 
     /// Classify each referenced namespace prefix against the lock using the default SLA policy.
     /// Pure, deterministic, offline-safe. `now` is injected — never reads the system clock.
@@ -144,11 +162,18 @@ module VocabClassifier =
     ///  Identity is always the namespace IRI, never the prefix label — handles the case
     ///  where the same namespace IRI is stored under a different prefix key (e.g. sdo/schema).
     ///
+    /// `appBaseUri` (#419): see classifyReferencedVocabWith — None preserves prior behavior.
+    ///
     /// H2 boundary: classification is NAMESPACE-LEVEL only (does the namespace dereference to
     /// parseable RDF?). Term-level membership (is the referenced term ∈ entry.Terms?) is enforced
     /// by the #378 analyzer which consumes entry.Terms. Do NOT add term-membership checking here.
-    let classifyReferencedVocab (lock: LockFile) (now: DateTimeOffset) (referencedNs: string list) : VocabState list =
-        classifyReferencedVocabWith lock (buildVocabUriIndex lock.Vocabularies) now referencedNs
+    let classifyReferencedVocab
+        (lock: LockFile)
+        (now: DateTimeOffset)
+        (appBaseUri: string option)
+        (referencedNs: string list)
+        : VocabState list =
+        classifyReferencedVocabWith lock (buildVocabUriIndex lock.Vocabularies) now appBaseUri referencedNs
 
     /// Canonical string form of a VocabState, shared across all surfaces (accept, status, JSON).
     let vocabStateToString (state: VocabState) : string =

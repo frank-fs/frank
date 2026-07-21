@@ -103,7 +103,7 @@ let reasoningHomeTests =
           testCase "classifyReferencedVocab is from VocabClassifier in Core"
           <| fun _ ->
               // Accessing this function compiles only if Core is referenced, not just Analyzers SDK
-              let _: LockFile -> DateTimeOffset -> string list -> VocabState list =
+              let _: LockFile -> DateTimeOffset -> string option -> string list -> VocabState list =
                   classifyReferencedVocab
 
               Expect.isTrue true "classifyReferencedVocab is accessible from Core"
@@ -136,7 +136,7 @@ let iriIdentityTests =
                           Vocabularies = Map.ofList [ "schema", entry ]
                           DeclaredPrefixes = Map.ofList [ "sdo", "https://schema.org/" ] }
 
-              let states = classifyReferencedVocab lf fixedNow [ "sdo" ]
+              let states = classifyReferencedVocab lf fixedNow None [ "sdo" ]
               Expect.equal states [ VocabState.Confirmed ] "AT7: sdo → same IRI as schema → Confirmed"
 
           testCase "AT6: foreign authority not in Vocabularies → Undereferenceable (authority-aware)"
@@ -146,12 +146,12 @@ let iriIdentityTests =
                       { emptyLock with
                           DeclaredPrefixes = Map.ofList [ "ext", "https://foreign.org/vocab" ] }
 
-              let states = classifyReferencedVocab lf fixedNow [ "ext" ]
+              let states = classifyReferencedVocab lf fixedNow None [ "ext" ]
               Expect.equal states [ VocabState.Undereferenceable ] "AT6: foreign authority → Undereferenceable"
 
           testCase "prefix not in DeclaredPrefixes → Undereferenceable"
           <| fun _ ->
-              let states = classifyReferencedVocab emptyLock fixedNow [ "orphan" ]
+              let states = classifyReferencedVocab emptyLock fixedNow None [ "orphan" ]
               Expect.equal states [ VocabState.Undereferenceable ] "orphan prefix → Undereferenceable" ]
 
 // ── Phase 3: AstExtractors ───────────────────────────────────────────────────
@@ -236,7 +236,7 @@ let analyzerV2Tests =
         [ testCase "AT-integrity (absent): None lock → no diagnostics"
           <| fun _ ->
               let tree = parseFixture (fixture "VocabNoRoute")
-              let msgs = analyzeWithLock None fixedNow tree
+              let msgs = analyzeWithLock None fixedNow None tree
               Expect.isEmpty msgs "Absent lock → no diagnostics at all"
 
           testCase "AT-integrity (tampered): Error lock → FRANK003 regenerate diagnostic"
@@ -244,7 +244,7 @@ let analyzerV2Tests =
               let tree = parseFixture (fixture "VocabNoRoute")
 
               let msgs =
-                  analyzeWithLock (Some(Error "lock appears hand-edited; regenerate")) fixedNow tree
+                  analyzeWithLock (Some(Error "lock appears hand-edited; regenerate")) fixedNow None tree
 
               let frank003 = filterCode "FRANK003" msgs
               Expect.isGreaterThanOrEqual frank003.Length 1 "Expected FRANK003 for tampered lock"
@@ -258,7 +258,7 @@ let analyzerV2Tests =
           testCase "AT-integrity (tampered): tampered lock is distinct from FRANK002"
           <| fun _ ->
               let tree = parseFixture (fixture "VocabNoRoute")
-              let msgs = analyzeWithLock (Some(Error "tampered")) fixedNow tree
+              let msgs = analyzeWithLock (Some(Error "tampered")) fixedNow None tree
               let codes = msgs |> List.map (fun m -> m.Code) |> Set.ofList
               Expect.isFalse (codes.Contains "FRANK002") "Tampered lock must NOT produce FRANK002"
               Expect.isTrue (codes.Contains "FRANK003") "Tampered lock must produce FRANK003"
@@ -273,7 +273,7 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "ext", "https://foreign.org/vocab" ] }
 
               let tree = parseFixture (fixture "VocabForeignWithLocalRouteAndExtRef")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
               let frank002 = filterCode "FRANK002" msgs
 
               Expect.isGreaterThanOrEqual
@@ -291,7 +291,7 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "ttt", "https://external.org/tictactoe#" ] }
 
               let tree = parseFixture (fixture "VocabWithRouteAndTttRef")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
               let frank002 = filterCode "FRANK002" msgs
               Expect.isGreaterThanOrEqual frank002.Length 1 "AT-authority-fixture: different host → FRANK002 fires"
 
@@ -309,7 +309,7 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "sdo", "https://schema.org/" ] }
 
               let tree = parseFixture (fixture "VocabSdoRef")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
               let frank002 = filterCode "FRANK002" msgs
               Expect.isEmpty frank002 "AT7: sdo references schema.org IRI via IRI-identity → Confirmed → no FRANK002"
 
@@ -323,7 +323,7 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ] }
 
               let tree = parseFixture (fixture "VocabWithRouteAndTttRef")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
               let frank002 = filterCode "FRANK002" msgs
 
               Expect.isGreaterThanOrEqual
@@ -339,7 +339,7 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ] }
 
               let tree = parseFixture (fixture "VocabWithRouteAndTttRef")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
 
               let infoNotes =
                   msgs |> List.filter (fun m -> m.Severity = FSharp.Analyzers.SDK.Severity.Info)
@@ -359,7 +359,7 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/" ] }
 
               let tree = parseFixture (fixture "VocabTermUsage")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
               let stale = filterCode "FRANK004" msgs
               Expect.isGreaterThanOrEqual stale.Length 1 "AT-stale: stale vocab → FRANK004"
 
@@ -382,8 +382,8 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/" ] }
 
               let tree = parseFixture (fixture "VocabTermUsage")
-              let msgs1 = analyzeWithLock (Some(Ok lf)) fixedNow tree
-              let msgs2 = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs1 = analyzeWithLock (Some(Ok lf)) fixedNow None tree
+              let msgs2 = analyzeWithLock (Some(Ok lf)) fixedNow None tree
 
               Expect.equal
                   (msgs1 |> List.map (fun m -> m.Code))
@@ -404,7 +404,7 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/" ] }
 
               let tree = parseFixture (fixture "VocabTermUsage")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
               // schema:Game is referenced but "Game" not in {"Person","Event"}
               let termWarns = filterCode "FRANK006" msgs
               Expect.isGreaterThanOrEqual termWarns.Length 1 "AT-term: schema:Game absent from Terms → FRANK006"
@@ -425,7 +425,7 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/" ] }
 
               let tree = parseFixture (fixture "VocabTermUsage")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
               let termWarns = filterCode "FRANK006" msgs
 
               Expect.isFalse
@@ -444,7 +444,7 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/" ] }
 
               let tree = parseFixture (fixture "VocabTermUsage")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
               let termWarns = filterCode "FRANK006" msgs
               Expect.isEmpty termWarns "AT-term: Terms=None → suppress term check, no FRANK006"
 
@@ -461,7 +461,7 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/" ] }
 
               let tree = parseFixture (fixture "VocabTermUsage")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
               let termWarns = filterCode "FRANK006" msgs
               Expect.isEmpty termWarns "AT-term: Terms=empty → suppress term check, no FRANK006"
 
@@ -478,7 +478,7 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/" ] }
 
               let tree = parseFixture (fixture "VocabTermUsage")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
               let frank002 = filterCode "FRANK002" msgs
               Expect.isEmpty frank002 "Confirmed vocab → no FRANK002 even when prefix is referenced"
 
@@ -498,7 +498,7 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "sdo", "https://schema.org/" ] }
 
               let tree = parseFixture (fixture "VocabSdoRef")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
 
               Expect.isEmpty
                   (filterCode "FRANK006" msgs)
@@ -507,7 +507,7 @@ let analyzerV2Tests =
           testCase "FRANK003 severity is Error (trust failure, not routine warning)"
           <| fun _ ->
               let tree = parseFixture (fixture "VocabNoRoute")
-              let msgs = analyzeWithLock (Some(Error "lock appears hand-edited")) fixedNow tree
+              let msgs = analyzeWithLock (Some(Error "lock appears hand-edited")) fixedNow None tree
               let frank003 = filterCode "FRANK003" msgs
               Expect.isGreaterThanOrEqual frank003.Length 1 "FRANK003 must fire for tampered lock"
 
@@ -527,7 +527,7 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/" ] }
 
               let tree = parseFixture (fixture "VocabTermUsage")
-              let msgs = analyzeWithLockCli (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLockCli (Some(Ok lf)) fixedNow None tree
               Expect.isEmpty (filterCode "FRANK004" msgs) "CLI path must NOT emit FRANK004 for stale vocab"
 
           testCase "FRANK010: Owned-unvalidated vocab with no covering route → Info nudge (not silent)"
@@ -553,7 +553,7 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "sdo", "https://schema.org/" ] }
 
               let tree = parseFixture (fixture "VocabSdoRef")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
               let frank005 = filterCode "FRANK005" msgs
 
               Expect.isGreaterThanOrEqual
@@ -566,6 +566,40 @@ let analyzerV2Tests =
                    |> List.forall (fun m -> m.Severity = FSharp.Analyzers.SDK.Severity.Info))
                   "FRANK010 nudge must be Info severity"
 
+          testCase "#419 AC3: declared-only owned prefix (no Vocabularies entry) -> FRANK005 nudge, not FRANK002 warning"
+          <| fun _ ->
+              // sdo declared, authority matches appBaseUri, but NEVER fetched -> no Vocabularies entry at all.
+              // Prior to #419 this fell into the None branch and was mis-classified Undereferenceable.
+              let lf =
+                  stampedLock
+                      { emptyLock with
+                          Vocabularies = Map.empty
+                          DeclaredPrefixes = Map.ofList [ "sdo", "https://schema.org/" ] }
+
+              // VocabSdoRef references sdo:Game/sdo:Person — no resource route in file.
+              let tree = parseFixture (fixture "VocabSdoRef")
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow (Some "https://schema.org") tree
+
+              Expect.isEmpty
+                  (filterCode "FRANK002" msgs)
+                  "#419 AC3: owned-but-unfetched must NOT produce the harsher FRANK002/makeUndereferenceable warning"
+
+              let frank005 = filterCode "FRANK005" msgs
+
+              Expect.isGreaterThanOrEqual
+                  frank005.Length
+                  1
+                  "#419 AC3: owned-but-unfetched must produce the softer FRANK005/makeOwnershipNudge instead"
+
+              Expect.isTrue
+                  (frank005
+                   |> List.forall (fun m -> m.Severity = FSharp.Analyzers.SDK.Severity.Info))
+                  "#419 AC3: ownership nudge is Info, not Warning"
+
+              Expect.isTrue
+                  (frank005 |> List.exists (fun m -> m.Message.Contains "recorded as owned but not yet confirmed"))
+                  "#419 AC3: message text is the ownership nudge, not the Undereferenceable warning"
+
           testCase "Diagnostic range is not Range.range0 (real file range)"
           <| fun _ ->
               // VocabWithRouteAndTttRef references ttt:Thing and ttt:Move so ttt is in-scope.
@@ -576,7 +610,7 @@ let analyzerV2Tests =
                           DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ] }
 
               let tree = parseFixture (fixture "VocabWithRouteAndTttRef")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
               let frank002 = filterCode "FRANK002" msgs
 
               Expect.isGreaterThanOrEqual
@@ -644,7 +678,7 @@ let scopePinningTests =
                           DeclaredPrefixes = Map.ofList [ "ext", "https://foreign.org/vocab" ] }
 
               let tree = parseFixture (fixture "VocabNoRoute")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
 
               Expect.isEmpty
                   (filterCode "FRANK002" msgs)
@@ -659,7 +693,7 @@ let scopePinningTests =
                           DeclaredPrefixes = Map.ofList [ "ext", "https://foreign.org/vocab" ] }
 
               let tree = parseFixture (fixture "VocabForeignWithLocalRouteAndExtRef")
-              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow None tree
 
               Expect.isGreaterThanOrEqual
                   (filterCode "FRANK002" msgs).Length

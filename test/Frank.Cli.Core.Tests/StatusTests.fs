@@ -44,7 +44,7 @@ let at5StatusTests =
                         mapping "G" Excluded
                         mapping "H" Excluded ]
 
-              let output = Status.format System.DateTimeOffset.UtcNow lf
+              let output = Status.format System.DateTimeOffset.UtcNow None lf
               Expect.stringContains output "Confirmed:  3" "confirmed count"
               Expect.stringContains output "Proposed:   2" "proposed count"
               Expect.stringContains output "Unresolved: 1" "unresolved count"
@@ -53,7 +53,7 @@ let at5StatusTests =
 
           test "empty lock produces all-zero counts" {
               let lf = lockWith []
-              let output = Status.format System.DateTimeOffset.UtcNow lf
+              let output = Status.format System.DateTimeOffset.UtcNow None lf
               Expect.stringContains output "Confirmed:  0" "confirmed zero"
               Expect.stringContains output "Proposed:   0" "proposed zero"
               Expect.stringContains output "Unresolved: 0" "unresolved zero"
@@ -82,7 +82,7 @@ let formatByPackageTests =
                       [ mappingWith "MyApp.Orders.Order" (Some "schema:Order") Confirmed
                         mappingWith "MyApp.Catalog.Product" (Some "schema:Product") Proposed ]
 
-              let output = Status.formatByPackage System.DateTimeOffset.UtcNow lf
+              let output = Status.formatByPackage System.DateTimeOffset.UtcNow None lf
               Expect.stringContains output "MyApp.Orders" "orders block"
               Expect.stringContains output "MyApp.Catalog" "catalog block"
           }
@@ -94,7 +94,7 @@ let formatByPackageTests =
                         mappingWith "MyApp.Orders.LineItem" None Confirmed
                         mappingWith "MyApp.Catalog.Product" None Proposed ]
 
-              let output = Status.formatByPackage System.DateTimeOffset.UtcNow lf
+              let output = Status.formatByPackage System.DateTimeOffset.UtcNow None lf
               Expect.stringContains output "MyApp.Orders" "orders block"
               Expect.stringContains output "MyApp.Catalog" "catalog block"
               Expect.stringContains output "Confirmed:  2" "two confirmed in orders"
@@ -108,14 +108,14 @@ let formatByPackageTests =
                           mappingWith "MyApp.Orders.Result" (Some "schema:result") Confirmed ] with
                       DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/" ] }
 
-              let output = Status.formatByPackage System.DateTimeOffset.UtcNow lf
+              let output = Status.formatByPackage System.DateTimeOffset.UtcNow None lf
               Expect.stringContains output "schema (2)" "two schema terms"
           }
 
           test "AC3 plain format unchanged" {
               let lf = lockWith [ mapping "A" Confirmed; mapping "B" Proposed ]
 
-              let output = Status.format System.DateTimeOffset.UtcNow lf
+              let output = Status.format System.DateTimeOffset.UtcNow None lf
 
               Expect.equal
                   output
@@ -125,13 +125,13 @@ let formatByPackageTests =
 
           test "namespace (global) shown for unqualified types" {
               let lf = lockWith [ mappingWith "Game" None Proposed ]
-              let output = Status.formatByPackage System.DateTimeOffset.UtcNow lf
+              let output = Status.formatByPackage System.DateTimeOffset.UtcNow None lf
               Expect.stringContains output "(global)" "global namespace shown"
           }
 
           test "no vocab line when no IRIs present" {
               let lf = lockWith [ mappingWith "MyApp.Orders.Foo" None Unresolved ]
-              let output = Status.formatByPackage System.DateTimeOffset.UtcNow lf
+              let output = Status.formatByPackage System.DateTimeOffset.UtcNow None lf
               Expect.stringContains output "MyApp.Orders" "namespace shown"
               Expect.isFalse (output.Contains "vocabs:") "no vocabs line when none"
           } ]
@@ -168,7 +168,7 @@ let ac10StatusSurfaceTests =
                       (Map.ofList [ "schema", confirmedEntry ])
                       (Map.ofList [ "schema", "https://schema.org/" ])
 
-              let output = Status.format fixedNow lf
+              let output = Status.format fixedNow None lf
               Expect.stringContains output "  schema: Confirmed" "vocab section shows schema: Confirmed"
           }
 
@@ -188,10 +188,10 @@ let ac10StatusSurfaceTests =
                       (Map.ofList [ "schema", confirmedEntry ])
                       (Map.ofList [ "schema", "https://schema.org/" ])
 
-              let states = classifyReferencedVocab lf fixedNow [ "schema" ]
+              let states = classifyReferencedVocab lf fixedNow None [ "schema" ]
               Expect.equal (List.head states) VocabState.Confirmed "classifier: schema is Confirmed"
 
-              let output = Status.format fixedNow lf
+              let output = Status.format fixedNow None lf
               Expect.stringContains output "  schema: Confirmed" "status surface agrees with classifier: schema: Confirmed"
           }
 
@@ -199,7 +199,49 @@ let ac10StatusSurfaceTests =
               let lf =
                   lockWithVocabs Map.empty (Map.ofList [ "ex", "https://example.org/" ])
 
-              let output = Status.format fixedNow lf
+              let output = Status.format fixedNow None lf
               Expect.stringContains output "ex" "status output mentions ex"
               Expect.stringContains output "Undereferenceable" "status output shows Undereferenceable"
+          } ]
+
+// ── #419 AC4: status distinguishes declared-only owned vs. genuinely-external prefixes ──
+
+[<Tests>]
+let issue419StatusTests =
+    testList
+        "#419 AC4: frank semantic status distinguishes owned-unfetched from external-unfetched"
+        [ test "declared-only, never-fetched, app-owned prefix reports LocallyServedUnconfirmed" {
+              let ownedLock =
+                  lockWithVocabs Map.empty (Map.ofList [ "ttt", "https://example.org/tictactoe#" ])
+
+              let output = Status.format fixedNow (Some "https://example.org") ownedLock
+
+              Expect.stringContains output "  ttt: LocallyServedUnconfirmed" "owned-unfetched prefix reports LocallyServedUnconfirmed"
+          }
+
+          test "declared-only, never-fetched, genuinely external prefix (Wikidata) reports Undereferenceable" {
+              let externalLock =
+                  lockWithVocabs Map.empty (Map.ofList [ "wd", "https://www.wikidata.org/entity/" ])
+
+              let output = Status.format fixedNow (Some "https://example.org") externalLock
+
+              Expect.stringContains output "  wd: Undereferenceable" "external-unfetched prefix reports Undereferenceable"
+          }
+
+          test "owned-unfetched and external-unfetched fixtures produce different message text" {
+              let ownedLock =
+                  lockWithVocabs Map.empty (Map.ofList [ "ttt", "https://example.org/tictactoe#" ])
+
+              let externalLock =
+                  lockWithVocabs Map.empty (Map.ofList [ "wd", "https://www.wikidata.org/entity/" ])
+
+              let ownedOutput = Status.format fixedNow (Some "https://example.org") ownedLock
+              let externalOutput = Status.format fixedNow (Some "https://example.org") externalLock
+
+              Expect.isFalse (ownedOutput.Contains "Undereferenceable") "owned-unfetched must not say Undereferenceable"
+              Expect.isFalse (externalOutput.Contains "LocallyServedUnconfirmed") "external-unfetched must not say LocallyServedUnconfirmed"
+
+              // Undereferenceable additionally gets a Warnings: host-it hint; LocallyServedUnconfirmed does not.
+              Expect.isTrue (externalOutput.Contains "Warnings:") "external-unfetched gets a Warnings section"
+              Expect.isFalse (ownedOutput.Contains "Warnings:") "owned-unfetched does not get a Warnings section"
           } ]

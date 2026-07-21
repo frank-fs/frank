@@ -92,22 +92,22 @@ let pureFnTests =
         "classifyReferencedVocab (replacing checkUndereferenceableVocab)"
         [ testCase "AT1 equiv: ttt not in Vocabularies -> Undereferenceable"
           <| fun _ ->
-              let states = classifyReferencedVocab tttLockUnfetched fixedNow [ "ttt" ]
+              let states = classifyReferencedVocab tttLockUnfetched fixedNow None [ "ttt" ]
               Expect.equal states [ VocabState.Undereferenceable ] "Expected Undereferenceable for unfetched ttt"
 
           testCase "AT3 equiv: ttt in Vocabularies (validated) -> Confirmed"
           <| fun _ ->
-              let states = classifyReferencedVocab tttLockFetched fixedNow [ "ttt" ]
+              let states = classifyReferencedVocab tttLockFetched fixedNow None [ "ttt" ]
               Expect.equal states [ VocabState.Confirmed ] "Expected Confirmed when ttt is fetched and validated"
 
           testCase "AT5 equiv: schema.org in Vocabularies -> Confirmed"
           <| fun _ ->
-              let states = classifyReferencedVocab schemaLockFetched fixedNow [ "schema" ]
+              let states = classifyReferencedVocab schemaLockFetched fixedNow None [ "schema" ]
               Expect.equal states [ VocabState.Confirmed ] "Expected Confirmed for fetched schema.org"
 
           testCase "empty referencedNs -> empty result"
           <| fun _ ->
-              let states = classifyReferencedVocab tttLockUnfetched fixedNow []
+              let states = classifyReferencedVocab tttLockUnfetched fixedNow None []
               Expect.isEmpty states "Empty input -> empty output"
 
           testCase "multiple prefixes produce states in order"
@@ -115,7 +115,7 @@ let pureFnTests =
               let lock =
                   makeLock [ "ttt", tttNsUri; "schema", schemaNsUri ] [ "schema", schemaNsUri ]
 
-              let states = classifyReferencedVocab lock fixedNow [ "ttt"; "schema" ]
+              let states = classifyReferencedVocab lock fixedNow None [ "ttt"; "schema" ]
 
               Expect.equal
                   states
@@ -131,14 +131,14 @@ let private expectFrank002 (fixtureName: string) (lock: LockFile) (description: 
     testCase $"{fixtureName} + lock -> {description}"
     <| fun _ ->
         let tree = parseFixture (fixture fixtureName)
-        let messages = analyzeWithLock (Some(Ok lock)) fixedNow tree
+        let messages = analyzeWithLock (Some(Ok lock)) fixedNow None tree
         Expect.isGreaterThanOrEqual (frank002 messages).Length 1 $"Expected FRANK002 in {fixtureName}"
 
 let private expectNoFrank002 (fixtureName: string) (lock: LockFile) (description: string) =
     testCase $"{fixtureName} + lock -> {description}"
     <| fun _ ->
         let tree = parseFixture (fixture fixtureName)
-        let messages = analyzeWithLock (Some(Ok lock)) fixedNow tree
+        let messages = analyzeWithLock (Some(Ok lock)) fixedNow None tree
         Expect.isEmpty (frank002 messages) $"Expected no FRANK002 in {fixtureName}"
 
 [<Tests>]
@@ -153,7 +153,7 @@ let analyzerTests =
           testCase "AT2 new: route /tictactoe does NOT suppress FRANK002 (hint only)"
           <| fun _ ->
               let tree = parseFixture (fixture "VocabWithRouteAndTttRef")
-              let msgs = analyzeWithLock (Some(Ok tttLockUnfetched)) fixedNow tree
+              let msgs = analyzeWithLock (Some(Ok tttLockUnfetched)) fixedNow None tree
               Expect.isGreaterThanOrEqual (frank002 msgs).Length 1 "Route does not suppress FRANK002 -- route is hint only"
 
           // AT3: ttt in Vocabularies (validated) -> no FRANK002; file references ttt: so suppression is exercised
@@ -166,7 +166,7 @@ let analyzerTests =
           testCase "No lock (None) -> no FRANK002"
           <| fun _ ->
               let tree = parseFixture (fixture "VocabNoRoute")
-              let messages = analyzeWithLock None fixedNow tree
+              let messages = analyzeWithLock None fixedNow None tree
               Expect.isEmpty (frank002 messages) "No lock -> no diagnostics"
 
           // extractRoutes extracts /tictactoe from VocabWithRoute fixture

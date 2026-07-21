@@ -151,12 +151,13 @@ let private vocabDiagnostics
     (lock: LockFile)
     (byUri: Map<string, VocabularyEntry>)
     (now: DateTimeOffset)
+    (appBaseUri: string option)
     (routes: string list)
     (referencedTerms: (string * string) list)
     (range: Range)
     : Message list =
     let prefixKeys = referencedTerms |> List.map fst |> List.distinct
-    let states = classifyReferencedVocabWith lock byUri now prefixKeys
+    let states = classifyReferencedVocabWith lock byUri now appBaseUri prefixKeys
 
     List.zip prefixKeys states
     |> List.collect (fun (prefix, state) ->
@@ -200,10 +201,14 @@ let private termDiagnostics
 ///   Some (Error msg) → tampered/unreadable lock → FRANK003 diagnostic
 ///   Some (Ok lock)   → classify vocabs + terms
 /// `now` is injected; Core never reads the clock.
+/// `appBaseUri` (#419): the app's own authority, when known, so a declared-but-unfetched
+/// owned prefix classifies as LocallyServedUnconfirmed (Info nudge) instead of
+/// Undereferenceable (Warning). None when the caller has no known authority.
 /// For the CLI/CI path use analyzeWithLockCli which suppresses the clock-dependent FRANK004.
 let analyzeWithLock
     (lockResult: Result<LockFile, string> option)
     (now: DateTimeOffset)
+    (appBaseUri: string option)
     (parseTree: ParsedInput)
     : Message list =
     let range = fileStartRange parseTree
@@ -216,7 +221,7 @@ let analyzeWithLock
         let referencedTerms = extractReferencedTerms parseTree
         let byUri = buildVocabUriIndex lock.Vocabularies
 
-        vocabDiagnostics lock byUri now routes referencedTerms range
+        vocabDiagnostics lock byUri now appBaseUri routes referencedTerms range
         @ termDiagnostics lock byUri referencedTerms range
 
 /// CLI/CI variant: same as analyzeWithLock but suppresses FRANK004 (staleness).
@@ -224,9 +229,10 @@ let analyzeWithLock
 let analyzeWithLockCli
     (lockResult: Result<LockFile, string> option)
     (now: DateTimeOffset)
+    (appBaseUri: string option)
     (parseTree: ParsedInput)
     : Message list =
-    analyzeWithLock lockResult now parseTree
+    analyzeWithLock lockResult now appBaseUri parseTree
     |> List.filter (fun m -> m.Code <> StaleCode)
 
 // ── Analyzer registrations ────────────────────────────────────────────────────
@@ -250,7 +256,9 @@ let private runAnalysis (fileName: string) (parseTree: ParsedInput) : Message li
         []
     else
         let lockResult = loadAndVerifyLock dir
-        analyzeWithLock lockResult DateTimeOffset.UtcNow parseTree
+        // No persisted app authority available to the analyzer host (editor/CLI); None
+        // preserves current behavior. See #419 for the pure-classifier fix this depends on.
+        analyzeWithLock lockResult DateTimeOffset.UtcNow None parseTree
 
 let private runAnalysisCli (fileName: string) (parseTree: ParsedInput) : Message list =
     let dir = Path.GetDirectoryName fileName
@@ -258,7 +266,7 @@ let private runAnalysisCli (fileName: string) (parseTree: ParsedInput) : Message
     if String.IsNullOrEmpty dir then
         []
     else
-        analyzeWithLockCli (loadAndVerifyLock dir) DateTimeOffset.UtcNow parseTree
+        analyzeWithLockCli (loadAndVerifyLock dir) DateTimeOffset.UtcNow None parseTree
 
 [<EditorAnalyzer(name, shortDescription, helpUri)>]
 let editorAnalyzer: Analyzer<EditorContext> =

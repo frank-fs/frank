@@ -389,7 +389,7 @@ let vocabWarningTests =
 
           // AT3: status, dedicated Warnings section (stdout)
           test "AT3: status format has dedicated Warnings section for Undereferenceable ttt" {
-              let output = Status.format fixedNow at1Lock
+              let output = Status.format fixedNow None at1Lock
               Expect.stringContains output "Warnings:" "AT3: Warnings: section header present"
               Expect.stringContains output "https://example.org/tictactoe#" "AT3: Warnings section includes resolved IRI"
               Expect.stringContains output "publish" "AT3: Warnings section includes host-it hint"
@@ -420,7 +420,7 @@ let vocabWarningTests =
 
           test "AT5a: LocallyServedUnconfirmed does NOT appear in status Warnings section" {
               let lock = singlePrefixLock "ns" localEntry.Uri localEntry
-              let output = Status.format fixedNow lock
+              let output = Status.format fixedNow None lock
               Expect.isFalse (output.Contains "Warnings:") "AT5a: no Warnings section for LocallyServedUnconfirmed"
           }
 
@@ -436,7 +436,7 @@ let vocabWarningTests =
 
           test "AT5b: Proposed does NOT appear in status Warnings section" {
               let lock = singlePrefixLock "ns" proposedEntry.Uri proposedEntry
-              let output = Status.format fixedNow lock
+              let output = Status.format fixedNow None lock
               Expect.isFalse (output.Contains "Warnings:") "AT5b: no Warnings section for Proposed"
           }
 
@@ -452,7 +452,7 @@ let vocabWarningTests =
 
           test "AT5c: Stale does NOT appear in status Warnings section" {
               let lock = singlePrefixLock "ns" staleEntry.Uri staleEntry
-              let output = Status.format fixedNow lock
+              let output = Status.format fixedNow None lock
               Expect.isFalse (output.Contains "Warnings:") "AT5c: no Warnings section for Stale"
           }
 
@@ -493,7 +493,7 @@ let vocabWarningTests =
                   (Set.ofList [ "under" ])
                   "AT7: accept warns only on Undereferenceable prefix"
 
-              let statusOutput = Status.format fixedNow fiveStateLock
+              let statusOutput = Status.format fixedNow None fiveStateLock
 
               Expect.isTrue (statusOutput.Contains "Warnings:") "AT7: status has Warnings section"
 
@@ -560,7 +560,7 @@ let vocabWarningTests =
                                     Source = Convention
                                     Status = Unresolved } ] } ] }
 
-              let warnings = Status.getWarnings fixedNow lock
+              let warnings = Status.getWarnings fixedNow None lock
               let tttW = warnings |> List.find (fun w -> w.Prefix = "ttt")
               // Position's IRI is under tictactoe-EXTRA, not tictactoe → must NOT attribute to it
               let tttField = tttW.Location |> Option.bind (fun l -> l.Field)
