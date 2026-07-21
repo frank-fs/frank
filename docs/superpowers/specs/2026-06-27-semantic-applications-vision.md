@@ -23,7 +23,7 @@ Each HTTP request that touches a resource produces a PROV-O record (`ProvenanceR
 | `StartedAt` / `EndedAt` | `prov:startedAtTime` / `endedAtTime` | per-action timing |
 | `HttpMethod` / `StatusCode` | `http:methodName` / `statusCodeValue` (W3C) | request shape + result |
 
-Store surface today: `Append`, `QueryByResource`, `QueryByAgent` (async). LinkedData additionally emits, per resource, outbound `rdfs:seeAlso` / `owl:equivalentClass` links from the vocabulary CE (the game already `seeAlso`s `wikidata:Q210339`, tic-tac-toe).
+Store surface today: `Append`, `QueryByResource`, `QueryByAgent` (async). LinkedData additionally emits outbound `rdfs:seeAlso` / `owl:equivalentClass` links from the vocabulary CE onto the CLASS-level ontology document (the game's class already `seeAlso`s `wikidata:Q210339`/`Q573573`/`Q573520`, tic-tac-toe) — reached from an instance via a two-hop path (#420): the instance response never inlines these facts; it carries a `Link: <.../vocabulary>; rel="describedby"` header the client follows to reach them.
 
 ## Target features, each mapped to captured data
 
@@ -50,7 +50,7 @@ Store surface today: `Append`, `QueryByResource`, `QueryByAgent` (async). Linked
 
 ### E. Agent learns the game from semantic relationships (the discovery thesis)
 - **Need:** a lightly-prompted ("dumb") agent, given only the API entry point, discovers what the game is and how to play it well — ideally competitive with, or beating, a hand-prompted opponent.
-- **From captured data:** GET a game → JSON-LD with `@type schema:Game` + `rdfs:seeAlso wikidata:Q210339` (tic-tac-toe). Follow-your-nose: the agent dereferences Wikidata/schema.org to learn the game's identity and rules. Discovery (ALPS/JSON Home) tells it the affordances (legal moves, transitions).
+- **From captured data (two-hop, #420):** GET a game → JSON-LD instance body (`schema:actionStatus`, `ttt:` terms) plus a `Link: <.../vocabulary>; rel="describedby"` header — the instance body itself carries no `seeAlso` (headers-only HATEOAS; class-level facts are never duplicated per-instance). Follow-your-nose: the agent follows that header to `/vocabulary`, where the `Game` class carries `rdfs:seeAlso` → `wikidata:Q210339`/`Q573573`/`Q573520` (tic-tac-toe), then dereferences Wikidata/schema.org from there to learn the game's identity and rules. Discovery (ALPS/JSON Home) tells it the affordances (legal moves, transitions).
 - **To build (for strategy):** add outbound `seeAlso` links in the vocabulary CE to **strategy** descriptions (e.g. Wikipedia "Tic-tac-toe#Strategy", a game-theory/solved-game reference). Tic-tac-toe is a *solved* game — optimal play is fully documented at the other end of those links. A naive agent that follows them can play perfectly; the experiment is whether discovery-only play matches/beats prompted play.
 - **Gap size:** vocabulary additions (more `seeAlso`/`equivalentClass`), not new infrastructure. This is the headline demonstration of the "naive client via links" thesis (AGENT_HYPOTHESIS Track A).
 

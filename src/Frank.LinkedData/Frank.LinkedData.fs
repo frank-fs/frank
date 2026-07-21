@@ -55,7 +55,8 @@ module ResourceLinkedDataExtensions =
                     b.Metadata.Add(
                         { Graph = graph
                           JsonLdContext = jsonLdContext
-                          GraphFactory = None }
+                          GraphFactory = None
+                          VocabularyUri = None }
                         : LinkedDataConfig
                     )
             )

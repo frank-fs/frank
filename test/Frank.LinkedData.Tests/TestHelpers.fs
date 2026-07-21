@@ -26,7 +26,8 @@ let schemaOrgContext = """{"@context":["https://schema.org"]}"""
 let sampleConfig =
     { Graph = buildFixtureGraph ()
       JsonLdContext = schemaOrgContext
-      GraphFactory = None }
+      GraphFactory = None
+      VocabularyUri = None }
 
 /// Build a fixture graph with a ttt:square term using the request origin from HttpContext.
 let buildTttGraphWithOrigin (ctx: HttpContext) : IGraph =
@@ -48,7 +49,8 @@ let buildTttGraphWithOrigin (ctx: HttpContext) : IGraph =
 let sampleConfigWithFactory =
     { Graph = buildFixtureGraph ()
       JsonLdContext = """{"@context":{"ttt":"/tictactoe#"}}"""
-      GraphFactory = Some buildTttGraphWithOrigin }
+      GraphFactory = Some buildTttGraphWithOrigin
+      VocabularyUri = None }
 
 /// Spin a TestServer with LinkedDataMiddleware installed.
 /// UseRouting is called before the middleware so ctx.GetEndpoint() resolves correctly.
@@ -100,7 +102,8 @@ let buildGraphWithNamespacesAndBaseUri (ctx: HttpContext) : IGraph =
 let sampleConfigWithNamespaces =
     { Graph = buildFixtureGraph ()
       JsonLdContext = schemaOrgContext
-      GraphFactory = Some buildGraphWithNamespacesAndBaseUri }
+      GraphFactory = Some buildGraphWithNamespacesAndBaseUri
+      VocabularyUri = None }
 
 /// Build a graph with an external-namespace predicate (schema:, off-origin) and a
 /// local-namespace predicate (ttt:, under origin/base') — #394: the inline @context[0]
@@ -133,7 +136,8 @@ let buildGraphWithExternalAndLocalNamespaces (ctx: HttpContext) : IGraph =
 let sampleConfigWithExternalAndLocalNamespaces =
     { Graph = buildFixtureGraph ()
       JsonLdContext = schemaOrgContext
-      GraphFactory = Some buildGraphWithExternalAndLocalNamespaces }
+      GraphFactory = Some buildGraphWithExternalAndLocalNamespaces
+      VocabularyUri = None }
 
 /// TestServer with a LinkedData-config endpoint (/data) AND a plain endpoint (/plain) without config.
 /// Used for MINOR-3: only LinkedData-owned endpoints should 406 for unsupported RDF Accept.

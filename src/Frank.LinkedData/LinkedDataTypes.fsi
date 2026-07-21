@@ -15,7 +15,14 @@ open VDS.RDF
 ///   Provides access to the request origin AND route values (e.g. path id), enabling
 ///   per-resource instance graphs that host-resolve app-owned term IRIs.
 ///   Graph is ignored when GraphFactory is Some.
+/// VocabularyUri: when Some, LinkedDataMiddleware appends a `Link: <uri>; rel="describedby"`
+///   header to every RDF-negotiated response for this endpoint (#420). Enables the two-hop
+///   discovery path — an instance's own class-level facts (e.g. rdfs:seeAlso/owl:equivalentClass)
+///   live at the referenced vocabulary document, never duplicated into the instance body.
+///   A relative reference (e.g. "/vocabulary") is valid per RFC 8288 and is resolved by the
+///   client against the response's own request URI.
 type LinkedDataConfig =
     { Graph: IGraph
       JsonLdContext: string
-      GraphFactory: (HttpContext -> IGraph) option }
+      GraphFactory: (HttpContext -> IGraph) option
+      VocabularyUri: string option }

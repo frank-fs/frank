@@ -18,7 +18,8 @@ module internal GeneratedLinkedDataResolver =
             Ok
                 { Graph = g
                   JsonLdContext = ctx
-                  GraphFactory = None }
+                  GraphFactory = None
+                  VocabularyUri = None }
         | Error e, _ -> Error e
         | _, Error e -> Error e
 

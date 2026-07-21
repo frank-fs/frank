@@ -355,7 +355,11 @@ let private gameResource =
         linkedDataGraphWith
             { Graph = Unchecked.defaultof<IGraph>
               JsonLdContext = """{"@context":["https://schema.org/version/latest/schemaorg-current-https.jsonld"]}"""
-              GraphFactory = Some gameGraphFactory }
+              GraphFactory = Some gameGraphFactory
+              // #420: Game's class-level facts (rdfs:seeAlso Wikidata IRIs) live at
+              // /vocabulary, never duplicated into this instance body — the naive
+              // client follows this Link header, never a hardcoded path.
+              VocabularyUri = Some "/vocabulary" }
 
         get gameHandler
 
@@ -376,7 +380,8 @@ let private tttVocabResource =
             { Graph = Unchecked.defaultof<IGraph>
               JsonLdContext =
                 """{"@context":["http://www.w3.org/1999/02/22-rdf-syntax-ns#","http://www.w3.org/2000/01/rdf-schema#","http://www.w3.org/2002/07/owl#","https://schema.org/version/latest/schemaorg-current-https.jsonld"]}"""
-              GraphFactory = Some loadTttVocabGraph }
+              GraphFactory = Some loadTttVocabGraph
+              VocabularyUri = None }
 
         get (fun (ctx: HttpContext) ->
             task {
@@ -420,7 +425,8 @@ let private appVocabularyResource =
         linkedDataGraphWith
             { Graph = Unchecked.defaultof<IGraph>
               JsonLdContext = appVocabularyJsonLdContext
-              GraphFactory = Some appVocabularyGraphFactory }
+              GraphFactory = Some appVocabularyGraphFactory
+              VocabularyUri = None }
 
         get (fun (ctx: HttpContext) ->
             task {

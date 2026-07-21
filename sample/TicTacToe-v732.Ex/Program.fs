@@ -269,7 +269,8 @@ let private exVocabResource =
         linkedDataGraphWith
             { Graph = Unchecked.defaultof<IGraph>
               JsonLdContext = exVocabularyJsonLdContext
-              GraphFactory = Some exVocabularyGraphFactory }
+              GraphFactory = Some exVocabularyGraphFactory
+              VocabularyUri = None }
 
         get (fun (ctx: HttpContext) ->
             task {
