@@ -127,7 +127,8 @@ let at1PipelineTests =
                             AssemblyRefs = dllRefs ()
                             OutputFormat = Pipeline.Text }
 
-                  let summary = Expect.wantOk result "pipeline should succeed"
+                  let extractResult = Expect.wantOk result "pipeline should succeed"
+                  let summary = extractResult.Summary
                   Expect.isTrue (summary.Confirmed >= 0) "Confirmed >= 0"
                   Expect.isTrue (summary.Proposed >= 0) "Proposed >= 0"
                   Expect.isTrue (summary.Unresolved >= 0) "Unresolved >= 0"

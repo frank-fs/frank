@@ -189,6 +189,24 @@ let private printSummary (fmt: Pipeline.OutputFormat) (s: Pipeline.ExtractSummar
     | Pipeline.Text -> printfn "Confirmed: %d, Proposed: %d, Unresolved: %d" s.Confirmed s.Proposed s.Unresolved
     | Pipeline.Json -> printfn """{"confirmed":%d,"proposed":%d,"unresolved":%d}""" s.Confirmed s.Proposed s.Unresolved
 
+/// Print a notice for each type whose ClassIri was collapsed onto a declared
+/// equivalentClass target because the type had no independent convention match of
+/// its own (see EquivalentClassNotice / ConventionEngine.applyExplicitClass).
+let private printEquivalentClassNotices (fmt: Pipeline.OutputFormat) (notices: EquivalentClassNotice list) : unit =
+    match fmt with
+    | Pipeline.Text ->
+        for n in notices do
+            printfn
+                "notice: %s has no independent convention match; ClassIri collapsed to explicit equivalentClass target %s"
+                n.FSharpType
+                n.ExplicitIri
+    | Pipeline.Json ->
+        for n in notices do
+            printfn
+                """{"notice":"equivalentClassCollapse","fsharpType":"%s","explicitIri":"%s"}"""
+                n.FSharpType
+                n.ExplicitIri
+
 // ── Command handlers ──────────────────────────────────────────────────────────
 
 let private buildExtractOpts
@@ -224,8 +242,9 @@ let private handleExtract (args: ParseResults<ExtractArgs>) : int =
         | Error e ->
             eprintfn "error: %s" e
             1
-        | Ok summary ->
-            printSummary fmt summary
+        | Ok result ->
+            printSummary fmt result.Summary
+            printEquivalentClassNotices fmt result.EquivalentClassNotices
             0
 
 let private lockPathFrom (lockFile: string option) (project: string option) : Result<string, string> =

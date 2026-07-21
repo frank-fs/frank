@@ -642,6 +642,70 @@ let explicitEquivalentClassTests =
               let fields = MappingShape.payloadFields mapping.Shape
               Expect.isNonEmpty fields "fields convention-scored"
               Expect.equal fields.[0].Name "Position" "field name preserved"
+          }
+
+          test "collapse without independent convention match surfaces an EquivalentClassNotice" {
+              // MoveLog<_> doesn't convention-match "itemlist" (no independent candidate),
+              // so applyExplicitClass fully collapses its ClassIri onto schema:ItemList.
+              // That collapse must be traceable, not silent.
+              let terms: VocabTerms =
+                  { Classes = Map.ofList [ "itemlist", "https://schema.org/ItemList" ]
+                    Properties = Map.empty
+                    Individuals = Map.empty }
+
+              let typeInfo: TypeInfo =
+                  { FullName = "TicTacToe.Model.MoveLog`1"
+                    Namespace = "TicTacToe.Model"
+                    LocalName = "MoveLog"
+                    Shape = TypeShape.Record []
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let registry =
+                  { VocabularyRegistry.empty with
+                      Prefixes = Map.ofList [ "schema", Uri("https://schema.org/") ]
+                      Using = Set.ofList [ "schema" ]
+                      EquivalentClasses =
+                          Map.ofList [ "TicTacToe.Model.MoveLog`1", Uri("https://schema.org/ItemList") ] }
+
+              let mapping, notice = ConventionEngine.scoreDetailed terms registry typeInfo
+
+              Expect.equal mapping.Iri (Some "schema:ItemList") "class IRI still overridden"
+
+              match notice with
+              | None -> failwith "expected an EquivalentClassNotice for a collapse without an independent match"
+              | Some n ->
+                  Expect.equal n.FSharpType "TicTacToe.Model.MoveLog`1" "notice names the collapsed type"
+                  Expect.equal n.ExplicitIri "schema:ItemList" "notice carries the explicit CURIE"
+          }
+
+          test "collapse WITH an independent convention match produces no notice" {
+              // Order convention-matches "order" on its own; the explicit override to a
+              // *different* class still replaces ClassIri (existing behavior, unchanged),
+              // but since Order had its own match, this is not the silent-collapse case.
+              let terms: VocabTerms =
+                  { Classes = Map.ofList [ "order", "https://schema.org/Order" ]
+                    Properties = Map.empty
+                    Individuals = Map.empty }
+
+              let typeInfo: TypeInfo =
+                  { FullName = "MyApp.Order"
+                    Namespace = "MyApp"
+                    LocalName = "Order"
+                    Shape = TypeShape.Record []
+                    Attributes = Map.empty
+                    DocComment = None }
+
+              let registry =
+                  { VocabularyRegistry.empty with
+                      Prefixes = Map.ofList [ "schema", Uri("https://schema.org/") ]
+                      Using = Set.ofList [ "schema" ]
+                      EquivalentClasses = Map.ofList [ "MyApp.Order", Uri("https://schema.org/Product") ] }
+
+              let mapping, notice = ConventionEngine.scoreDetailed terms registry typeInfo
+
+              Expect.equal mapping.Iri (Some "schema:Product") "class IRI still overridden by explicit target"
+              Expect.isNone notice "no notice: type had its own independent convention match"
           } ]
 
 // ── Exact-identity confirm rule ───────────────────────────────────────────────

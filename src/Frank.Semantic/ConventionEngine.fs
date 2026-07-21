@@ -21,6 +21,17 @@ type VocabTermIris =
       PropertyIris: Set<string>
       IndividualIris: Set<string> }
 
+/// Diagnostic emitted when ConventionEngine.applyExplicitClass collapses a type's own
+/// ClassIri onto a declared equivalentClass target because the type had no independent
+/// convention match of its own. Without this notice the collapse is silent: an author who
+/// declared `equivalentClass typeof<Foo> "schema:Bar"` expecting Foo to keep its own class
+/// identity AND gain a genuine owl:equivalentClass link to Bar instead gets neither — Foo's
+/// ClassIri becomes Bar's IRI outright, and the resulting equivalentClass field then
+/// collapses to a no-op (see #425, ResolvedModel.buildResolvedResource).
+type EquivalentClassNotice =
+    { FSharpType: string
+      ExplicitIri: string }
+
 module ConventionEngine =
 
     // ── Jaro distance ─────────────────────────────────────────────────────────
@@ -513,14 +524,17 @@ module ConventionEngine =
 
     /// If registry.EquivalentClasses contains an entry for typeInfo.FullName,
     /// override the class IRI to the explicit one, keeping convention-scored fields.
+    /// Also returns an EquivalentClassNotice when the override collapses a type that had
+    /// no independent convention match of its own (convention.Iri = None) — the case where
+    /// the author's "distinct-but-equivalent" intent silently degrades into identity collapse.
     let private applyExplicitClass
         (registry: VocabularyRegistry)
         (typeInfo: TypeInfo)
         (terms: VocabTerms)
         (convention: Mapping)
-        : Mapping =
+        : Mapping * EquivalentClassNotice option =
         match Map.tryFind typeInfo.FullName registry.EquivalentClasses with
-        | None -> convention
+        | None -> convention, None
         | Some explicitUri ->
             let curie = toCurie registry.Prefixes explicitUri
 
@@ -532,12 +546,21 @@ module ConventionEngine =
                 else
                     MappingShape.payloadFields convention.Shape
 
+            let notice =
+                if convention.Iri.IsNone then
+                    Some
+                        { FSharpType = typeInfo.FullName
+                          ExplicitIri = curie }
+                else
+                    None
+
             { convention with
                 Iri = Some curie
                 Confidence = 1.0
                 Source = Manual
                 Status = Confirmed
-                Shape = MappingShape.Record fieldMappings }
+                Shape = MappingShape.Record fieldMappings },
+            notice
 
     // ── Union fallback ────────────────────────────────────────────────────────
 
@@ -565,9 +588,15 @@ module ConventionEngine =
           Rt = None
           Shape = MappingShape.Record [] }
 
-    /// Score a TypeInfo against in-scope vocabulary terms and emit a candidate Mapping.
+    /// Score a TypeInfo against in-scope vocabulary terms and emit a candidate Mapping,
+    /// plus an EquivalentClassNotice when applyExplicitClass silently collapsed the type's
+    /// ClassIri onto a declared equivalentClass target (see EquivalentClassNotice).
     /// Pure: takes pre-extracted VocabTerms and VocabularyRegistry as data — no I/O.
-    let score (terms: VocabTerms) (registry: VocabularyRegistry) (typeInfo: TypeInfo) : Mapping =
+    let scoreDetailed
+        (terms: VocabTerms)
+        (registry: VocabularyRegistry)
+        (typeInfo: TypeInfo)
+        : Mapping * EquivalentClassNotice option =
         let inScopeClasses =
             terms.Classes |> Map.filter (fun _ iri -> isInScope registry iri)
 
@@ -619,3 +648,8 @@ module ConventionEngine =
                       Shape = shape }
 
         applyExplicitClass registry typeInfo terms conventionResult
+
+    /// Score a TypeInfo against in-scope vocabulary terms and emit a candidate Mapping.
+    /// Thin wrapper over scoreDetailed for callers that don't need the notice channel.
+    let score (terms: VocabTerms) (registry: VocabularyRegistry) (typeInfo: TypeInfo) : Mapping =
+        scoreDetailed terms registry typeInfo |> fst

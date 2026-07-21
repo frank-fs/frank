@@ -20,6 +20,17 @@ type VocabTermIris =
       PropertyIris: Set<string>
       IndividualIris: Set<string> }
 
+/// Diagnostic emitted when ConventionEngine.applyExplicitClass collapses a type's own
+/// ClassIri onto a declared equivalentClass target because the type had no independent
+/// convention match of its own. Without this notice the collapse is silent: an author who
+/// declared `equivalentClass typeof<Foo> "schema:Bar"` expecting Foo to keep its own class
+/// identity AND gain a genuine owl:equivalentClass link to Bar instead gets neither — Foo's
+/// ClassIri becomes Bar's IRI outright, and the resulting equivalentClass field then
+/// collapses to a no-op (see #425, ResolvedModel.buildResolvedResource).
+type EquivalentClassNotice =
+    { FSharpType: string
+      ExplicitIri: string }
+
 module ConventionEngine =
 
     /// Jaro-Winkler similarity between two strings. Result in [0.0, 1.0].
@@ -49,6 +60,17 @@ module ConventionEngine =
     /// the local name "identifier". Term-existence identity is the absolute IRI.
     val extractTermIris: graph: IGraph -> VocabTermIris
 
+    /// Score a TypeInfo against in-scope vocabulary terms and emit a candidate Mapping,
+    /// plus an EquivalentClassNotice when applyExplicitClass silently collapsed the type's
+    /// ClassIri onto a declared equivalentClass target (see EquivalentClassNotice).
+    /// Pure: takes pre-extracted VocabTerms and VocabularyRegistry as data — no I/O.
+    val scoreDetailed:
+        terms: VocabTerms ->
+        registry: VocabularyRegistry ->
+        typeInfo: TypeInfo ->
+            Mapping * EquivalentClassNotice option
+
     /// Score a TypeInfo against in-scope vocabulary terms and emit a candidate Mapping.
+    /// Thin wrapper over scoreDetailed for callers that don't need the notice channel.
     /// Pure: takes pre-extracted VocabTerms and VocabularyRegistry as data — no I/O.
     val score: terms: VocabTerms -> registry: VocabularyRegistry -> typeInfo: TypeInfo -> Mapping
