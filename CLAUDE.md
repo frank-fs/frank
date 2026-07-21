@@ -8,8 +8,11 @@ F# web framework proving that HATEOAS, statecharts, and semantic discovery compo
 # Build (DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 required on nix-darwin due to ICU mismatch)
 DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet build Frank.sln
 
-# Test (excludes sample apps)
-DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet test Frank.sln --filter "FullyQualifiedName!~Sample"
+# Test (excludes sample apps; -m:1 is required — without it, dotnet test's own
+# solution-wide MSBuild parallelism races Frank.Cli.MSBuild.Tests's subprocess
+# `dotnet build` calls for worker capacity and can push them past their
+# timeout caps, see #406)
+DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet test Frank.sln --filter "FullyQualifiedName!~Sample" -m:1
 
 # Frank.Tests is NOT in Frank.sln — test separately
 DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 dotnet test test/Frank.Tests/
