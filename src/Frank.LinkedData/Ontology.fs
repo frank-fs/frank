@@ -74,7 +74,12 @@ let private addClass (g: IGraph) (baseUri: Uri option) (c: ClassDecl) : unit =
         let eAbs =
             resolveAbsolute baseUri "equivalentClass" "owl:equivalentClass" (Some c.Iri) e
 
-        Triples.assert3 g subj (Triples.qnameNode g "owl:equivalentClass") (Triples.uriNode g eAbs.AbsoluteUri)
+        // #417: EquivalentClass resolving to the same IRI as the class's own Iri is a
+        // tautology (`X owl:equivalentClass X`), not an assertion — e.g. when
+        // ConventionEngine.applyExplicitClass has already overridden ClassIri to the
+        // explicit equivalentClass target, nothing distinct is left to assert.
+        if eAbs.AbsoluteUri <> classAbs.AbsoluteUri then
+            Triples.assert3 g subj (Triples.qnameNode g "owl:equivalentClass") (Triples.uriNode g eAbs.AbsoluteUri)
     | None -> ()
 
     for s in c.SeeAlso do
