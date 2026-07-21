@@ -1,11 +1,11 @@
 {
   "schemaVersion": 2,
-  "generated": "2026-06-29T03:18:44+00:00",
-  "integrity": "6ee1785017ff02597a13ec67dfab405bd5280b9a29f377af5b5b4580b2c62e9c",
+  "generated": "2026-07-21T01:40:54+00:00",
+  "integrity": "6c887460ae54fed8462e71b1169ae24e39a9fd2d184a6522a62c95e9ad749e90",
   "vocabularies": {},
   "declaredPrefixes": {
-    "ex": "https://example.org/ex#",
-    "ttt": "https://example.org/tictactoe#"
+    "ex": "https://tictactoe.invalid/ex#",
+    "ttt": "https://tictactoe.invalid/tictactoe#"
   },
   "mappings": [
     {

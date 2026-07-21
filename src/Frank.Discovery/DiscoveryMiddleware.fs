@@ -48,6 +48,18 @@ let private acceptedRequestTypeOf (re: RouteEndpoint) : string option =
         | null -> None
         | t -> Some(Frank.ClrTypeName.normalizeFullName t.FullName)
 
+/// Top-level class descriptors' ClassIri → Href, e.g. "https://tictactoe.invalid/ex#Game"
+/// → "/ex#Game" — DiscoveryEmitter already computed this host-relative-for-declared-only
+/// href (EmitterShared.hrefFor) once at codegen time. Only descriptors carrying BOTH a
+/// ClassIri and an Href contribute (field/case children never carry ClassIri).
+let internal classIriHrefMap (descriptors: AlpsDescriptor list) : Map<string, string> =
+    descriptors
+    |> List.choose (fun d ->
+        match d.ClassIri, d.Href with
+        | Some c, Some h -> Some(c, h)
+        | _ -> None)
+    |> Map.ofList
+
 /// Build JSON Home resource entries from live endpoints.
 /// Endpoints carrying ResourceRelationMetadata contribute to one merged entry per
 /// (Relation, Href) pair — a resource with both GET and POST produces a single entry
@@ -56,8 +68,17 @@ let private acceptedRequestTypeOf (re: RouteEndpoint) : string option =
 /// Returns a list that may contain multiple entries with the same Relation when two
 /// distinct hrefs share a relation IRI; caller is responsible for deduplication.
 /// resourceHrefVars maps each relation IRI to its template-variable meaning IRIs.
+/// classIriToHref (#415) resolves the SERVED resource key: a relation whose class is a
+/// declared-only/owned prefix (EmitterShared.declaredOnlyBases, #396) is served as its
+/// own AlpsDescriptor's host-relative Href — never the un-relativized identity key
+/// (which stays the correlation-key contract's absolute form, unchanged, #397/#398/#411)
+/// — so a placeholder domain nobody serves never leaks onto the wire as a JSON Home
+/// resource key. A relation with no matching descriptor (e.g. a route whose class was
+/// never itself emitted as a top-level ALPS descriptor) falls back to the raw relation,
+/// preserving prior behavior.
 let homeResourcesFromEndpoints
     (resourceHrefVars: Map<string, Map<string, string>>)
+    (classIriToHref: Map<string, string>)
     (dataSource: EndpointDataSource)
     : JsonHomeResource list =
     let addHead (methods: string list) =
@@ -91,7 +112,10 @@ let homeResourcesFromEndpoints
         let varMeanings =
             resourceHrefVars |> Map.tryFind relation |> Option.defaultValue Map.empty
 
-        { Relation = relation
+        let servedRelation =
+            classIriToHref |> Map.tryFind relation |> Option.defaultValue relation
+
+        { Relation = servedRelation
           Href = href
           Allow = allMethods
           HrefVars = varMeanings })
@@ -301,7 +325,11 @@ type DiscoveryMiddleware
     // a configuration error; first-registered href wins with a LogWarning.
     // Computed once via Lazy<_> (F3: endpoint set is fixed after startup).
     let buildHomeResources () =
-        let all = homeResourcesFromEndpoints config.ResourceHrefVars endpointDataSource
+        let all =
+            homeResourcesFromEndpoints
+                config.ResourceHrefVars
+                (classIriHrefMap config.AlpsDescriptors)
+                endpointDataSource
 
         all
         |> List.groupBy (fun r -> r.Relation)

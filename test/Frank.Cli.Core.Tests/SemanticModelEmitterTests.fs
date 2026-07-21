@@ -688,3 +688,84 @@ let openClashTests =
               Expect.stringContains src "member this.Iri" "Iri emitted as member"
               Expect.stringContains src "member this.ClrType" "ClrType emitted as member"
           } ]
+
+// ── #415: declared-only (owned) prefix emits host-relative Iri ─────────────────
+// A prefix present only in DeclaredPrefixes (never fetched into Vocabularies) whose
+// own resources' ClassIri/case Iri authority matches it (EmitterShared.declaredOnlyBases,
+// #396) must be emitted host-relative — never a fixed placeholder domain baked as
+// literal absolute (#415: SemanticModelEmitter was the one emitter never migrated to
+// this rule). Mirrors LinkedDataEmitterTests' ownedPrefixHostRelativeTests fixture shape.
+
+let private exDeclaredOnlyLock: LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Integrity = None
+      Vocabularies = Map.empty
+      DeclaredPrefixes = Map.ofList [ "ex", "https://example.org/ex#" ]
+      Mappings =
+        [ { FSharpType = "Probe.Move"
+            Iri = Some "ex:Move"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Rt = None
+            Shape =
+              MappingShape.Union
+                  [ { Name = "XMove"
+                      Iri = Some "ex:XMove"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed
+                      Payload = [] }
+                    { Name = "OMove"
+                      Iri = Some "ex:OMove"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed
+                      Payload = [] } ] } ] }
+
+[<Tests>]
+let declaredOnlyPrefixHostRelativeTests =
+    testList
+        "SemanticModelEmitter — #415 declared-only (owned) prefix emits host-relative Iri"
+        [ test "ex: class Iri is host-relative (never bakes in example.org)" {
+              let src =
+                  Expect.wantOk
+                      (SemanticModelEmitter.emit "Probe.Generated" VocabularyRegistry.empty exDeclaredOnlyLock)
+                      "emit"
+
+              Expect.stringContains
+                  src
+                  "System.Uri (\"/ex#Move\", System.UriKind.Relative)"
+                  "ex:Move must be the host-relative System.Uri literal"
+
+              Expect.isFalse (src.Contains "example.org") "example.org never appears in generated source"
+          }
+
+          test "ex: case Iri is host-relative (never bakes in example.org)" {
+              let src =
+                  Expect.wantOk
+                      (SemanticModelEmitter.emit "Probe.Generated" VocabularyRegistry.empty exDeclaredOnlyLock)
+                      "emit"
+
+              Expect.stringContains
+                  src
+                  "Some (System.Uri (\"/ex#XMove\", System.UriKind.Relative))"
+                  "ex:XMove case arm must be the host-relative System.Uri literal"
+
+              Expect.stringContains
+                  src
+                  "Some (System.Uri (\"/ex#OMove\", System.UriKind.Relative))"
+                  "ex:OMove case arm must be the host-relative System.Uri literal"
+          }
+
+          test "schema.org terms in external vocab lock stay absolute (unchanged, #415 no regression)" {
+              let src =
+                  unwrapOk (SemanticModelEmitter.emit "Probe.Generated" probeRegistry probeLock)
+
+              Expect.stringContains
+                  src
+                  "| Game -> System.Uri \"https://schema.org/Game\""
+                  "schema:Game stays absolute — DeclaredPrefixes empty in this fixture"
+          } ]

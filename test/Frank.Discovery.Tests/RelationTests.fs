@@ -132,6 +132,63 @@ let runtimeJsonHomeTests =
               Expect.stringContains body "https://schema.org/Game" "Game IRI present"
               Expect.stringContains body "https://schema.org/WebPage" "WebPage IRI present" ]
 
+// ── #415: JSON Home resource key relativized for declared-only prefixes ────────
+// ResourceRelationMetadata.Relation stays the full, un-relativized class IRI (the
+// correlation key matched against AlpsDescriptor.ClassIri — #397/#398/#411's
+// invariant, never itself relativized). But when SERVED as a JSON Home resource key
+// (JsonHomeSerializer.WritePropertyName), a declared-only/owned prefix's identity must
+// not leak a placeholder domain nobody serves (#415 thesis) — the SAME host-relative
+// href DiscoveryEmitter already computed for that class's own AlpsDescriptor.Href is
+// used instead, mirroring how `href`/`href-template` are already served host-relative.
+
+let private declaredOnlyConfig: DiscoveryConfig =
+    { ProfileUri = "/alps/test"
+      HomeRoute = "/"
+      AlpsDescriptors =
+        [ { Id = "Game"
+            Type = "semantic"
+            Doc = None
+            Href = Some "/ex#Game"
+            Descriptors = []
+            Rt = None
+            ClassIri = Some "https://tictactoe.invalid/ex#Game"
+            RequestClrTypeName = None } ]
+      DescribedByLinks = []
+      ResourceHrefVars = Map.ofList [ "https://tictactoe.invalid/ex#Game", Map.ofList [ "id", "/ex#identifier" ] ] }
+
+let private startDeclaredOnlyRelationServer () =
+    let gameResource =
+        resource "/games/{id}" {
+            relation "https://tictactoe.invalid/ex#Game"
+            get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("game")))
+        }
+
+    let app = buildDiscoveryApp None declaredOnlyConfig gameResource.Endpoints
+    app.StartAsync().GetAwaiter().GetResult()
+    app
+
+[<Tests>]
+let declaredOnlyJsonHomeKeyTests =
+    testList
+        "runtime JSON Home — #415 declared-only relation resolved to its own AlpsDescriptor.Href"
+        [ testCase "resource key is the host-relative href, not the un-relativized placeholder domain"
+          <| fun _ ->
+              use app = startDeclaredOnlyRelationServer ()
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/")
+              req.Headers.Add("Accept", "application/json-home")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "200 OK"
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              use doc = JsonDocument.Parse body
+              let resources = doc.RootElement.GetProperty("resources")
+              let keys = resources.EnumerateObject() |> Seq.map (fun p -> p.Name) |> Seq.toList
+              Expect.contains keys "/ex#Game" "resource key is the host-relative href"
+
+              Expect.isFalse
+                  (keys |> List.exists (fun k -> k.Contains "tictactoe.invalid"))
+                  "the un-relativized placeholder-domain identity key never appears as a served resource key" ]
+
 [<Tests>]
 let jsonHomeFromSampleConfigTests =
     testList

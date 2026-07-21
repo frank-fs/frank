@@ -45,38 +45,23 @@ let internal projectOntology (model: ResolvedModel) : OntologyDecl =
 
 // ── AstRender helpers ────────────────────────────────────────────────────────
 
-/// Emit a System.Uri expression. `bases` are the app's own declared-only prefix base URIs
-/// (EmitterShared.declaredOnlyBases) — a Uri whose authority matches one is rendered
-/// host-relative (path+fragment only, e.g. "/tictactoe#square"), deferring resolution to a
-/// real deployed origin supplied at call time via Ontology.toGraph/toJsonLdContext's baseUri
-/// parameter (#396 round 5). Every other Uri (genuinely external vocab — schema.org, Wikidata)
-/// is rendered absolute, unchanged (#396 round 4).
-/// The relative form must pass System.UriKind.Relative explicitly: the single-arg Uri(string)
-/// constructor's UriKind.RelativeOrAbsolute inference treats a leading '/' as a Unix absolute
-/// file path on this platform (e.g. "/tictactoe#Game" → file:///tictactoe%23Game), not a
-/// relative Uri — silently defeating the rebasing step in Ontology.toGraph/toJsonLdContext.
-let private uriExprFor (bases: Set<string>) (u: Uri) =
-    let href = EmitterShared.hrefFor bases u.AbsoluteUri
-
-    if href = u.AbsoluteUri then
-        AstRender.appExpr "System.Uri" (AstRender.strExpr href)
-    else
-        AstRender.appExpr
-            "System.Uri"
-            (AstRender.parenExpr (
-                AstRender.tupleExpr [ AstRender.strExpr href; AstRender.rawExpr "System.UriKind.Relative" ]
-            ))
-
-let private uriField (bases: Set<string>) (name: string) (u: Uri) = name, uriExprFor bases u
+/// `bases` are the app's own declared-only prefix base URIs (EmitterShared.declaredOnlyBases)
+/// — a Uri whose authority matches one is rendered host-relative (path+fragment only, e.g.
+/// "/tictactoe#square"), deferring resolution to a real deployed origin supplied at call time
+/// via Ontology.toGraph/toJsonLdContext's baseUri parameter (#396 round 5). Every other Uri
+/// (genuinely external vocab — schema.org, Wikidata) is rendered absolute, unchanged (#396
+/// round 4). Uri-expression rendering itself is EmitterShared.uriExprFor — the ONE place both
+/// this module and SemanticModelEmitter build it (#415, constitution #8).
+let private uriField (bases: Set<string>) (name: string) (u: Uri) = name, EmitterShared.uriExprFor bases u
 
 let private renderUriOpt (bases: Set<string>) (u: Uri) =
-    AstRender.parenExpr (uriExprFor bases u)
+    AstRender.parenExpr (EmitterShared.uriExprFor bases u)
 
 let private optUriField (bases: Set<string>) (name: string) (u: Uri option) =
     name, AstRender.optionExpr (renderUriOpt bases) u
 
 let private uriListField (bases: Set<string>) (name: string) (us: Uri list) =
-    name, AstRender.listExpr (us |> List.map (uriExprFor bases))
+    name, AstRender.listExpr (us |> List.map (EmitterShared.uriExprFor bases))
 
 let private propExpr (bases: Set<string>) (p: PropertyDecl) =
     AstRender.recordExpr [ uriField bases "Iri" p.Iri; uriField bases "Domain" p.Domain ]
