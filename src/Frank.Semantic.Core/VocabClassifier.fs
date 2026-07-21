@@ -70,6 +70,12 @@ module VocabClassifier =
         | Some a, Some b -> a = b
         | _ -> false
 
+    /// True iff uriStr's normalized authority is a member of a precomputed authority set.
+    /// Shared primitive for callers that test many candidate URIs against a fixed owned-authority
+    /// set (VocabClassifier.isOwnedDeclaredPrefix, EmitterShared.declaredOnlyBases).
+    let authorityInSet (authorities: Set<string>) (uriStr: string) : bool =
+        normalizeAuthority uriStr |> Option.exists (fun a -> Set.contains a authorities)
+
     // ── Staleness ─────────────────────────────────────────────────────────────
 
     /// True iff the entry's age (since FetchedAt) exceeds the policy threshold.
@@ -186,10 +192,7 @@ module VocabClassifier =
     let private isOwnedDeclaredPrefix (ownAuthorities: Set<string>) (lock: LockFile) (prefix: string) : bool =
         match Map.tryFind prefix lock.DeclaredPrefixes with
         | None -> false
-        | Some iri ->
-            match normalizeAuthority iri with
-            | None -> false
-            | Some authority -> Set.contains authority ownAuthorities
+        | Some iri -> authorityInSet ownAuthorities iri
 
     /// Classify each referenced namespace prefix against a pre-built URI index.
     /// Prefer when byUri is already built at the call site to avoid redundant Map construction.

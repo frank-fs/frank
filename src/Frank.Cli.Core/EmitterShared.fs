@@ -53,11 +53,7 @@ let internal declaredOnlyBases (lock: LockFile) (model: ResolvedModel) : Set<str
         |> List.choose (fun u -> VocabClassifier.normalizeAuthority u.AbsoluteUri)
         |> Set.ofList
 
-    candidates
-    |> Set.filter (fun candidateBase ->
-        match VocabClassifier.normalizeAuthority candidateBase with
-        | Some authority -> Set.contains authority identityAuthorities
-        | None -> false)
+    candidates |> Set.filter (VocabClassifier.authorityInSet identityAuthorities)
 
 /// For a declared-only IRI, extract the host-relative path+fragment.
 /// For external vocab IRIs, return the absolute URI unchanged.

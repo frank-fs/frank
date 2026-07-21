@@ -64,6 +64,13 @@ module VocabFetcher =
     /// that wants the same on-disk cache without re-deriving the lookup.
     val loadCachedVocab: cacheDir: string -> name: string -> Result<CachedVocab, string> option
 
+    /// Parse `bytes` as `format`, write to cacheDir under `name`, and wrap as CachedVocab.
+    /// Shared write-and-wrap step for any fetch boundary (plain HTTP or content-negotiated)
+    /// that has already obtained a successful response body — the counterpart to
+    /// loadCachedVocab's shared read step.
+    val parseAndCacheBytes:
+        cacheDir: string -> name: string -> format: VocabFormat -> bytes: byte[] -> Result<CachedVocab, string>
+
     /// Fetch a vocabulary URI, parse it, and write it to cacheDir.
     /// Returns CachedVocab on success.
     /// Cache hit (file matching <name>.*) returns cached result without invoking fetch.

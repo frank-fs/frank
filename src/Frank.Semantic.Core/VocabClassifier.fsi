@@ -44,6 +44,11 @@ module VocabClassifier =
     /// this function derives the fact from URIs.
     val isOwnedByAuthority: appBaseUri: string -> vocabUri: string -> bool
 
+    /// True iff uriStr's normalized authority is a member of a precomputed authority set.
+    /// Shared primitive for callers that test many candidate URIs against a fixed owned-authority
+    /// set (see Frank.Cli.Core.EmitterShared.declaredOnlyBases).
+    val authorityInSet: authorities: Set<string> -> uriStr: string -> bool
+
     /// True iff the entry's age (since FetchedAt) exceeds the policy threshold.
     /// A future-stamped FetchedAt (now < FetchedAt) yields negative elapsed days and is treated as not-stale;
     /// staleness only ever flags entries older than the SLA.

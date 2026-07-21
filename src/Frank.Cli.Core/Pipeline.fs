@@ -145,26 +145,7 @@ let private fetchAndCacheConneg
             match result with
             | RdfContent r ->
                 let format = VocabFetcher.detectFormat (Some r.MediaType) uri
-
-                match VocabFetcher.parseGraph format r.Body with
-                | Error e -> return Error $"RDF parse failed: {e}"
-                | Ok graph ->
-                    let hash = VocabFetcher.sha256Hex r.Body
-                    let fileName = VocabFetcher.cacheFileName name hash format
-                    let filePath = Path.Combine(cacheDir, fileName)
-
-                    try
-                        File.WriteAllBytes(filePath, r.Body)
-
-                        let cached: VocabFetcher.CachedVocab =
-                            { Hash = hash
-                              Format = format
-                              CacheFilePath = filePath
-                              Graph = graph }
-
-                        return Ok cached
-                    with ex ->
-                        return Error $"could not write cache file: {ex.Message}"
+                return VocabFetcher.parseAndCacheBytes cacheDir name format r.Body
             | _ ->
                 match RdfConneg.buildEvidence uri (clock ()) result with
                 | UnverifiableNonRdf reason -> return Error $"unverifiable-non-rdf: {reason}"

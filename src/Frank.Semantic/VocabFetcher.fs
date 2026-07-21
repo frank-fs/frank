@@ -199,6 +199,34 @@ module VocabFetcher =
                               Graph = graph }
                     )
 
+    /// Parse `bytes` as `format`, write to cacheDir under `name`, and wrap as CachedVocab.
+    /// Shared write-and-wrap step for any fetch boundary (plain HTTP or content-negotiated)
+    /// that has already obtained a successful response body — the counterpart to
+    /// loadCachedVocab's shared read step.
+    let parseAndCacheBytes
+        (cacheDir: string)
+        (name: string)
+        (format: VocabFormat)
+        (bytes: byte[])
+        : Result<CachedVocab, string> =
+        match parseGraph format bytes with
+        | Error e -> Error e
+        | Ok graph ->
+            let hash = sha256Hex bytes
+            let fileName = cacheFileName name hash format
+            let filePath = Path.Combine(cacheDir, fileName)
+
+            try
+                File.WriteAllBytes(filePath, bytes)
+
+                Ok
+                    { Hash = hash
+                      Format = format
+                      CacheFilePath = filePath
+                      Graph = graph }
+            with ex ->
+                Error $"could not write cache file: {ex.Message}"
+
     /// Fetch a vocabulary URI, parse it, and write it to cacheDir.
     /// Returns CachedVocab on success.
     /// Cache hit (file matching <name>.*) returns cached result without invoking fetch.
@@ -217,25 +245,7 @@ module VocabFetcher =
                 | Error reason -> return Error reason
                 | Ok response ->
                     let format = detectFormat response.ContentType uri
-
-                    match parseGraph format response.Body with
-                    | Error e -> return Error e
-                    | Ok graph ->
-                        let hash = sha256Hex response.Body
-                        let fileName = cacheFileName name hash format
-                        let filePath = Path.Combine(cacheDir, fileName)
-
-                        try
-                            File.WriteAllBytes(filePath, response.Body)
-
-                            return
-                                Ok
-                                    { Hash = hash
-                                      Format = format
-                                      CacheFilePath = filePath
-                                      Graph = graph }
-                        with ex ->
-                            return Error $"could not write cache file: {ex.Message}"
+                    return parseAndCacheBytes cacheDir name format response.Body
         }
 
     // ── Pure: detect drift ────────────────────────────────────────────────────
