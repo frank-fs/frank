@@ -27,27 +27,32 @@ open NUnit.Framework
 type OriginRobustnessTests() =
     inherit PlaywrightTest()
 
-    /// Send a raw HTTP/1.1 POST with an explicit (possibly malformed) Host header value,
-    /// bypassing HttpClient's own Host-header validation entirely. Returns the response
-    /// status code.
-    member private this.PostWithRawHost
-        (baseUrl: string, path: string, hostHeaderValue: string, jsonBody: string)
+    /// Send a raw HTTP/1.1 request with an explicit (possibly malformed, possibly merely
+    /// disallowed) Host header value, bypassing HttpClient's own Host-header validation
+    /// entirely. Returns the response status code.
+    member private this.SendWithRawHost
+        (baseUrl: string, httpMethod: string, path: string, hostHeaderValue: string, body: string option)
         : Task<int> =
         task {
             let uri = Uri baseUrl
             use client = new TcpClient()
             do! client.ConnectAsync(uri.Host, uri.Port)
             use stream = client.GetStream()
-            let bodyBytes = Encoding.UTF8.GetBytes jsonBody
+
+            let bodyHeaders, bodyText =
+                match body with
+                | Some text ->
+                    let bodyBytes = Encoding.UTF8.GetBytes text
+                    $"Content-Type: application/json\r\nContent-Length: {bodyBytes.Length}\r\n", text
+                | None -> "", ""
 
             let request =
-                $"POST {path} HTTP/1.1\r\n"
+                $"{httpMethod} {path} HTTP/1.1\r\n"
                 + $"Host: {hostHeaderValue}\r\n"
-                + "Content-Type: application/json\r\n"
-                + $"Content-Length: {bodyBytes.Length}\r\n"
+                + bodyHeaders
                 + "Connection: close\r\n"
                 + "\r\n"
-                + jsonBody
+                + bodyText
 
             let requestBytes = Encoding.Latin1.GetBytes request
             do! stream.WriteAsync(requestBytes, 0, requestBytes.Length)
@@ -56,6 +61,14 @@ type OriginRobustnessTests() =
             let statusLine = response.Split("\r\n").[0]
             return statusLine.Split(' ').[1] |> int
         }
+
+    /// Send a raw HTTP/1.1 POST with an explicit (possibly malformed) Host header value,
+    /// bypassing HttpClient's own Host-header validation entirely. Returns the response
+    /// status code.
+    member private this.PostWithRawHost
+        (baseUrl: string, path: string, hostHeaderValue: string, jsonBody: string)
+        : Task<int> =
+        this.SendWithRawHost(baseUrl, "POST", path, hostHeaderValue, Some jsonBody)
 
     [<Test>]
     member this.``schema: sample POST /games/{id} with an empty Host header returns 400, not an unhandled 500``() =
@@ -98,5 +111,30 @@ type OriginRobustnessTests() =
                 statusCode,
                 Is.EqualTo 400,
                 "malformed (empty) Host header must be rejected gracefully with 400 — the ex: sample has no upstream Provenance guard, so this is moveHandler's OWN fix being exercised directly"
+            )
+        }
+
+    /// #405 part 2: a Host header can be perfectly well-formed and still not belong to any
+    /// host this deployment serves — "evil-flood-attempt.example" parses as a valid absolute
+    /// URI, so Frank.OriginValidation.tryValidateOrigin (which only ever rejects a Host value
+    /// Uri.TryCreate can't parse) would let it straight through to Frank's own middleware.
+    /// The 400 here must instead come from ASP.NET Core's native host filtering
+    /// (UseHostFiltering, configured via AllowedHosts in appsettings.json) rejecting the
+    /// request BEFORE it reaches UseRouting or any Frank middleware — closing the
+    /// Host-header-flood vector at its true source, independent of and complementing
+    /// Frank's own bounded-cache mitigation (#405 part 1).
+    [<Test>]
+    member this.``schema: sample GET / with a well-formed but disallowed Host header returns 400 from ASP.NET Core host filtering``
+        ()
+        =
+        task {
+            let! statusCode = this.SendWithRawHost(Server.Url(), "GET", "/", "evil-flood-attempt.example", None)
+
+            Assert.That(
+                statusCode,
+                Is.EqualTo 400,
+                "a syntactically valid Host header not on AllowedHosts must be rejected by ASP.NET Core's \
+                 UseHostFiltering — Frank's own OriginValidation only rejects unparseable Host values, never a \
+                 valid-looking host that's merely off the allow-list, so this 400 proves framework-level filtering"
             )
         }

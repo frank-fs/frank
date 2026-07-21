@@ -438,6 +438,14 @@ let private appVocabularyResource =
 [<EntryPoint>]
 let main args =
     webHost args {
+        // #405 part 2: reject requests with an unrecognized Host header at the ASP.NET
+        // Core framework level, before they ever reach Frank's own middleware (Provenance,
+        // Validation, Discovery, LinkedData). Frank's bounded caches (#405 part 1) cap the
+        // memory a Host-header flood can consume, but don't stop the flood requests from
+        // being processed at all — UseHostFiltering (reading AllowedHosts from
+        // appsettings.json) closes that vector at its true source. Registered via
+        // plugBeforeRouting so it runs ahead of UseRouting and every other middleware.
+        plugBeforeRouting HostFilteringBuilderExtensions.UseHostFiltering
         useProvenance
         useValidation
         useDiscoveryWith TicTacToe.GeneratedDiscovery.discoveryConfig
