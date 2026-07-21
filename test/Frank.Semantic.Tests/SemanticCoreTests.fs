@@ -36,6 +36,7 @@ let ac6Tests =
         "A-C6: schema-v2 VocabularyEntry round-trip and v1 default safety"
         [ test "v2 entry round-trips all fields exactly" {
               let entry = makeV2Entry false true 5.0
+
               let lf: LockFile =
                   { SchemaVersion = 2
                     Generated = fixedNow
@@ -197,7 +198,7 @@ let ac10Tests =
               Expect.isOk (verifyIntegrity lf) "lock integrity valid"
 
               // Direct classifier call
-              let states = classifyReferencedVocab lf fixedNow None [ "schema" ]
+              let states = classifyReferencedVocab lf fixedNow [ "schema" ]
               Expect.equal (List.head states) VocabState.Confirmed "classifier: schema is Confirmed"
           }
 
@@ -212,13 +213,15 @@ let ac10Tests =
 
               let lf = withIntegrity lf
 
-              let states = classifyReferencedVocab lf fixedNow None [ "ex" ]
+              let states = classifyReferencedVocab lf fixedNow [ "ex" ]
               Expect.equal (List.head states) VocabState.Undereferenceable "classifier: ex is Undereferenceable"
           }
 
           test "http://www.example.org authority matches declared base https://example.org" {
               // Owned flag set via authority normalization
-              let isOwned = isOwnedByAuthority "https://example.org/" "http://www.example.org/vocab#"
+              let isOwned =
+                  isOwnedByAuthority "https://example.org/" "http://www.example.org/vocab#"
+
               Expect.isTrue isOwned "www. http variant matches https apex"
           }
 
@@ -236,7 +239,7 @@ let ac10Tests =
                     DeclaredPrefixes = Map.empty
                     Mappings = [] }
 
-              let states = classifyReferencedVocab lf fixedNow None [ "unknown" ]
+              let states = classifyReferencedVocab lf fixedNow [ "unknown" ]
               Expect.equal (List.head states) VocabState.Undereferenceable "missing prefix is Undereferenceable"
           }
 
@@ -246,7 +249,10 @@ let ac10Tests =
                       Uri = "https://schema.org/"
                       FetchedAt = fixedNow.AddDays(-1.0)
                       Hash = "sha256:abc"
-                      Validated = { IsValidated = true; Reason = None; LastChecked = Some fixedNow } }
+                      Validated =
+                          { IsValidated = true
+                            Reason = None
+                            LastChecked = Some fixedNow } }
 
               let lf: LockFile =
                   { SchemaVersion = 2
@@ -256,53 +262,73 @@ let ac10Tests =
                     DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/"; "ex", "https://example.org/" ]
                     Mappings = [] }
 
-              let states = classifyReferencedVocab lf fixedNow None [ "schema"; "ex" ]
+              let states = classifyReferencedVocab lf fixedNow [ "schema"; "ex" ]
               Expect.equal states [ VocabState.Confirmed; VocabState.Undereferenceable ] "correct states in order"
           } ]
 
-// ── #419: LocallyServedUnconfirmed reachability via None-branch ownership check ────
+// ── #419: LocallyServedUnconfirmed reachability, ownership derived from the app's own
+// resolved resource identity (lock.Mappings) — never from an externally supplied base URI.
+// A deployed app may bind a different domain than any dev-time config, so ownership must
+// be a fact derivable from the produced artifact alone (mirrors EmitterShared.declaredOnlyBases,
+// #396's equivalent ResolvedModel-based computation).
+
+let private confirmedMapping (fsType: string) (iri: string) : Mapping =
+    { FSharpType = fsType
+      Iri = Some iri
+      Confidence = 1.0
+      Source = Convention
+      Status = Confirmed
+      Alternates = []
+      Rt = None
+      Shape = MappingShape.Record [] }
 
 [<Tests>]
 let issue419Tests =
     testList
-        "#419: classifyReferencedVocabWith None-branch ownership"
-        [ test "AC1: declared-only owned prefix (authority matches appBaseUri), no Vocabularies entry -> LocallyServedUnconfirmed" {
+        "#419: classifyReferencedVocabWith None-branch ownership (derived from lock.Mappings)"
+        [ test
+              "AC1: declared-only prefix backing one of the app's own Confirmed mapping IRIs, no Vocabularies entry -> LocallyServedUnconfirmed" {
               let lf: LockFile =
                   { SchemaVersion = 2
                     Generated = fixedNow
                     Integrity = None
                     Vocabularies = Map.empty
                     DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ]
-                    Mappings = [] }
+                    Mappings = [ confirmedMapping "App.Move" "ttt:Move" ] }
 
-              let states =
-                  classifyReferencedVocab lf fixedNow (Some "https://example.org") [ "ttt" ]
+              let states = classifyReferencedVocab lf fixedNow [ "ttt" ]
 
               Expect.equal
                   states
                   [ VocabState.LocallyServedUnconfirmed ]
-                  "AC1: owned, unfetched, declared prefix must be LocallyServedUnconfirmed, not Undereferenceable"
+                  "AC1: prefix backing the app's own resource identity must be LocallyServedUnconfirmed, not Undereferenceable"
           }
 
-          test "AC2: declared-only foreign prefix (Wikidata, authority does NOT match appBaseUri) -> still Undereferenceable" {
+          test
+              "AC2: declared-only foreign prefix (Wikidata), never used to identify any of the app's own resources -> still Undereferenceable, even when a sibling prefix in the same lock IS owned" {
               let lf: LockFile =
                   { SchemaVersion = 2
                     Generated = fixedNow
                     Integrity = None
                     Vocabularies = Map.empty
-                    DeclaredPrefixes = Map.ofList [ "wd", "https://www.wikidata.org/entity/" ]
-                    Mappings = [] }
+                    DeclaredPrefixes =
+                      Map.ofList
+                          [ "wd", "https://www.wikidata.org/entity/"
+                            "ttt", "https://example.org/tictactoe#" ]
+                    // ttt backs the app's own type identity; wd is declared but never used to
+                    // identify any of the app's own resources — no Mappings evidence for wd.
+                    Mappings = [ confirmedMapping "App.Move" "ttt:Move" ] }
 
-              let states =
-                  classifyReferencedVocab lf fixedNow (Some "https://example.org") [ "wd" ]
+              let states = classifyReferencedVocab lf fixedNow [ "wd"; "ttt" ]
 
               Expect.equal
                   states
-                  [ VocabState.Undereferenceable ]
-                  "AC2: genuinely external, uncached prefix stays Undereferenceable (correct — not yet confirmed)"
+                  [ VocabState.Undereferenceable; VocabState.LocallyServedUnconfirmed ]
+                  "AC2: wd stays Undereferenceable (correct — not yet confirmed) while ttt (backed by real identity evidence) is LocallyServedUnconfirmed"
           }
 
-          test "appBaseUri = None preserves prior behavior: owned-looking prefix still Undereferenceable" {
+          test
+              "no Mappings evidence of ownership at all -> Undereferenceable even for an authority that looks self-hosted" {
               let lf: LockFile =
                   { SchemaVersion = 2
                     Generated = fixedNow
@@ -311,12 +337,43 @@ let issue419Tests =
                     DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ]
                     Mappings = [] }
 
-              let states = classifyReferencedVocab lf fixedNow None [ "ttt" ]
+              let states = classifyReferencedVocab lf fixedNow [ "ttt" ]
 
               Expect.equal
                   states
                   [ VocabState.Undereferenceable ]
-                  "No known appBaseUri -> cannot claim ownership -> Undereferenceable (unchanged behavior)"
+                  "Zero produced-artifact evidence of ownership -> cannot claim owned -> Undereferenceable"
+          }
+
+          test "ownership evidence via a Confirmed field IRI (not just the type IRI) is sufficient" {
+              let lf: LockFile =
+                  { SchemaVersion = 2
+                    Generated = fixedNow
+                    Integrity = None
+                    Vocabularies = Map.empty
+                    DeclaredPrefixes = Map.ofList [ "ttt", "https://example.org/tictactoe#" ]
+                    Mappings =
+                      [ { FSharpType = "App.MoveRequest"
+                          Iri = Some "schema:Action"
+                          Confidence = 1.0
+                          Source = Convention
+                          Status = Confirmed
+                          Alternates = []
+                          Rt = None
+                          Shape =
+                            MappingShape.Record
+                                [ { Name = "Position"
+                                    Iri = Some "ttt:square"
+                                    Confidence = 1.0
+                                    Source = Convention
+                                    Status = Confirmed } ] } ] }
+
+              let states = classifyReferencedVocab lf fixedNow [ "ttt" ]
+
+              Expect.equal
+                  states
+                  [ VocabState.LocallyServedUnconfirmed ]
+                  "A Confirmed field IRI under ttt is itself evidence of app-owned identity"
           } ]
 
 // ── A-C11: integrity tamper detection ─────────────────────────────────────────
@@ -330,7 +387,12 @@ let ac11Tests =
                   { SchemaVersion = 2
                     Generated = fixedNow
                     Integrity = None
-                    Vocabularies = Map.ofList [ "schema", { v1Empty with Uri = "https://schema.org/"; Hash = "sha256:abc" } ]
+                    Vocabularies =
+                      Map.ofList
+                          [ "schema",
+                            { v1Empty with
+                                Uri = "https://schema.org/"
+                                Hash = "sha256:abc" } ]
                     DeclaredPrefixes = Map.empty
                     Mappings = [] }
 
@@ -342,10 +404,14 @@ let ac11Tests =
                   { stamped with
                       Vocabularies =
                           stamped.Vocabularies
-                          |> Map.add "fake" { v1Empty with Uri = "https://evil.com/"; Hash = "sha256:evil" } }
+                          |> Map.add
+                              "fake"
+                              { v1Empty with
+                                  Uri = "https://evil.com/"
+                                  Hash = "sha256:evil" } }
 
               match verifyIntegrity tampered with
-              | Ok () -> failtest "tampered lock must not pass integrity check"
+              | Ok() -> failtest "tampered lock must not pass integrity check"
               | Error msg -> Expect.stringContains msg "hand-edited" "tamper message is diagnostic"
           }
 
@@ -368,14 +434,24 @@ let ac11Tests =
                       { SchemaVersion = 2
                         Generated = fixedNow
                         Integrity = None
-                        Vocabularies = Map.ofList [ "s", { v1Empty with Uri = "https://s.org/"; Hash = "h" } ]
+                        Vocabularies =
+                          Map.ofList
+                              [ "s",
+                                { v1Empty with
+                                    Uri = "https://s.org/"
+                                    Hash = "h" } ]
                         DeclaredPrefixes = Map.empty
                         Mappings = [] }
 
               let tampered =
                   { lf with
                       Vocabularies =
-                          lf.Vocabularies |> Map.add "evil" { v1Empty with Uri = "https://evil.com/"; Hash = "!" } }
+                          lf.Vocabularies
+                          |> Map.add
+                              "evil"
+                              { v1Empty with
+                                  Uri = "https://evil.com/"
+                                  Hash = "!" } }
 
               Expect.isError (verifyIfStamped tampered) "stamped+tampered lock detected"
           } ]
@@ -387,22 +463,40 @@ let slaTests =
     testList
         "SLA policy: pure staleness reasoning"
         [ test "unowned entry < 30 days → not stale" {
-              let entry = { v1Empty with FetchedAt = fixedNow.AddDays(-20.0); Owned = false }
+              let entry =
+                  { v1Empty with
+                      FetchedAt = fixedNow.AddDays(-20.0)
+                      Owned = false }
+
               Expect.isFalse (isStale SlaPolicy.defaultPolicy "schema" entry fixedNow) "20d < 30d threshold → not stale"
           }
 
           test "unowned entry > 30 days → stale" {
-              let entry = { v1Empty with FetchedAt = fixedNow.AddDays(-31.0); Owned = false }
+              let entry =
+                  { v1Empty with
+                      FetchedAt = fixedNow.AddDays(-31.0)
+                      Owned = false }
+
               Expect.isTrue (isStale SlaPolicy.defaultPolicy "schema" entry fixedNow) "31d > 30d threshold → stale"
           }
 
           test "owned entry < 90 days → not stale" {
-              let entry = { v1Empty with FetchedAt = fixedNow.AddDays(-50.0); Owned = true }
-              Expect.isFalse (isStale SlaPolicy.defaultPolicy "myns" entry fixedNow) "50d < 90d owned threshold → not stale"
+              let entry =
+                  { v1Empty with
+                      FetchedAt = fixedNow.AddDays(-50.0)
+                      Owned = true }
+
+              Expect.isFalse
+                  (isStale SlaPolicy.defaultPolicy "myns" entry fixedNow)
+                  "50d < 90d owned threshold → not stale"
           }
 
           test "owned entry > 90 days → stale" {
-              let entry = { v1Empty with FetchedAt = fixedNow.AddDays(-91.0); Owned = true }
+              let entry =
+                  { v1Empty with
+                      FetchedAt = fixedNow.AddDays(-91.0)
+                      Owned = true }
+
               Expect.isTrue (isStale SlaPolicy.defaultPolicy "myns" entry fixedNow) "91d > 90d owned threshold → stale"
           }
 
@@ -412,7 +506,10 @@ let slaTests =
                       Uri = "https://schema.org/"
                       FetchedAt = fixedNow.AddDays(-60.0)
                       Owned = false
-                      Validated = { IsValidated = true; Reason = None; LastChecked = Some fixedNow } }
+                      Validated =
+                          { IsValidated = true
+                            Reason = None
+                            LastChecked = Some fixedNow } }
 
               let lf: LockFile =
                   { SchemaVersion = 2
@@ -423,7 +520,7 @@ let slaTests =
                     DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/" ]
                     Mappings = [] }
 
-              let states = classifyReferencedVocab lf fixedNow None [ "schema" ]
+              let states = classifyReferencedVocab lf fixedNow [ "schema" ]
               Expect.equal (List.head states) VocabState.Stale "60d > 30d unowned threshold → Stale"
           }
 
@@ -432,7 +529,11 @@ let slaTests =
                   { SlaPolicy.defaultPolicy with
                       PerVocabOverrides = Map.ofList [ "schema", 100 ] }
 
-              let entry = { v1Empty with FetchedAt = fixedNow.AddDays(-50.0); Owned = false }
+              let entry =
+                  { v1Empty with
+                      FetchedAt = fixedNow.AddDays(-50.0)
+                      Owned = false }
+
               Expect.isFalse (isStale policy "schema" entry fixedNow) "50d < 100d per-vocab override → not stale"
           } ]
 

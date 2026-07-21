@@ -74,7 +74,6 @@ type StatusArgs =
     | By_Package
     | Format of format: string
     | Strict
-    | Base_Uri of uri: string
 
     interface IArgParserTemplate with
         member a.Usage =
@@ -83,8 +82,6 @@ type StatusArgs =
             | Lock_File _ -> "path to the lock file (defaults to <projectdir>/.frank/semantic-mappings.lock.json)"
             | By_Package -> "break down coverage and vocabulary usage per F# namespace"
             | Format _ -> "output format: 'text' (default) or 'json'"
-            | Base_Uri _ ->
-                "authority URI of this application (e.g. https://example.org); distinguishes a declared-but-unfetched owned vocabulary from a genuinely external one"
             | Strict ->
                 "promote any Undereferenceable-vocab warning to exit code 3 (distinct from 0=clean/1=error/2=diff)"
 
@@ -428,46 +425,41 @@ let private handleFinalize (args: ParseResults<FinalizeArgs>) : int =
             0
 
 let private handleStatus (args: ParseResults<StatusArgs>) : int =
-    match parseOptionalBaseUri (args.TryGetResult StatusArgs.Base_Uri) with
+    match lockPathFrom (args.TryGetResult StatusArgs.Lock_File) (args.TryGetResult StatusArgs.Project) with
     | Error e ->
         eprintfn "error: %s" e
         1
-    | Ok baseUri ->
-        match lockPathFrom (args.TryGetResult StatusArgs.Lock_File) (args.TryGetResult StatusArgs.Project) with
+    | Ok lockPath ->
+        match readVerified lockPath with
         | Error e ->
             eprintfn "error: %s" e
             1
-        | Ok lockPath ->
-            match readVerified lockPath with
+        | Ok lf ->
+            let now = DateTimeOffset.UtcNow
+            let warnings = getWarnings now lf
+
+            let fmtStr = args.TryGetResult(StatusArgs.Format) |> Option.defaultValue "text"
+
+            match parseOutputFormat fmtStr with
             | Error e ->
                 eprintfn "error: %s" e
                 1
-            | Ok lf ->
-                let now = DateTimeOffset.UtcNow
-                let warnings = getWarnings now baseUri lf
+            | Ok fmt ->
+                match fmt with
+                | Pipeline.Json -> printfn "%s" (Accept.vocabWarningsToJson warnings)
+                | Pipeline.Text ->
+                    let output =
+                        if args.Contains StatusArgs.By_Package then
+                            formatByPackage now lf
+                        else
+                            format now lf
 
-                let fmtStr = args.TryGetResult(StatusArgs.Format) |> Option.defaultValue "text"
+                    printfn "%s" output
 
-                match parseOutputFormat fmtStr with
-                | Error e ->
-                    eprintfn "error: %s" e
-                    1
-                | Ok fmt ->
-                    match fmt with
-                    | Pipeline.Json -> printfn "%s" (Accept.vocabWarningsToJson warnings)
-                    | Pipeline.Text ->
-                        let output =
-                            if args.Contains StatusArgs.By_Package then
-                                formatByPackage now baseUri lf
-                            else
-                                format now baseUri lf
-
-                        printfn "%s" output
-
-                    if args.Contains StatusArgs.Strict && not (List.isEmpty warnings) then
-                        3
-                    else
-                        0
+                if args.Contains StatusArgs.Strict && not (List.isEmpty warnings) then
+                    3
+                else
+                    0
 
 let private printRefreshOutcomes (report: RefreshReport) : unit =
     for prefix, outcome in report.Outcomes do

@@ -5,13 +5,13 @@ open Frank.Semantic
 open Frank.Semantic.LockFile
 open Frank.Semantic.VocabClassifier
 
-let private vocabSection (now: DateTimeOffset) (appBaseUri: string option) (lf: LockFile) : string option =
+let private vocabSection (now: DateTimeOffset) (lf: LockFile) : string option =
     let referencedNs = lf.DeclaredPrefixes |> Map.keys |> Seq.toList
 
     if List.isEmpty referencedNs then
         None
     else
-        let states = classifyReferencedVocab lf now appBaseUri referencedNs
+        let states = classifyReferencedVocab lf now referencedNs
 
         let lines =
             List.zip referencedNs states
@@ -21,17 +21,13 @@ let private vocabSection (now: DateTimeOffset) (appBaseUri: string option) (lf: 
         Some $"Vocabularies:\n{lines}"
 
 // Returns (prefix, iri) pairs for every Undereferenceable prefix in DeclaredPrefixes.
-let private undereferencedPrefixes
-    (now: DateTimeOffset)
-    (appBaseUri: string option)
-    (lf: LockFile)
-    : (string * string) list =
+let private undereferencedPrefixes (now: DateTimeOffset) (lf: LockFile) : (string * string) list =
     let referencedNs = lf.DeclaredPrefixes |> Map.keys |> Seq.toList
 
     if List.isEmpty referencedNs then
         []
     else
-        let states = classifyReferencedVocab lf now appBaseUri referencedNs
+        let states = classifyReferencedVocab lf now referencedNs
 
         List.zip referencedNs states
         |> List.choose (fun (prefix, state) ->
@@ -41,8 +37,8 @@ let private undereferencedPrefixes
             else
                 None)
 
-let private warningSection (now: DateTimeOffset) (appBaseUri: string option) (lf: LockFile) : string option =
-    match undereferencedPrefixes now appBaseUri lf with
+let private warningSection (now: DateTimeOffset) (lf: LockFile) : string option =
+    match undereferencedPrefixes now lf with
     | [] -> None
     | pairs ->
         let lines =
@@ -121,9 +117,8 @@ let private findMappingRef (prefix: string) (nsIri: string) (mappings: Mapping l
 
 /// Returns structured warning records for each Undereferenceable prefix.
 /// Used by the CLI for --strict exit-code decisions and --format json output.
-/// `appBaseUri` (#419): the app's own authority, when known — see classifyReferencedVocabWith.
-let getWarnings (now: DateTimeOffset) (appBaseUri: string option) (lf: LockFile) : Accept.VocabWarning list =
-    undereferencedPrefixes now appBaseUri lf
+let getWarnings (now: DateTimeOffset) (lf: LockFile) : Accept.VocabWarning list =
+    undereferencedPrefixes now lf
     |> List.map (fun (prefix, iri) ->
         let typeName, fieldName = findMappingRef prefix iri lf.Mappings
 
@@ -145,17 +140,14 @@ let getWarnings (now: DateTimeOffset) (appBaseUri: string option) (lf: LockFile)
 /// Format lock status including mapping counts and vocabulary states derived from
 /// classifyReferencedVocab — the single shared classifier.
 /// `now` is injected for deterministic SLA reasoning.
-/// `appBaseUri` (#419): the app's own authority, when known — see classifyReferencedVocabWith.
-let format (now: DateTimeOffset) (appBaseUri: string option) (lf: LockFile) : string =
+let format (now: DateTimeOffset) (lf: LockFile) : string =
     let c = countByStatus lf.Mappings
 
     let mappingSection =
         $"Confirmed:  {c.Confirmed}\nProposed:   {c.Proposed}\nUnresolved: {c.Unresolved}\nExcluded:   {c.Excluded}"
 
     let parts =
-        [ Some mappingSection
-          vocabSection now appBaseUri lf
-          warningSection now appBaseUri lf ]
+        [ Some mappingSection; vocabSection now lf; warningSection now lf ]
         |> List.choose id
 
     String.concat "\n\n" parts
@@ -172,8 +164,7 @@ let private formatGroupBlock (g: PackageGroup) : string =
 
         $"{g.Namespace}\n{statusLine}\nvocabs: {vocabList}"
 
-/// `appBaseUri` (#419): the app's own authority, when known — see classifyReferencedVocabWith.
-let formatByPackage (now: DateTimeOffset) (appBaseUri: string option) (lf: LockFile) : string =
+let formatByPackage (now: DateTimeOffset) (lf: LockFile) : string =
     let knownPrefixes =
         Set.union (lf.Vocabularies |> Map.keys |> Set.ofSeq) (lf.DeclaredPrefixes |> Map.keys |> Set.ofSeq)
 
@@ -181,9 +172,6 @@ let formatByPackage (now: DateTimeOffset) (appBaseUri: string option) (lf: LockF
     let groupsStr = groups |> List.map formatGroupBlock |> String.concat "\n\n"
 
     let parts =
-        [ Some groupsStr
-          vocabSection now appBaseUri lf
-          warningSection now appBaseUri lf ]
-        |> List.choose id
+        [ Some groupsStr; vocabSection now lf; warningSection now lf ] |> List.choose id
 
     String.concat "\n\n" parts

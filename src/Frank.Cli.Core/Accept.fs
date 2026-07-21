@@ -503,9 +503,7 @@ let private collectVocabWarnings (lf: LockFile) (entries: ResolvedEntry list) : 
         []
     else
         let now = System.DateTimeOffset.UtcNow
-        // No app authority known at accept-time (AcceptArgs has no --base-uri); None
-        // preserves prior behavior — see #419.
-        let states = classifyReferencedVocab lf now None uniquePrefixes
+        let states = classifyReferencedVocab lf now uniquePrefixes
         let stateMap = List.zip uniquePrefixes states |> Map.ofList
 
         allCtxs
