@@ -769,3 +769,60 @@ let declaredOnlyPrefixHostRelativeTests =
                   "| Game -> System.Uri \"https://schema.org/Game\""
                   "schema:Game stays absolute — DeclaredPrefixes empty in this fixture"
           } ]
+
+// ── #423: case-only ownership evidence must render host-relative ──────────────
+// A resource's class Iri resolves to an unrelated, already-fetched vocabulary (schema:Game)
+// — no type-level or field-level IRI backs the `ex:` prefix's authority. The ONLY owning
+// evidence for `ex:` is the Confirmed union-case IRI `ex:XMove`. EmitterShared.declaredOnlyBases
+// must still treat `ex:` as owned (matching what VocabClassifier.ownedIdentityAuthorities/
+// `frank semantic status`/the analyzer already report for this fixture, #419) — closing the
+// case-IRI coverage gap so the case Iri renders host-relative, not a fixed absolute IRI.
+
+let private caseOnlyOwnershipLock: LockFile =
+    { SchemaVersion = 1
+      Generated = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+      Integrity = None
+      Vocabularies =
+        Map.ofList
+            [ "schema",
+              { v1Empty with
+                  Uri = "https://schema.org/"
+                  FetchedAt = DateTimeOffset.Parse("2025-01-01T00:00:00Z")
+                  Hash = "sha256:test" } ]
+      DeclaredPrefixes = Map.ofList [ "ex", "https://example.org/ex#" ]
+      Mappings =
+        [ { FSharpType = "Probe.Move"
+            Iri = Some "schema:Game"
+            Confidence = 1.0
+            Source = Manual
+            Status = Confirmed
+            Alternates = []
+            Rt = None
+            Shape =
+              MappingShape.Union
+                  [ { Name = "XMove"
+                      Iri = Some "ex:XMove"
+                      Confidence = 1.0
+                      Source = Manual
+                      Status = Confirmed
+                      Payload = [] } ] } ] }
+
+[<Tests>]
+let caseOnlyOwnershipTests =
+    testList
+        "SemanticModelEmitter — #423 case-only ownership evidence renders host-relative"
+        [ test "ex: case Iri is host-relative even though the class Iri backs an unrelated fetched vocab" {
+              let src =
+                  Expect.wantOk
+                      (SemanticModelEmitter.emit "Probe.Generated" VocabularyRegistry.empty caseOnlyOwnershipLock)
+                      "emit"
+
+              Expect.stringContains
+                  src
+                  "Some (System.Uri (\"/ex#XMove\", System.UriKind.Relative))"
+                  "ex:XMove case arm must be host-relative — case-only evidence must still be recognized as owned"
+
+              Expect.isFalse
+                  (src.Contains "https://example.org/ex#XMove")
+                  "ex:XMove must never be emitted as a fixed absolute IRI"
+          } ]
