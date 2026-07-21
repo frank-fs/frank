@@ -226,6 +226,96 @@ let declaredOnlyJsonHomeKeyTests =
                   (body.Contains "\"/ex#identifier\"")
                   "the un-resolved, still-relative meaning IRI never appears" ]
 
+// ── #416 AC2: JSON Home's resolved href-vars meaning IRI is IDENTICAL to ALPS's
+// resolved meaning IRI for the SAME term, at the SAME live origin — not merely "also
+// absolute" but byte-identical, proving both paths resolve through the same mechanism
+// (Frank.UriResolution.resolveAgainst) rather than two independently-plausible-but-drifting
+// implementations. The ALPS descriptor tree below carries a nested field descriptor whose
+// Href is the exact SAME declared-only term ("/ex#identifier") that ResourceHrefVars maps
+// "id" to — the same term, deliberately duplicated in both structures, mirroring how
+// DiscoveryEmitter's real codegen output derives both from the SAME field IRI
+// (computeHrefVars / fieldDescriptor, both driven by EmitterShared.hrefFor).
+
+let private crossCheckConfig: DiscoveryConfig =
+    { ProfileUri = "/alps/test"
+      HomeRoute = "/"
+      AlpsDescriptors =
+        [ { Id = "Game"
+            Type = "semantic"
+            Doc = None
+            Href = Some "/ex#Game"
+            Descriptors =
+              [ { Id = "identifier"
+                  Type = "semantic"
+                  Doc = None
+                  Href = Some "/ex#identifier"
+                  Descriptors = []
+                  Rt = None
+                  ClassIri = None
+                  RequestClrTypeName = None } ]
+            Rt = None
+            ClassIri = Some "https://tictactoe.invalid/ex#Game"
+            RequestClrTypeName = None } ]
+      DescribedByLinks = []
+      ResourceHrefVars = Map.ofList [ "https://tictactoe.invalid/ex#Game", Map.ofList [ "id", "/ex#identifier" ] ] }
+
+let private startCrossCheckServer () =
+    let gameResource =
+        resource "/games/{id}" {
+            relation "https://tictactoe.invalid/ex#Game"
+            get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("game")))
+        }
+
+    let app = buildDiscoveryApp None crossCheckConfig gameResource.Endpoints
+    app.StartAsync().GetAwaiter().GetResult()
+    app
+
+[<Tests>]
+let jsonHomeAlpsResolutionCrossCheckTests =
+    testList
+        "runtime JSON Home / ALPS — #416 AC2: resolved meaning IRI is identical across both"
+        [ testCase
+              "the SAME declared-only term resolves to the IDENTICAL absolute IRI in both ALPS (nested field href) and JSON Home (href-vars)"
+          <| fun _ ->
+              use app = startCrossCheckServer ()
+              use client = app.GetTestClient()
+
+              let alpsResp = client.GetAsync(crossCheckConfig.ProfileUri).GetAwaiter().GetResult()
+              Expect.equal (int alpsResp.StatusCode) 200 "ALPS profile served"
+              let alpsBody = alpsResp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              use alpsDoc = JsonDocument.Parse alpsBody
+
+              let alpsIdentifierHref =
+                  alpsDoc.RootElement.GetProperty("alps").GetProperty("descriptor").EnumerateArray()
+                  |> Seq.collect (fun d -> d.GetProperty("descriptor").EnumerateArray())
+                  |> Seq.find (fun d -> d.GetProperty("id").GetString() = "identifier")
+                  |> fun d -> d.GetProperty("href").GetString()
+
+              use homeReq = new HttpRequestMessage(HttpMethod.Get, "/")
+              homeReq.Headers.Add("Accept", "application/json-home")
+              let homeResp = client.SendAsync(homeReq).GetAwaiter().GetResult()
+              Expect.equal (int homeResp.StatusCode) 200 "JSON Home served"
+              let homeBody = homeResp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              use homeDoc = JsonDocument.Parse homeBody
+
+              let homeIdentifierMeaning =
+                  homeDoc.RootElement
+                      .GetProperty("resources")
+                      .GetProperty("http://localhost/ex#Game")
+                      .GetProperty("href-vars")
+                      .GetProperty("id")
+                      .GetString()
+
+              Expect.equal
+                  homeIdentifierMeaning
+                  alpsIdentifierHref
+                  "JSON Home's resolved href-vars 'id' meaning IRI must be byte-identical to ALPS's resolved 'identifier' field href — same term, same live origin, same resolution mechanism"
+
+              Expect.equal
+                  homeIdentifierMeaning
+                  "http://localhost/ex#identifier"
+                  "sanity: the shared resolved value is the expected absolute, origin-resolved IRI (parses via Uri(v, UriKind.Absolute))" ]
+
 // ── 2nd expert finding: classIriHrefMap fallback (no matching ALPS descriptor) ─────
 // homeResourcesFromEndpoints's servedRelation falls back to the RAW relation IRI when no
 // top-level ALPS descriptor's ClassIri matches it (line ~116). By the correlation-key
