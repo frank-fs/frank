@@ -33,11 +33,18 @@ type internal BoundedCache<'K, 'V when 'K: equality>(capacity: int) =
     let order = ConcurrentQueue<'K>()
     let mutable count = 0
 
+    /// Evict the single oldest-inserted key, if one is available and still present in
+    /// the map (Holzmann 10: capped to "one dequeue per over-capacity insertion", never
+    /// an unbounded sweep).
+    let evictOneIfNeeded () =
+        match order.TryDequeue() with
+        | true, oldest when map.TryRemove(oldest) |> fst -> Interlocked.Decrement(&count) |> ignore
+        | _ -> ()
+
     /// Get the existing value for `key`, or build it (via `build`, run at most once per
     /// key) and insert it. Once more than `capacity` distinct keys have been inserted,
     /// each further insertion evicts the single oldest-inserted key first — a bounded,
-    /// O(1)-per-insertion cap (Holzmann 10: eviction is capped to "one dequeue per
-    /// over-capacity insertion", never an unbounded sweep).
+    /// O(1)-per-insertion cap.
     member _.GetOrAdd(key: 'K, build: unit -> 'V) : 'V =
         let mutable wasNew = false
 
@@ -51,14 +58,9 @@ type internal BoundedCache<'K, 'V when 'K: equality>(capacity: int) =
 
         if wasNew then
             order.Enqueue key
-            let newCount = Interlocked.Increment(&count)
 
-            if newCount > capacity then
-                match order.TryDequeue() with
-                | true, oldest ->
-                    if map.TryRemove(oldest) |> fst then
-                        Interlocked.Decrement(&count) |> ignore
-                | false, _ -> ()
+            if Interlocked.Increment(&count) > capacity then
+                evictOneIfNeeded ()
 
         lazyValue.Value
 

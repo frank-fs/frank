@@ -48,18 +48,35 @@ let synthesizing (namespaces: string seq) : JsonLdDocumentLoader =
         index.[ns] <- ns
         index.[ns.TrimEnd('/')] <- ns
 
+    // Precomputed once per synthesizing call (not per request): normalizing each candidate
+    // namespace's authority up front lets the per-request fallback below normalize only the
+    // requested URI, via VocabClassifier.authorityInSet, instead of re-normalizing every
+    // candidate namespace on every unresolved request (see authorityInSet's own doc comment).
+    // First-listed namespace wins when several share a normalized authority (e.g. rdf/rdfs/owl
+    // all normalize to the same w3.org authority) — matches the original List.tryFind's
+    // first-match-in-list-order semantics.
+    let namespacesByAuthority =
+        allNamespaces
+        |> List.choose (fun ns -> VocabClassifier.normalizeAuthority ns |> Option.map (fun a -> a, ns))
+        |> List.fold (fun m (a, ns) -> if Map.containsKey a m then m else Map.add a ns m) Map.empty
+
+    let knownAuthorities =
+        namespacesByAuthority |> Map.toSeq |> Seq.map fst |> Set.ofSeq
+
     let load (uri: Uri) (_opts: JsonLdLoaderOptions) : RemoteDocument =
         let key = uri.AbsoluteUri
 
         match index.TryGetValue(key) with
         | true, ns -> buildDocument uri ns
         | false, _ ->
-            match
-                allNamespaces
-                |> List.tryFind (fun ns -> VocabClassifier.isOwnedByAuthority ns key)
-            with
-            | Some ns -> buildDocument uri ns
-            | None ->
+            if VocabClassifier.authorityInSet knownAuthorities key then
+                let ns =
+                    VocabClassifier.normalizeAuthority key
+                    |> Option.bind (fun a -> Map.tryFind a namespacesByAuthority)
+                    |> Option.get
+
+                buildDocument uri ns
+            else
                 failwithf
                     "Frank.Validation: no known vocabulary namespace for JSON-LD @context '%s'; \
                      declare its prefix in the vocabulary CE"
