@@ -34,4 +34,12 @@ val buildStateEntityNodeGraph:
 /// scheme+host — no app-owned-vs-external classification is performed.
 val usedPrefixContext: declared: (string * string) list -> g: IGraph -> (string * string) list
 
-val compactGraph: extraCtx: (string * string) list -> g: IGraph -> string
+/// #424: PROV-O's fixed prefixes ++ declaredPrefixes, filtered to those used in the graph,
+/// computed from a single shared triple walk. Internal — used by compactGraph and by
+/// Frank.Provenance.Tests to verify the single-scan behavior.
+val internal usedContextEntries: declaredPrefixes: (string * string) list -> g: IGraph -> (string * string) list
+
+/// Compact `g` to JSON-LD; `declaredPrefixes` is the raw (unfiltered) app-declared prefix
+/// list — filtering against both it and PROV-O's fixed prefixes happens internally from one
+/// triple walk (#424).
+val compactGraph: declaredPrefixes: (string * string) list -> g: IGraph -> string

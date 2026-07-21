@@ -33,13 +33,11 @@ let private tryMatchAbsoluteNs (storedNs: string) (uris: Uri list) : string opti
     |> List.tryFind (fun u -> u.AbsoluteUri.StartsWith(storedNs, StringComparison.Ordinal))
     |> Option.map (fun _ -> storedNs)
 
-/// Build the @context entry list from DeclaredPrefixes, retaining only those whose
-/// namespace actually prefixes a URI node in the graph. For host-relative stored namespaces
-/// (starting with "/"), the absolute namespace is derived from the matching graph URI's own
-/// scheme+host — no app-owned-vs-external classification is performed.
-let usedPrefixContext (declared: (string * string) list) (g: IGraph) : (string * string) list =
-    let uris = graphUriNodes g
-
+/// Retain only the declared prefixes whose namespace actually prefixes one of the given
+/// (already-scanned) graph URI nodes. For host-relative stored namespaces (starting with
+/// "/"), the absolute namespace is derived from the matching URI's own scheme+host — no
+/// app-owned-vs-external classification is performed.
+let private filterUsedPrefixes (declared: (string * string) list) (uris: Uri list) : (string * string) list =
     declared
     |> List.choose (fun (prefix, storedNs) ->
         let tryMatch =
@@ -49,6 +47,11 @@ let usedPrefixContext (declared: (string * string) list) (g: IGraph) : (string *
                 tryMatchAbsoluteNs storedNs uris
 
         tryMatch |> Option.map (fun resolvedNs -> prefix, resolvedNs))
+
+/// Build the @context entry list from DeclaredPrefixes, retaining only those whose
+/// namespace actually prefixes a URI node in the graph.
+let usedPrefixContext (declared: (string * string) list) (g: IGraph) : (string * string) list =
+    filterUsedPrefixes declared (graphUriNodes g)
 
 // PROV-O's own namespaces (prov/http/rdfs). #412: run these through usedPrefixContext just
 // like app-declared DeclaredPrefixes — no unconditional always-present base context.
@@ -67,6 +70,16 @@ let private compact (graph: IGraph) (extraContext: (string * string) list) : str
         ctx.[k] <- JToken.op_Implicit v
 
     RdfSerialization.compactWithContext graph ctx
+
+/// #424: compute the served @context entries (PROV-O's fixed prefixes ++ the app's
+/// DeclaredPrefixes), filtered to prefixes actually used in the graph, from a single shared
+/// graphUriNodes walk — instead of ProvenanceEndpoint.serveJsonLd and this filtering each
+/// re-scanning the graph's triples independently.
+let internal usedContextEntries (declaredPrefixes: (string * string) list) (g: IGraph) : (string * string) list =
+    let uris = graphUriNodes g
+
+    filterUsedPrefixes provDeclaredPrefixes uris
+    @ filterUsedPrefixes declaredPrefixes uris
 
 let private u (g: IGraph) (s: string) =
     g.CreateUriNode(UriFactory.Create s) :> INode
@@ -312,4 +325,12 @@ let buildStateEntityNodeGraph
 
     g
 
-let compactGraph (extraCtx: (string * string) list) (g: IGraph) : string = compact g extraCtx
+/// Compact `g` to JSON-LD, with `declaredPrefixes` (raw, app-declared, unfiltered) and
+/// PROV-O's fixed prefixes both resolved against a single triple walk (#424).
+let compactGraph (declaredPrefixes: (string * string) list) (g: IGraph) : string =
+    let ctx = JObject()
+
+    for (k, v) in usedContextEntries declaredPrefixes g do
+        ctx.[k] <- JToken.op_Implicit v
+
+    RdfSerialization.compactWithContext g ctx
