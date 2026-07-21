@@ -1957,29 +1957,42 @@ type SemanticTests() =
             assertNoPlaceholder "JSON Home body" homeBody
 
             // Positive check (not absence-only): JSON Home serves the relation as its own
-            // host-relative AlpsDescriptor.Href — "/ex#Game" — never the un-relativized
-            // absolute identity key (confirmed live: DiscoveryMiddleware.classIriHrefMap
-            // resolves it, #415). An empty/broken `{"resources":{}}` response is free of
-            // "example.org"/"tictactoe.invalid" too — this positive assertion is what
-            // actually falsifies that false-green.
+            // AlpsDescriptor.Href, resolved against the live request origin — the real,
+            // dereferenceable ex:Game IRI (RFC 8288 §2.1 requires the resources-object key
+            // to be a genuine link-relation-type IRI, not a host-relative fragment) — never
+            // the un-relativized placeholder-domain identity key, and never the merely
+            // host-relative "/ex#Game" intermediate form either (confirmed live:
+            // DiscoveryMiddleware.classIriHrefMap relativizes it, then
+            // resolveJsonHomeResourceAgainst resolves it against origin, #415/#wave1c). An
+            // empty/broken `{"resources":{}}` response is free of "example.org"/
+            // "tictactoe.invalid" too — this positive assertion is what actually falsifies
+            // that false-green.
             use homeDoc = JsonDocument.Parse homeBody
             let resources = homeDoc.RootElement.GetProperty "resources"
 
             let gameEntry =
                 resources.EnumerateObject()
-                |> Seq.tryFind (fun p -> p.Name = "/ex#Game")
+                |> Seq.tryFind (fun p -> p.Name = gameIri)
                 |> Option.defaultWith (fun () ->
                     failwith (
                         sprintf
-                            "JSON Home must key the Game resource by the host-relative '/ex#Game' href, got: %s"
+                            "JSON Home must key the Game resource by the origin-resolved '%s' IRI, got: %s"
+                            gameIri
                             homeBody
                     ))
 
+            Assert.That(
+                resources.EnumerateObject() |> Seq.exists (fun p -> p.Name = "/ex#Game"),
+                Is.False,
+                "JSON Home must never key the Game resource by the un-resolved, still-relative '/ex#Game' form"
+            )
+
             let hrefVars = gameEntry.Value.GetProperty "href-vars"
+            let identifierIri = exOriginBase + "/ex#identifier"
 
             Assert.That(
                 hrefVars.GetProperty("id").GetString(),
-                Is.EqualTo "/ex#identifier",
-                "JSON Home href-vars.id must be the host-relative '/ex#identifier' meaning IRI"
+                Is.EqualTo identifierIri,
+                sprintf "JSON Home href-vars.id must be the origin-resolved '%s' meaning IRI" identifierIri
             )
         }

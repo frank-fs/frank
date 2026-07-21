@@ -132,7 +132,8 @@ let runtimeJsonHomeTests =
               Expect.stringContains body "https://schema.org/Game" "Game IRI present"
               Expect.stringContains body "https://schema.org/WebPage" "WebPage IRI present" ]
 
-// ── #415: JSON Home resource key relativized for declared-only prefixes ────────
+// ── #415/#wave1c: JSON Home resource key relativized for declared-only prefixes, then
+// resolved against the live request origin ─────────────────────────────────────────
 // ResourceRelationMetadata.Relation stays the full, un-relativized class IRI (the
 // correlation key matched against AlpsDescriptor.ClassIri — #397/#398/#411's
 // invariant, never itself relativized). But when SERVED as a JSON Home resource key
@@ -140,6 +141,11 @@ let runtimeJsonHomeTests =
 // not leak a placeholder domain nobody serves (#415 thesis) — the SAME host-relative
 // href DiscoveryEmitter already computed for that class's own AlpsDescriptor.Href is
 // used instead, mirroring how `href`/`href-template` are already served host-relative.
+// That host-relative form is itself only an intermediate value, though: RFC 8288 §2.1
+// requires the served resources-object key to be a genuine link-relation-type IRI, so
+// DiscoveryMiddleware resolves it (and every HrefVars meaning IRI) against the live
+// TestServer request origin before writing the wire body — mirroring handleAlpsProfile's
+// existing per-request Href/Rt resolution (#398).
 
 let private declaredOnlyConfig: DiscoveryConfig =
     { ProfileUri = "/alps/test"
@@ -171,7 +177,8 @@ let private startDeclaredOnlyRelationServer () =
 let declaredOnlyJsonHomeKeyTests =
     testList
         "runtime JSON Home — #415 declared-only relation resolved to its own AlpsDescriptor.Href"
-        [ testCase "resource key is the host-relative href, not the un-relativized placeholder domain"
+        [ testCase
+              "resource key is resolved absolute against the live origin, not the host-relative href nor the un-relativized placeholder domain"
           <| fun _ ->
               use app = startDeclaredOnlyRelationServer ()
               use client = app.GetTestClient()
@@ -183,11 +190,139 @@ let declaredOnlyJsonHomeKeyTests =
               use doc = JsonDocument.Parse body
               let resources = doc.RootElement.GetProperty("resources")
               let keys = resources.EnumerateObject() |> Seq.map (fun p -> p.Name) |> Seq.toList
-              Expect.contains keys "/ex#Game" "resource key is the host-relative href"
+
+              Expect.contains
+                  keys
+                  "http://localhost/ex#Game"
+                  "resource key is the host-relative href resolved against the live TestServer request origin"
+
+              Expect.isFalse (keys |> List.contains "/ex#Game") "the un-resolved, still-relative form never appears"
 
               Expect.isFalse
                   (keys |> List.exists (fun k -> k.Contains "tictactoe.invalid"))
-                  "the un-relativized placeholder-domain identity key never appears as a served resource key" ]
+                  "the un-relativized placeholder-domain identity key never appears as a served resource key"
+
+          testCase "HrefVars meaning IRIs are resolved against the live origin, not served relative"
+          <| fun _ ->
+              use app = startDeclaredOnlyRelationServer ()
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/")
+              req.Headers.Add("Accept", "application/json-home")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              use doc = JsonDocument.Parse body
+
+              let resource =
+                  doc.RootElement.GetProperty("resources").GetProperty("http://localhost/ex#Game")
+
+              let hrefVars = resource.GetProperty("href-vars")
+
+              Expect.equal
+                  (hrefVars.GetProperty("id").GetString())
+                  "http://localhost/ex#identifier"
+                  "href-vars 'id' meaning IRI is resolved against the live TestServer request origin"
+
+              Expect.isFalse
+                  (body.Contains "\"/ex#identifier\"")
+                  "the un-resolved, still-relative meaning IRI never appears" ]
+
+// ── 2nd expert finding: classIriHrefMap fallback (no matching ALPS descriptor) ─────
+// homeResourcesFromEndpoints's servedRelation falls back to the RAW relation IRI when no
+// top-level ALPS descriptor's ClassIri matches it (line ~116). By the correlation-key
+// contract (#397/#398/#411), ResourceRelationMetadata.Relation is always the class's full,
+// un-relativized absolute IRI — so in the documented/expected case, this fallback's raw
+// value is already absolute, and resolveJsonHomeResourceAgainst's resolveHrefAgainst is a
+// no-op on it (RFC 3986 §5.3), so it stays absolute unchanged: safe by construction.
+// The `relation` CE op only validates non-empty (Frank.Discovery.fs), not absoluteness —
+// an app author could call it with a relative string directly, bypassing the documented
+// invariant. Because the resolution fix above applies resolveJsonHomeResourceAgainst to
+// EVERY served resource regardless of which classIriHrefMap branch produced it, that
+// hypothetical relative relation is resolved against the live origin too — closing the gap
+// even for input that violates the documented contract, not just the expected case.
+
+let private fallbackRelationConfig: DiscoveryConfig =
+    { ProfileUri = "/alps/test"
+      HomeRoute = "/"
+      // No descriptor's ClassIri matches either registered relation below — both fall
+      // through classIriHrefMap's Map.tryFind to the RAW relation.
+      AlpsDescriptors = []
+      DescribedByLinks = []
+      ResourceHrefVars = Map.empty }
+
+let private startFallbackRelationServer () =
+    // Fixed (non-templated) routes deliberately — this fixture investigates Relation
+    // resolution specifically, and a templated href would additionally require every
+    // template variable to have a derived meaning IRI (JsonHomeSerializer.writeHrefVar),
+    // an orthogonal concern already covered by the href-vars-resolution test above.
+    let absoluteRelationResource =
+        resource "/widgets" {
+            relation "https://tictactoe.invalid/ex#Widget"
+            get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("widget")))
+        }
+
+    // Deliberately violates the documented "always absolute" contract — the `relation` CE
+    // op only validates non-empty, not absoluteness (Frank.Discovery.fs `Relation` member).
+    let relativeRelationResource =
+        resource "/gadgets" {
+            relation "/ex#Gadget"
+            get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("gadget")))
+        }
+
+    let endpoints: Endpoint[] =
+        Array.append absoluteRelationResource.Endpoints relativeRelationResource.Endpoints
+
+    let app = buildDiscoveryApp None fallbackRelationConfig endpoints
+    app.StartAsync().GetAwaiter().GetResult()
+    app
+
+[<Tests>]
+let fallbackRelationTests =
+    testList
+        "runtime JSON Home — classIriHrefMap fallback (no matching ALPS descriptor, 2nd expert finding)"
+        [ testCase "an absolute relation with no matching descriptor stays absolute unchanged (safe by construction)"
+          <| fun _ ->
+              use app = startFallbackRelationServer ()
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/")
+              req.Headers.Add("Accept", "application/json-home")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              use doc = JsonDocument.Parse body
+
+              let keys =
+                  doc.RootElement.GetProperty("resources").EnumerateObject()
+                  |> Seq.map (fun p -> p.Name)
+                  |> Seq.toList
+
+              Expect.contains
+                  keys
+                  "https://tictactoe.invalid/ex#Widget"
+                  "already-absolute fallback relation is unchanged, still absolute"
+
+          testCase
+              "a relative relation with no matching descriptor is still resolved against the live origin, never leaked relative"
+          <| fun _ ->
+              use app = startFallbackRelationServer ()
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/")
+              req.Headers.Add("Accept", "application/json-home")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              use doc = JsonDocument.Parse body
+
+              let keys =
+                  doc.RootElement.GetProperty("resources").EnumerateObject()
+                  |> Seq.map (fun p -> p.Name)
+                  |> Seq.toList
+
+              Expect.contains
+                  keys
+                  "http://localhost/ex#Gadget"
+                  "even a relative fallback relation (bypassing the documented always-absolute contract) is resolved against origin"
+
+              Expect.isFalse
+                  (keys |> List.contains "/ex#Gadget")
+                  "the un-resolved, still-relative fallback relation never appears" ]
 
 [<Tests>]
 let jsonHomeFromSampleConfigTests =

@@ -240,6 +240,20 @@ let rec private resolveDescriptorHrefsAgainst (baseUri: Uri) (d: AlpsDescriptor)
         Rt = d.Rt |> Option.map (resolveHrefAgainst baseUri)
         Descriptors = d.Descriptors |> List.map (resolveDescriptorHrefsAgainst baseUri) }
 
+/// Resolve a served JSON Home resource's Relation (RFC 8288 §2.1 link-relation-type IRI,
+/// the `resources` object's key) and HrefVars VALUES (json-home draft §4.2 "meaning"
+/// IRIs) against a pre-parsed live request origin Uri — the same rule
+/// resolveDescriptorHrefsAgainst already applies to ALPS Href/Rt. HrefVars KEYS are
+/// template variable names (e.g. "id"), never IRIs, so only the map's values are resolved.
+/// Href/Allow are deliberately left untouched: Href is a route template/resource location,
+/// legitimately relative per the json-home spec — resolved by the consuming client against
+/// the document's own URL, same as any relative link on a web page — not the identity key
+/// this closes.
+let private resolveJsonHomeResourceAgainst (baseUri: Uri) (r: JsonHomeResource) : JsonHomeResource =
+    { r with
+        Relation = resolveHrefAgainst baseUri r.Relation
+        HrefVars = r.HrefVars |> Map.map (fun _ meaning -> resolveHrefAgainst baseUri meaning) }
+
 /// Reconcile codegen-emitted ALPS Type against real registered HTTP methods (#397).
 /// Tries the precise per-verb signal first (RequestClrTypeName via IAcceptsMetadata —
 /// disambiguates an action sharing a route with other verbs), then falls back to the
@@ -399,6 +413,28 @@ type DiscoveryMiddleware
             )
             .Value
 
+    // Mirrors resolvedAlpsCache/cachedResolvedAlps exactly, applied to JSON Home's
+    // resources instead of the ALPS descriptor tree — same instance-level-dictionary
+    // rationale (one DiscoveryConfig per middleware instance, never per-endpoint) and same
+    // build-once-per-distinct-origin discipline.
+    let resolvedHomeResourcesCache =
+        ConcurrentDictionary<string, Lazy<JsonHomeResource list>>()
+
+    let mutable resolvedHomeBuildCount = 0
+
+    let cachedResolvedHomeResources (origin: string) : JsonHomeResource list =
+        resolvedHomeResourcesCache
+            .GetOrAdd(
+                origin,
+                (fun _ ->
+                    Lazy<JsonHomeResource list>(fun () ->
+                        System.Threading.Interlocked.Increment(&resolvedHomeBuildCount) |> ignore
+
+                        cachedHomeResources.Value
+                        |> List.map (resolveJsonHomeResourceAgainst (Uri origin))))
+            )
+            .Value
+
     let handleOptions (ctx: HttpContext) : Task =
         let requestPath = ctx.Request.Path.Value
         let methods = methodsForPath endpointDataSource requestPath
@@ -465,10 +501,35 @@ type DiscoveryMiddleware
             ctx.Response.ContentType <- "application/alps+json"
             ctx.Response.WriteAsync(AlpsSerializer.serialize resolved)
 
+    // JSON Home resource keys (Relation, an RFC 8288 §2.1 link-relation-type IRI) and
+    // href-vars meaning IRIs are resolved against the LIVE request origin, not served
+    // schemeless-relative — mirrors handleAlpsProfile above (#398) and LinkedDataMiddleware's
+    // per-request term resolution (#396). A malformed Host header cannot mint resolvable
+    // IRIs, so this fails the same way: logged and 400, never a garbage-but-valid URI.
+    let handleJsonHome (ctx: HttpContext) : Task =
+        match Frank.OriginValidation.tryValidateOrigin ctx.Request with
+        | None ->
+            logger.LogWarning(
+                "DiscoveryMiddleware: malformed Host header '{Host}' — cannot mint resolvable JSON Home IRIs, rejecting with 400",
+                ctx.Request.Host.Value
+            )
+
+            ctx.Response.StatusCode <- 400
+            Task.CompletedTask
+        | Some origin ->
+            ctx.Response.Headers.Append("Vary", "Accept")
+            ctx.Response.ContentType <- "application/json-home"
+            ctx.Response.WriteAsync(JsonHomeSerializer.serialize (cachedResolvedHomeResources origin))
+
     /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of times
     /// the resolved ALPS descriptor tree was actually (re)built — proves build-once-per-
     /// distinct-origin, not once per request (#398 /simplify item 6).
     member internal _.ResolvedAlpsBuildCount = resolvedAlpsBuildCount
+
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of times
+    /// the resolved JSON Home resources list was actually (re)built — proves build-once-
+    /// per-distinct-origin, not once per request, mirroring ResolvedAlpsBuildCount above.
+    member internal _.ResolvedHomeBuildCount = resolvedHomeBuildCount
 
     member _.Invoke(ctx: HttpContext) : Task =
         let path = ctx.Request.Path.Value
@@ -479,8 +540,6 @@ type DiscoveryMiddleware
         elif isGet && path = config.ProfileUri then
             handleAlpsProfile ctx
         elif isGet && path = config.HomeRoute && acceptsJsonHome ctx then
-            ctx.Response.Headers.Append("Vary", "Accept")
-            ctx.Response.ContentType <- "application/json-home"
-            ctx.Response.WriteAsync(JsonHomeSerializer.serialize cachedHomeResources.Value)
+            handleJsonHome ctx
         else
             next.Invoke ctx
