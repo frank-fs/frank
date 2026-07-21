@@ -1,7 +1,6 @@
 namespace Frank.LinkedData
 
 open System
-open System.Collections.Concurrent
 open System.IO
 open System.Runtime.CompilerServices
 open System.Text
@@ -250,12 +249,17 @@ type LinkedDataMiddleware
 
     /// Serialized static-graph bodies for the GraphFactory=None branch, keyed by the owning
     /// LinkedDataConfig instance (endpoints are configured once at startup and live for the
-    /// app's lifetime) then by (origin, mediaType). ConditionalWeakTable ties cache lifetime to
-    /// the config's own lifetime — no manual eviction needed, since the host/mediaType
-    /// combination set behind a single app is tiny in practice (issue #382). The
-    /// GraphFactory=Some branch is genuinely per-request and is NEVER routed through this cache.
+    /// app's lifetime) then by (origin, mediaType). ConditionalWeakTable ties the OUTER
+    /// cache's lifetime to the config's own lifetime — the mediaType set is indeed tiny (a
+    /// handful of supported content types), but `origin` is derived from the request's own
+    /// `Host` header (Frank.OriginValidation.tryValidateOrigin validates only SYNTACTIC
+    /// well-formedness, never an allowlist) — an unauthenticated client varying Host can
+    /// mint unbounded permanent entries here (#405). Frank.BoundedCache bounds the INNER
+    /// per-config cache to a hard ceiling, independent of how many distinct origins a
+    /// client sends. The GraphFactory=Some branch is genuinely per-request and is NEVER
+    /// routed through this cache.
     let staticBodyCache =
-        ConditionalWeakTable<LinkedDataConfig, ConcurrentDictionary<struct (string * string), Lazy<string>>>()
+        ConditionalWeakTable<LinkedDataConfig, Frank.BoundedCache<struct (string * string), string>>()
 
     let mutable staticBodyBuildCount = 0
 
@@ -268,20 +272,17 @@ type LinkedDataMiddleware
         let perConfig =
             staticBodyCache.GetValue(
                 config,
-                ConditionalWeakTable<LinkedDataConfig, ConcurrentDictionary<struct (string * string), Lazy<string>>>
+                ConditionalWeakTable<LinkedDataConfig, Frank.BoundedCache<struct (string * string), string>>
                     .CreateValueCallback
-                    (fun _ -> ConcurrentDictionary())
+                    (fun _ -> Frank.BoundedCache<struct (string * string), string>(Frank.BoundedCache.DefaultCapacity))
             )
 
-        perConfig
-            .GetOrAdd(
-                struct (origin, mediaType),
-                (fun _ ->
-                    Lazy<string>(fun () ->
-                        System.Threading.Interlocked.Increment(&staticBodyBuildCount) |> ignore
-                        build ()))
-            )
-            .Value
+        perConfig.GetOrAdd(
+            struct (origin, mediaType),
+            (fun () ->
+                System.Threading.Interlocked.Increment(&staticBodyBuildCount) |> ignore
+                build ())
+        )
 
     let computeBody (mediaType: string) (origin: string) (effective: LinkedDataConfig) (ctx: HttpContext) : string =
         match effective.GraphFactory with
@@ -294,6 +295,17 @@ type LinkedDataMiddleware
     /// static-graph body was actually (re)built — proves build-once-per-(origin,mediaType) for
     /// the GraphFactory=None branch (issue #382).
     member internal _.StaticBodyBuildCount = staticBodyBuildCount
+
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of distinct
+    /// (origin, mediaType) entries currently retained for the given config's static-body
+    /// cache — proves the Host-header-flood cache-DoS fix (#405): bounded at
+    /// Frank.BoundedCache.DefaultCapacity regardless of how many distinct Host header
+    /// values a client sends. 0 when the config has never been served (cache not yet
+    /// created for it).
+    member internal _.StaticBodyCacheSizeFor(config: LinkedDataConfig) : int =
+        match staticBodyCache.TryGetValue config with
+        | true, cache -> cache.Count
+        | false, _ -> 0
 
     member private this.ServeRdf(ctx: HttpContext, mediaType: string, effective: LinkedDataConfig) : Task =
         match Frank.OriginValidation.tryValidateOrigin ctx.Request with

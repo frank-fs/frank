@@ -10,10 +10,13 @@
   <ItemGroup>
     <Compile Include="ShapesTests.fs" />
     <Compile Include="ResolverTests.fs" />
+    <Compile Include="JsonLdLoaderTests.fs" />
     <Compile Include="ValidatorTests.fs" />
     <Compile Include="MiddlewareTestHelpers.fs" />
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="MemoizationTests.fs" />
+    <Compile Include="CacheBoundTests.fs" />
+    <Compile Include="RoundTripTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
@@ -30,6 +33,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Frank.Validation/Frank.Validation.fsproj" />
+    <ProjectReference Include="../../src/Frank.LinkedData/Frank.LinkedData.fsproj" />
   </ItemGroup>
 
 </Project>

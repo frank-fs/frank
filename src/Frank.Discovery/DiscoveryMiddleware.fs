@@ -1,7 +1,6 @@
 module Frank.Discovery.DiscoveryMiddleware
 
 open System
-open System.Collections.Concurrent
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Metadata
@@ -47,6 +46,62 @@ let private acceptedRequestTypeOf (re: RouteEndpoint) : string option =
         match meta.RequestType with
         | null -> None
         | t -> Some(Frank.ClrTypeName.normalizeFullName t.FullName)
+
+/// Frank.OpenApi's `produces` operation stamps ProducesResponseTypeMetadata with
+/// typeof<Void> as its sentinel for "no declared response body type" (HandlerDefinition.fs)
+/// — never null. Mirrors Frank.Provenance.ProvenanceMiddleware's own sentinel-filtering
+/// convention (isSentinel) for the same metadata type.
+let private isVoidResponseType (t: Type) : bool =
+    t = typeof<Void> || t = typeof<unit> || t = typeof<obj>
+
+/// Declared response CLR type full names on an endpoint via IProducesResponseTypeMetadata
+/// (Frank.OpenApi's `produces`), normalized via Frank.ClrTypeName — the SAME correlation-key
+/// convention as acceptedRequestTypeOf, but for the response side (#418): a class-mapped
+/// resource can be legitimately reachable as an action's DECLARED RESPONSE type (e.g.
+/// `produces typeof<MoveResult> 200`) without ever being accepted as a request body or
+/// backing its own route by relation — methodsByRequestType (IAcceptsMetadata only) can't
+/// see this on its own.
+let internal producedResponseTypesOf (re: RouteEndpoint) : string list =
+    re.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
+    |> Seq.choose (fun m ->
+        match m.Type with
+        | null -> None
+        | t when isVoidResponseType t -> None
+        | t -> Some(Frank.ClrTypeName.normalizeFullName t.FullName))
+    |> Seq.toList
+
+/// #422 Finding C: the pluggable list of "live correlation key" signals that make an ALPS
+/// descriptor reachable (isLiveDescriptor) — relation IRI (ResourceRelationMetadata),
+/// accepted request CLR type (IAcceptsMetadata), declared response CLR type
+/// (IProducesResponseTypeMetadata, #418's third signal). Before this, each signal needed
+/// its own extraction function, its own map/set, and its own threaded parameter through
+/// filterReachableDescriptors/cachedAlpsDescriptors — #418 already had to grow a 3rd
+/// signal mid-implementation to fix a self-discovered regression (MoveResult). Adding a
+/// future signal is now exactly ONE function appended to this list;
+/// isLiveDescriptor/filterReachableDescriptors below never change.
+let internal correlationExtractors: (RouteEndpoint -> string list) list =
+    [ relationOf >> Option.toList
+      acceptedRequestTypeOf >> Option.toList
+      producedResponseTypesOf ]
+
+/// Union of every correlation key any of `extractors` contributes across every live
+/// endpoint in `dataSource` — the single set isLiveDescriptor/filterReachableDescriptors
+/// check ClassIri/RequestClrTypeName membership against. Parameterized over `extractors`
+/// (rather than hard-coding correlationExtractors) so the fold is independently testable —
+/// removing one extractor from the list demonstrably shrinks the resulting set with zero
+/// changes to isLiveDescriptor/filterReachableDescriptors.
+let internal liveCorrelationKeysWith
+    (extractors: (RouteEndpoint -> string list) list)
+    (dataSource: EndpointDataSource)
+    : Set<string> =
+    scanRouteEndpoints dataSource
+    |> Seq.collect (fun re -> extractors |> List.collect (fun extract -> extract re))
+    |> Set.ofSeq
+
+/// liveCorrelationKeysWith applied to the full, real correlationExtractors list — what
+/// production code actually calls.
+let internal liveCorrelationKeys (dataSource: EndpointDataSource) : Set<string> =
+    liveCorrelationKeysWith correlationExtractors dataSource
 
 /// Top-level class descriptors' ClassIri → Href, e.g. "https://tictactoe.invalid/ex#Game"
 /// → "/ex#Game" — DiscoveryEmitter already computed this host-relative-for-declared-only
@@ -234,26 +289,25 @@ let resolveHref (origin: string) (href: string) : string = resolveHrefAgainst (U
 /// cachedResolvedHomeResources below (#398 /simplify item 6 was duplicated verbatim
 /// between the two; this is the single extraction). `cache`/`onBuild` are owned by the
 /// calling DiscoveryMiddleware instance so this function stays free of module-level
-/// mutable state (Rule 13) — the caller supplies its own dictionary and build-count
-/// callback. The `Lazy` value under each key guarantees `build` runs at most once per
-/// origin, even if two requests race on a brand-new origin simultaneously. Mirrors
+/// mutable state (Rule 13) — the caller supplies its own cache and build-count callback.
+/// `cache` is a Frank.BoundedCache (#405: bounds retained memory to a hard ceiling
+/// independent of how many distinct Host header values a client sends — an unauthenticated
+/// client varying Host could otherwise mint unbounded permanent entries) — build still
+/// runs at most once per origin even if two requests race on a brand-new one. Mirrors
 /// ValidationMiddleware's getOrBuildShapesGraph shape (src/Frank.Validation/
 /// ValidationMiddleware.fs).
 let private getOrBuildByOrigin
-    (cache: ConcurrentDictionary<string, Lazy<'T>>)
+    (cache: Frank.BoundedCache<string, 'T>)
     (onBuild: unit -> unit)
     (origin: string)
     (build: unit -> 'T)
     : 'T =
-    cache
-        .GetOrAdd(
-            origin,
-            (fun _ ->
-                Lazy<'T>(fun () ->
-                    onBuild ()
-                    build ()))
-        )
-        .Value
+    cache.GetOrAdd(
+        origin,
+        (fun () ->
+            onBuild ()
+            build ())
+    )
 
 /// Resolve every Href/Rt in a descriptor tree (top-level and nested children) against a
 /// pre-parsed live request origin Uri (#398) — parsed ONCE by the caller and threaded
@@ -310,27 +364,127 @@ let internal reconcileAlpsTypes
 
     descriptors |> List.map reconcile
 
-// ── #398: per-request path matching shared by Allow and rel="type" scoping ───
+/// True iff a top-level descriptor is "live": its ClassIri OR its RequestClrTypeName
+/// appears in `liveKeys` — the union of every correlation signal any
+/// correlationExtractors entry contributes across live endpoints (#422 Finding C: relation
+/// IRI, accepted request type, and declared response type — #418's three signals — are no
+/// longer three separately-named maps/sets each requiring their own check here, just ONE
+/// set membership test).
+let private isLiveDescriptor (liveKeys: Set<string>) (d: AlpsDescriptor) : bool =
+    (d.ClassIri |> Option.exists (fun c -> Set.contains c liveKeys))
+    || (d.RequestClrTypeName |> Option.exists (fun t -> Set.contains t liveKeys))
 
-/// RouteEndpoints whose route template matches the given raw request path, regardless
-/// of the HTTP method each declares — the one-time template-match step shared by
-/// methodsForPath and relationsForPath. TemplateMatcher is not thread-safe — a fresh
-/// instance is constructed per candidate route, mirroring the prior inline usage.
-let private endpointsForPath (dataSource: EndpointDataSource) (requestPath: string) : RouteEndpoint list =
-    let pathString = PathString(requestPath)
+/// Bounded fixed-point closure over the `rt` chain (#422 expert-review finding 1): a
+/// one-hop check keeps a live descriptor's direct `rt` target but drops that target's OWN
+/// `rt` target, even though the now-served target descriptor publishes a real link to it —
+/// a client following live -> target -> target's-rt would hit a dead reference the server
+/// itself just served. Repeatedly unions in newly-rt-reachable descriptors (same dual-match
+/// join as before: a candidate is rt-reachable if its OWN Href OR Id appears in the raw Rt
+/// STRING VALUES collected from currently-reachable descriptors) until no new descriptor is
+/// added. Capped at `List.length descriptors` iterations (Holzmann rule 10): each productive
+/// iteration adds at least one previously-unreached descriptor Id, and there are only that
+/// many descriptors total, so the loop provably converges within the cap — hitting the cap
+/// with `newlyReachable` still non-empty is structurally impossible, not a truncation risk.
+let rec private closeOverRtChain
+    (descriptors: AlpsDescriptor list)
+    (reachableIds: Set<string>)
+    (remaining: int)
+    : Set<string> =
+    if remaining <= 0 then
+        reachableIds
+    else
+        let rtValues =
+            descriptors
+            |> List.filter (fun d -> Set.contains d.Id reachableIds)
+            |> List.choose (fun d -> d.Rt)
+            |> Set.ofList
 
+        let isRtReachable (d: AlpsDescriptor) =
+            (d.Href |> Option.exists (fun h -> Set.contains h rtValues))
+            || Set.contains d.Id rtValues
+
+        let newlyReachable =
+            descriptors
+            |> List.filter (fun d -> not (Set.contains d.Id reachableIds) && isRtReachable d)
+            |> List.map (fun d -> d.Id)
+            |> Set.ofList
+
+        if Set.isEmpty newlyReachable then
+            reachableIds
+        else
+            closeOverRtChain descriptors (Set.union reachableIds newlyReachable) (remaining - 1)
+
+/// #418: drop any top-level ALPS descriptor that (a) IS a class-mapped resource (ClassIri
+/// Some — DiscoveryEmitter.collectDescriptors only ever emits a top-level descriptor when
+/// the source resource carries a ClassIri, so this is never a real-world exclusion, only a
+/// guard against non-class-mapped top-level fixtures/descriptors this filter was never
+/// meant to touch) and (b) is neither live (isLiveDescriptor) nor `rt`-reachable, via a
+/// bounded fixed-point closure (closeOverRtChain, #422 expert-review finding 1), from a
+/// descriptor that IS live — an `rt` chain of ANY depth, not just one hop. Codegen
+/// (DiscoveryEmitter, MSBuild time) cannot see which types end up routed/embedded in
+/// Program.fs — that information only exists at runtime — so the running app is responsible
+/// for filtering its candidate descriptor set down to what a client can actually reach. A
+/// descriptor satisfying neither is a phantom affordance (e.g. a class-mapped type that
+/// exists only to exercise an `equivalentClass` declaration, never itself routed or
+/// embedded, #418) — a client following it would find nothing.
+let internal filterReachableDescriptors
+    (liveKeys: Set<string>)
+    (descriptors: AlpsDescriptor list)
+    : AlpsDescriptor list =
+    let liveIds =
+        descriptors
+        |> List.filter (isLiveDescriptor liveKeys)
+        |> List.map (fun d -> d.Id)
+        |> Set.ofList
+
+    let reachableIds = closeOverRtChain descriptors liveIds (List.length descriptors)
+
+    descriptors
+    |> List.filter (fun d -> d.ClassIri.IsNone || Set.contains d.Id reachableIds)
+
+// ── #398/#421: per-request path matching shared by Allow and rel="type" scoping ───
+
+/// One endpoint paired with its pre-parsed, immutable RouteTemplate (src/CLAUDE.md:
+/// "cache immutable RouteTemplate objects via TemplateParser.Parse; create TemplateMatcher
+/// per-request" — TemplateMatcher itself is NOT thread-safe and must never be cached, but
+/// the RouteTemplate it matches against is safe to share and must be, #421).
+type private EndpointTemplate = RouteEndpoint * RouteTemplate
+
+/// Parse every registered endpoint's route template exactly once — the cache-build step
+/// #421 introduces so methodsForPath/relationsForPath below stop re-parsing the SAME
+/// templates from raw strings on every OPTIONS request. `onParse` is called once per
+/// endpoint parsed, so callers (the DiscoveryMiddleware instance) can count real
+/// TemplateParser.Parse invocations without this pure function owning any counter state
+/// itself (Holzmann 14: side effects surfaced at the call site).
+let private buildRouteTemplates (onParse: unit -> unit) (dataSource: EndpointDataSource) : EndpointTemplate list =
     scanRouteEndpoints dataSource
-    |> Seq.filter (fun re ->
+    |> Seq.map (fun re ->
         let raw = re.RoutePattern.RawText
         let pattern = if raw.StartsWith('/') then raw.TrimStart('/') else raw
-        let matcher = TemplateMatcher(TemplateParser.Parse(pattern), RouteValueDictionary())
-        matcher.TryMatch(pathString, RouteValueDictionary()))
+        onParse ()
+        re, TemplateParser.Parse(pattern))
     |> Seq.toList
 
+/// RouteEndpoints whose (already-parsed, cached) route template matches the given raw
+/// request path, regardless of the HTTP method each declares — the one-time template-match
+/// step shared by methodsForPath and relationsForPath. TemplateMatcher is not thread-safe —
+/// a fresh instance is still constructed per candidate route on every call (#421 only caches
+/// the RouteTemplate parse, never the matcher itself, per the project's own rule).
+let private endpointsForPath (routeTemplates: EndpointTemplate list) (requestPath: string) : RouteEndpoint list =
+    let pathString = PathString(requestPath)
+
+    routeTemplates
+    |> List.filter (fun (_, template) ->
+        let matcher = TemplateMatcher(template, RouteValueDictionary())
+        matcher.TryMatch(pathString, RouteValueDictionary()))
+    |> List.map fst
+
 /// Real HTTP methods registered for the given request path, from every endpoint whose
-/// route template matches — the OPTIONS Allow header's source of truth.
-let internal methodsForPath (dataSource: EndpointDataSource) (requestPath: string) : string list =
-    endpointsForPath dataSource requestPath
+/// route template matches — the OPTIONS Allow header's source of truth. Takes the
+/// already-built RouteTemplate cache (#421), never a raw EndpointDataSource — the caller
+/// (handleOptions) builds/reuses that cache once per middleware instance lifetime.
+let internal methodsForPath (routeTemplates: EndpointTemplate list) (requestPath: string) : string list =
+    endpointsForPath routeTemplates requestPath
     |> List.choose httpMethodsOf
     |> List.collect id
     |> List.distinct
@@ -339,9 +493,10 @@ let internal methodsForPath (dataSource: EndpointDataSource) (requestPath: strin
 /// every endpoint whose route template matches. Used to scope rel="type" Link headers to
 /// only the resource actually matched (#398) — a route carrying no relation (e.g. "/",
 /// "/tictactoe") yields an empty list, and every codegen-emitted DescribedByLink for
-/// OTHER resources is withheld, not broadcast.
-let internal relationsForPath (dataSource: EndpointDataSource) (requestPath: string) : string list =
-    endpointsForPath dataSource requestPath
+/// OTHER resources is withheld, not broadcast. Takes the already-built RouteTemplate cache
+/// (#421), shared with methodsForPath — a request needing both never parses twice.
+let internal relationsForPath (routeTemplates: EndpointTemplate list) (requestPath: string) : string list =
+    endpointsForPath routeTemplates requestPath
     |> List.choose relationOf
     |> List.distinct
 
@@ -398,10 +553,22 @@ type DiscoveryMiddleware
     // correlation should not see.
     let cachedAlpsDescriptors =
         lazy
-            (let methodsByRel, methodsByReq =
-                correlateMethodsByRelationAndRequestType (resourceEndpointDataSource :> EndpointDataSource)
+            (let narrowSource = resourceEndpointDataSource :> EndpointDataSource
 
-             reconcileAlpsTypes methodsByRel methodsByReq config.AlpsDescriptors)
+             let methodsByRel, methodsByReq =
+                 correlateMethodsByRelationAndRequestType narrowSource
+
+             // #422 Finding C: liveKeys unions ALL correlationExtractors signals (relation,
+             // accepted-request-type, produced-response-type) in one fold — methodsByRel/
+             // methodsByReq above are still computed separately because reconcileAlpsTypes
+             // below needs the actual per-key HTTP METHOD sets, not just liveness.
+             let liveKeys = liveCorrelationKeys narrowSource
+
+             config.AlpsDescriptors
+             // #418: drop phantom top-level descriptors BEFORE Type reconciliation — a
+             // dropped descriptor never needs its Type reconciled.
+             |> filterReachableDescriptors liveKeys
+             |> reconcileAlpsTypes methodsByRel methodsByReq)
 
     // #398: DescribedByLinks keyed by class IRI, so a matched route's own declared
     // relation looks up only its own rel="type" link(s) — never every app resource's.
@@ -413,17 +580,46 @@ type DiscoveryMiddleware
              |> List.map (fun (classIri, links) -> classIri, links |> List.map (fun l -> l.Link))
              |> Map.ofList)
 
+    // #421: every registered endpoint's RouteTemplate, parsed once — src/CLAUDE.md's own
+    // documented rule ("cache immutable RouteTemplate objects via TemplateParser.Parse;
+    // create TemplateMatcher per-request") was honored for the matcher half but not the
+    // parse half; methodsForPath/relationsForPath (the Allow header and rel="type" scoping
+    // sources of truth) used to re-parse every endpoint's raw route string from scratch on
+    // every single OPTIONS request. Same "endpoint set is fixed after startup" rationale as
+    // cachedHomeResources/cachedAlpsDescriptors above — and here that invariant isn't just
+    // assumed: Frank's own ResourceEndpointDataSource.GetChangeToken() returns
+    // NullChangeToken.Singleton (src/Frank/Builder.fs), i.e. it declares itself as never
+    // changing after construction. A third-party EndpointDataSource composed into the same
+    // app that DOES fire change tokens (e.g. hot-reloaded Razor Pages) would need this cache
+    // to move to change-token-driven invalidation — this project has no such case anywhere
+    // yet (every other Lazy<_> cache in this file makes the identical assumption), so a
+    // plain build-once Lazy is the right-sized fix, not speculative invalidation plumbing.
+    let mutable routeTemplateParseCount = 0
+
+    let cachedRouteTemplates =
+        lazy
+            (buildRouteTemplates
+                (fun () -> System.Threading.Interlocked.Increment(&routeTemplateParseCount) |> ignore)
+                endpointDataSource)
+
     // #398 /simplify item 6: resolved-descriptor-tree cache, origin-keyed — mirrors
     // LinkedDataMiddleware.cachedStaticBody's origin-keyed Lazy memoization (#382),
     // applied here to handleAlpsProfile's per-request href/rt resolution, which used to
     // re-walk the whole descriptor tree on every request regardless of origin repetition.
     // DiscoveryConfig (unlike LinkedDataConfig) is a single constructor-injected value —
     // one per middleware instance, never looked up per-endpoint per-request — so a plain
-    // instance-level dictionary keyed by origin alone is the right-sized mirror of the
-    // same idea (LinkedDataMiddleware additionally keys by config via ConditionalWeakTable
-    // because ONE of its middleware instances serves MANY distinct LinkedDataConfig values,
-    // one per endpoint; DiscoveryMiddleware never does).
-    let resolvedAlpsCache = ConcurrentDictionary<string, Lazy<AlpsDescriptor list>>()
+    // instance-level cache keyed by origin alone is the right-sized mirror of the same idea
+    // (LinkedDataMiddleware additionally keys by config via ConditionalWeakTable because ONE
+    // of its middleware instances serves MANY distinct LinkedDataConfig values, one per
+    // endpoint; DiscoveryMiddleware never does). #405: Frank.BoundedCache bounds retained
+    // memory to a hard ceiling regardless of how many distinct Host header values a client
+    // sends — the origin string is only ever validated for SYNTACTIC well-formedness
+    // (Frank.OriginValidation.tryValidateOrigin), never checked against a configured
+    // allowlist, so an unbounded cache here would let an unauthenticated client mint
+    // unlimited permanent entries.
+    let resolvedAlpsCache =
+        Frank.BoundedCache<string, AlpsDescriptor list>(Frank.BoundedCache.DefaultCapacity)
+
     let mutable resolvedAlpsBuildCount = 0
 
     let cachedResolvedAlps (origin: string) : AlpsDescriptor list =
@@ -436,11 +632,11 @@ type DiscoveryMiddleware
                 |> List.map (resolveDescriptorHrefsAgainst (Uri origin)))
 
     // Mirrors resolvedAlpsCache/cachedResolvedAlps exactly, applied to JSON Home's
-    // resources instead of the ALPS descriptor tree — same instance-level-dictionary
-    // rationale (one DiscoveryConfig per middleware instance, never per-endpoint) and same
-    // build-once-per-distinct-origin discipline.
+    // resources instead of the ALPS descriptor tree — same instance-level-cache rationale
+    // (one DiscoveryConfig per middleware instance, never per-endpoint), same
+    // build-once-per-distinct-origin discipline, and the SAME bounded-cache fix (#405).
     let resolvedHomeResourcesCache =
-        ConcurrentDictionary<string, Lazy<JsonHomeResource list>>()
+        Frank.BoundedCache<string, JsonHomeResource list>(Frank.BoundedCache.DefaultCapacity)
 
     let mutable resolvedHomeBuildCount = 0
 
@@ -455,7 +651,7 @@ type DiscoveryMiddleware
 
     let handleOptions (ctx: HttpContext) : Task =
         let requestPath = ctx.Request.Path.Value
-        let methods = methodsForPath endpointDataSource requestPath
+        let methods = methodsForPath cachedRouteTemplates.Value requestPath
 
         let methods =
             if List.contains "GET" methods && not (List.contains "HEAD" methods) then
@@ -482,7 +678,7 @@ type DiscoveryMiddleware
         // #398: scope rel="type" links to the matched route's own declared relation(s) —
         // a route with no declared relation gets zero rel="type" links.
         let scopedLinks =
-            relationsForPath endpointDataSource requestPath
+            relationsForPath cachedRouteTemplates.Value requestPath
             |> List.collect (fun relation ->
                 describedByLinksByRelation.Value
                 |> Map.tryFind relation
@@ -548,6 +744,21 @@ type DiscoveryMiddleware
     /// the resolved JSON Home resources list was actually (re)built — proves build-once-
     /// per-distinct-origin, not once per request, mirroring ResolvedAlpsBuildCount above.
     member internal _.ResolvedHomeBuildCount = resolvedHomeBuildCount
+
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of times
+    /// TemplateParser.Parse was actually invoked — proves parse-once-per-endpoint at
+    /// cache-build time, not once per OPTIONS request (#421).
+    member internal _.RouteTemplateParseCount = routeTemplateParseCount
+
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of
+    /// distinct origins currently retained in the resolved-ALPS cache — proves the
+    /// Host-header-flood cache-DoS fix (#405): bounded at Frank.BoundedCache.DefaultCapacity
+    /// regardless of how many distinct Host header values a client sends.
+    member internal _.ResolvedAlpsCacheSize = resolvedAlpsCache.Count
+
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): mirrors
+    /// ResolvedAlpsCacheSize above, for the resolved-JSON-Home cache (#405).
+    member internal _.ResolvedHomeCacheSize = resolvedHomeResourcesCache.Count
 
     member _.Invoke(ctx: HttpContext) : Task =
         let path = ctx.Request.Path.Value

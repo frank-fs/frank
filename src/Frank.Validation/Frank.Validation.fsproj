@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="../Frank/Frank.fsproj" />
     <ProjectReference Include="../Frank.Semantic/Frank.Semantic.fsproj" />
+    <ProjectReference Include="../Frank.Semantic.Core/Frank.Semantic.Core.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

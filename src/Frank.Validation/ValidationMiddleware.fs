@@ -1,7 +1,6 @@
 namespace Frank.Validation
 
 open System
-open System.Collections.Concurrent
 open System.IO
 open System.Text
 open System.Text.Json
@@ -85,26 +84,26 @@ module private HostRelative =
     /// Builds (or reuses) the origin-keyed host-relative ShapesGraph. `cache`/`onBuild` are
     /// owned by the calling ValidationMiddleware instance (#382) so this function stays free of
     /// module-level mutable state — the caller supplies its caching policy explicitly (Rule 13).
-    /// The `Lazy` value under each dictionary key guarantees `Shapes.toShapesGraph` runs at most
-    /// once per origin, even if two requests race on a brand-new origin simultaneously.
+    /// `cache` is a Frank.BoundedCache (#405/#422: bounds retained memory to a hard ceiling
+    /// independent of how many distinct Host header values a client sends — an unauthenticated
+    /// client varying Host could otherwise mint unbounded permanent entries, the SAME defect
+    /// #405 closed for DiscoveryMiddleware/LinkedDataMiddleware) — `Shapes.toShapesGraph` still
+    /// runs at most once per origin, even if two requests race on a brand-new one.
     let private getOrBuildShapesGraph
-        (cache: ConcurrentDictionary<string, Lazy<VDS.RDF.Shacl.ShapesGraph>>)
+        (cache: Frank.BoundedCache<string, VDS.RDF.Shacl.ShapesGraph>)
         (onBuild: unit -> unit)
         (props: (Uri * string * string option) list)
         (origin: string)
         : VDS.RDF.Shacl.ShapesGraph =
-        cache
-            .GetOrAdd(
-                origin,
-                (fun o ->
-                    Lazy<VDS.RDF.Shacl.ShapesGraph>(fun () ->
-                        onBuild ()
-                        Shapes.toShapesGraph (resolveProps props o)))
-            )
-            .Value
+        cache.GetOrAdd(
+            origin,
+            (fun () ->
+                onBuild ()
+                Shapes.toShapesGraph (resolveProps props origin))
+        )
 
     let validateDynamic
-        (cache: ConcurrentDictionary<string, Lazy<VDS.RDF.Shacl.ShapesGraph>>)
+        (cache: Frank.BoundedCache<string, VDS.RDF.Shacl.ShapesGraph>)
         (onBuild: unit -> unit)
         (props: (Uri * string * string option) list)
         (origin: string)
@@ -128,12 +127,16 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
         if config.MaxBodyBytes <= 0L then
             invalidArg (nameof config) "ValidationConfig.MaxBodyBytes must be positive"
 
-    /// Host-relative ShapesGraph cache, one entry per distinct request origin. Bounded in
-    /// practice: the host set behind a single app is tiny (issue #382), and entries live for the
-    /// process lifetime of this (singleton, per-pipeline) middleware instance — no manual
-    /// eviction needed.
+    /// Host-relative ShapesGraph cache, one entry per distinct request origin (issue #382).
+    /// #405/#422: Frank.BoundedCache bounds retained memory to a hard ceiling regardless of
+    /// how many distinct Host header values a client sends — the origin string is only ever
+    /// validated for SYNTACTIC well-formedness (Frank.OriginValidation.tryValidateOrigin),
+    /// never checked against a configured allowlist, so an unbounded cache here would let an
+    /// unauthenticated client mint unlimited permanent entries (the same defect #405 closed
+    /// for DiscoveryMiddleware's resolvedAlpsCache/resolvedHomeResourcesCache and
+    /// LinkedDataMiddleware's staticBodyCache).
     let hostRelativeShapesCache =
-        ConcurrentDictionary<string, Lazy<VDS.RDF.Shacl.ShapesGraph>>()
+        Frank.BoundedCache<string, VDS.RDF.Shacl.ShapesGraph>(Frank.BoundedCache.DefaultCapacity)
 
     let mutable hostRelativeShapesBuildCount = 0
 
@@ -168,6 +171,13 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
     /// host-relative ShapesGraph was actually rebuilt — proves build-once-per-origin under
     /// repeated requests to the same host (issue #382).
     member internal _.HostRelativeShapesBuildCount = hostRelativeShapesBuildCount
+
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of distinct
+    /// origins currently retained in the host-relative ShapesGraph cache — proves the
+    /// Host-header-flood cache-DoS fix (#405/#422): bounded at
+    /// Frank.BoundedCache.DefaultCapacity regardless of how many distinct Host header values
+    /// a client sends.
+    member internal _.HostRelativeShapesCacheSize = hostRelativeShapesCache.Count
 
     member private _.InvokeCore(ctx: HttpContext, origin: string) : Task =
         if not (JsonLdBody.isLdJson ctx) then

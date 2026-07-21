@@ -14,7 +14,10 @@
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="AlpsMemoizationTests.fs" />
     <Compile Include="JsonHomeMemoizationTests.fs" />
+    <Compile Include="RouteTemplateCacheTests.fs" />
+    <Compile Include="CacheBoundTests.fs" />
     <Compile Include="AlpsTypeReconciliationTests.fs" />
+    <Compile Include="PhantomDescriptorTests.fs" />
     <Compile Include="CeOrderingTests.fs" />
     <Compile Include="RelationTests.fs" />
     <Compile Include="ResolverTests.fs" />

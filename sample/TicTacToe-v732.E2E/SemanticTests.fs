@@ -2033,3 +2033,61 @@ type SemanticTests() =
                 sprintf "JSON Home href-vars.id must be the origin-resolved '%s' meaning IRI" identifierIri
             )
         }
+
+    // ── AT-S11: phantom ALPS descriptor (MoveLog/ItemList) never served (#418) ───
+    //
+    // Vocabulary.fs declares `equivalentClass typedefof<MoveLog<_>> "schema:ItemList"`
+    // purely to exercise the equivalentClass CE keyword — MoveLog backs zero registered
+    // route and is never embedded as a field of any routed resource (confirmed:
+    // Program.fs registers exactly 4 resources — /, /games/{id}, /tictactoe, /vocabulary —
+    // none is MoveLog). Its full ALPS descriptor (served Id "ItemList" — DiscoveryEmitter's
+    // Id is the ClassIri's local name, confirmed via the real generated GeneratedDiscovery.fs:
+    // `{ Id = "ItemList"; ClassIri = Some "https://schema.org/ItemList";
+    // RequestClrTypeName = Some "TicTacToe.Model.MoveLog`1" }`) must not be served: a client
+    // following it would find nothing. Paired with a positive presence check —
+    // "MoveAction" (live via IAcceptsMetadata: MoveRequest is the POST body type) and
+    // "ActionStatusType" (live via IProducesResponseTypeMetadata: MoveResult is the
+    // `produces typeof<MoveResult> 200` declared response type, and nests the "Won"/"Draw"/
+    // etc. case descriptors AT-S8 depends on) — so this is not an absence-only false-green.
+    [<Test>]
+    member this.``AT-S11 phantom descriptor (MoveLog/ItemList) is never served in ALPS``() =
+        task {
+            use! ctx = this.NewContext()
+            let! opts = this.Options(ctx, "/games/at-s11")
+            let alpsUrl = (SemanticTests.LinkRels opts).["describedby"]
+            let! alps = ctx.GetAsync(alpsUrl)
+            Assert.That(alps.Status, Is.EqualTo 200, "ALPS profile not 200")
+            let! body = alps.TextAsync()
+
+            Assert.That(
+                body.Contains "ItemList",
+                Is.False,
+                "MoveLog/ItemList must never be served — it backs zero route and is never embedded anywhere (#418)"
+            )
+
+            use doc = JsonDocument.Parse body
+            let descriptors = doc.RootElement.GetProperty("alps").GetProperty("descriptor")
+
+            let ids =
+                descriptors.EnumerateArray()
+                |> Seq.map (fun d -> d.GetProperty("id").GetString())
+                |> Seq.toList
+
+            Assert.That(
+                ids |> List.contains "ItemList",
+                Is.False,
+                "MoveLog's ItemList descriptor id must not appear at top level"
+            )
+
+            Assert.That(
+                ids |> List.contains "MoveAction",
+                Is.True,
+                "MoveAction (live via IAcceptsMetadata) must still be served — regression guard, not an absence-only false-green"
+            )
+
+            Assert.That(
+                ids |> List.contains "ActionStatusType",
+                Is.True,
+                "ActionStatusType (live via IProducesResponseTypeMetadata's `produces typeof<MoveResult> 200`, nests the Won/Draw/etc. case descriptors) must still be served — regression guard"
+            )
+        }
