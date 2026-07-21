@@ -15,6 +15,7 @@
     <Compile Include="MiddlewareTestHelpers.fs" />
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="MemoizationTests.fs" />
+    <Compile Include="CacheBoundTests.fs" />
     <Compile Include="RoundTripTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>

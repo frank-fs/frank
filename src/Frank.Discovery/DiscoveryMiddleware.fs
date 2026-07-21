@@ -61,7 +61,7 @@ let private isVoidResponseType (t: Type) : bool =
 /// `produces typeof<MoveResult> 200`) without ever being accepted as a request body or
 /// backing its own route by relation — methodsByRequestType (IAcceptsMetadata only) can't
 /// see this on its own.
-let private producedResponseTypesOf (re: RouteEndpoint) : string list =
+let internal producedResponseTypesOf (re: RouteEndpoint) : string list =
     re.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
     |> Seq.choose (fun m ->
         match m.Type with
@@ -69,6 +69,39 @@ let private producedResponseTypesOf (re: RouteEndpoint) : string list =
         | t when isVoidResponseType t -> None
         | t -> Some(Frank.ClrTypeName.normalizeFullName t.FullName))
     |> Seq.toList
+
+/// #422 Finding C: the pluggable list of "live correlation key" signals that make an ALPS
+/// descriptor reachable (isLiveDescriptor) — relation IRI (ResourceRelationMetadata),
+/// accepted request CLR type (IAcceptsMetadata), declared response CLR type
+/// (IProducesResponseTypeMetadata, #418's third signal). Before this, each signal needed
+/// its own extraction function, its own map/set, and its own threaded parameter through
+/// filterReachableDescriptors/cachedAlpsDescriptors — #418 already had to grow a 3rd
+/// signal mid-implementation to fix a self-discovered regression (MoveResult). Adding a
+/// future signal is now exactly ONE function appended to this list;
+/// isLiveDescriptor/filterReachableDescriptors below never change.
+let internal correlationExtractors: (RouteEndpoint -> string list) list =
+    [ relationOf >> Option.toList
+      acceptedRequestTypeOf >> Option.toList
+      producedResponseTypesOf ]
+
+/// Union of every correlation key any of `extractors` contributes across every live
+/// endpoint in `dataSource` — the single set isLiveDescriptor/filterReachableDescriptors
+/// check ClassIri/RequestClrTypeName membership against. Parameterized over `extractors`
+/// (rather than hard-coding correlationExtractors) so the fold is independently testable —
+/// removing one extractor from the list demonstrably shrinks the resulting set with zero
+/// changes to isLiveDescriptor/filterReachableDescriptors.
+let internal liveCorrelationKeysWith
+    (extractors: (RouteEndpoint -> string list) list)
+    (dataSource: EndpointDataSource)
+    : Set<string> =
+    scanRouteEndpoints dataSource
+    |> Seq.collect (fun re -> extractors |> List.collect (fun extract -> extract re))
+    |> Set.ofSeq
+
+/// liveCorrelationKeysWith applied to the full, real correlationExtractors list — what
+/// production code actually calls.
+let internal liveCorrelationKeys (dataSource: EndpointDataSource) : Set<string> =
+    liveCorrelationKeysWith correlationExtractors dataSource
 
 /// Top-level class descriptors' ClassIri → Href, e.g. "https://tictactoe.invalid/ex#Game"
 /// → "/ex#Game" — DiscoveryEmitter already computed this host-relative-for-declared-only
@@ -196,18 +229,6 @@ let private correlateMethodsByRelationAndRequestType
         |> Map.ofSeq
 
     toMethodsMap byRelation, toMethodsMap byRequestType
-
-/// Set of every declared response CLR type full name (normalized) across all live
-/// endpoints, from IProducesResponseTypeMetadata (#418's third live-correlation signal,
-/// alongside methodsByRelation/methodsByRequestType above — see producedResponseTypesOf).
-/// A separate, single-purpose walk rather than folded into
-/// correlateMethodsByRelationAndRequestType above: that function's 2-tuple return is a
-/// public-facing contract methodsByRelation/methodsByRequestType already destructure via
-/// fst/snd, and this signal has no per-method breakdown to preserve (existence only).
-let private producedResponseTypeNames (dataSource: EndpointDataSource) : Set<string> =
-    scanRouteEndpoints dataSource
-    |> Seq.collect producedResponseTypesOf
-    |> Set.ofSeq
 
 /// Real HTTP methods per relation IRI, from live endpoints' ResourceRelationMetadata.
 /// Coarse correlation key: one `resource { relation X; ... }` block stamps the SAME
@@ -343,22 +364,15 @@ let internal reconcileAlpsTypes
 
     descriptors |> List.map reconcile
 
-/// True iff a top-level descriptor is "live": its ClassIri backs a registered route
-/// (methodsByRel, via ResourceRelationMetadata), its RequestClrTypeName backs a registered
-/// accepted request type (methodsByType, via IAcceptsMetadata — reconcileAlpsTypes above
-/// already established both signals, #397/#398), OR its RequestClrTypeName is a registered
-/// DECLARED RESPONSE type (producedTypes, via IProducesResponseTypeMetadata — #418: an
-/// action's `produces typeof<MoveResult> 200` return type is reachable even though it is
-/// never itself accepted as a request body or backed by its own relation).
-let private isLiveDescriptor
-    (methodsByRel: Map<string, Set<string>>)
-    (methodsByType: Map<string, Set<string>>)
-    (producedTypes: Set<string>)
-    (d: AlpsDescriptor)
-    : bool =
-    (d.ClassIri |> Option.exists (fun c -> Map.containsKey c methodsByRel))
-    || (d.RequestClrTypeName |> Option.exists (fun t -> Map.containsKey t methodsByType))
-    || (d.RequestClrTypeName |> Option.exists (fun t -> Set.contains t producedTypes))
+/// True iff a top-level descriptor is "live": its ClassIri OR its RequestClrTypeName
+/// appears in `liveKeys` — the union of every correlation signal any
+/// correlationExtractors entry contributes across live endpoints (#422 Finding C: relation
+/// IRI, accepted request type, and declared response type — #418's three signals — are no
+/// longer three separately-named maps/sets each requiring their own check here, just ONE
+/// set membership test).
+let private isLiveDescriptor (liveKeys: Set<string>) (d: AlpsDescriptor) : bool =
+    (d.ClassIri |> Option.exists (fun c -> Set.contains c liveKeys))
+    || (d.RequestClrTypeName |> Option.exists (fun t -> Set.contains t liveKeys))
 
 /// #418: drop any top-level ALPS descriptor that (a) IS a class-mapped resource (ClassIri
 /// Some — DiscoveryEmitter.collectDescriptors only ever emits a top-level descriptor when
@@ -374,12 +388,10 @@ let private isLiveDescriptor
 /// `equivalentClass` declaration, never itself routed or embedded, #418) — a client
 /// following it would find nothing.
 let internal filterReachableDescriptors
-    (methodsByRel: Map<string, Set<string>>)
-    (methodsByType: Map<string, Set<string>>)
-    (producedTypes: Set<string>)
+    (liveKeys: Set<string>)
     (descriptors: AlpsDescriptor list)
     : AlpsDescriptor list =
-    let isLive = isLiveDescriptor methodsByRel methodsByType producedTypes
+    let isLive = isLiveDescriptor liveKeys
 
     let liveRtTargets =
         descriptors |> List.filter isLive |> List.choose (fun d -> d.Rt) |> Set.ofList
@@ -507,12 +519,16 @@ type DiscoveryMiddleware
              let methodsByRel, methodsByReq =
                  correlateMethodsByRelationAndRequestType narrowSource
 
-             let producedTypes = producedResponseTypeNames narrowSource
+             // #422 Finding C: liveKeys unions ALL correlationExtractors signals (relation,
+             // accepted-request-type, produced-response-type) in one fold — methodsByRel/
+             // methodsByReq above are still computed separately because reconcileAlpsTypes
+             // below needs the actual per-key HTTP METHOD sets, not just liveness.
+             let liveKeys = liveCorrelationKeys narrowSource
 
              config.AlpsDescriptors
              // #418: drop phantom top-level descriptors BEFORE Type reconciliation — a
              // dropped descriptor never needs its Type reconciled.
-             |> filterReachableDescriptors methodsByRel methodsByReq producedTypes
+             |> filterReachableDescriptors liveKeys
              |> reconcileAlpsTypes methodsByRel methodsByReq)
 
     // #398: DescribedByLinks keyed by class IRI, so a matched route's own declared

@@ -54,13 +54,18 @@
   </ItemGroup>
 
   <!-- BoundedCache (#405) is tested directly in isolation, mirroring the pattern above, and
-       its DefaultCapacity constant is asserted against from both consumer test suites. -->
+       its DefaultCapacity constant is asserted against from all three consumer test suites
+       (#422 cluster: ValidationMiddleware's hostRelativeShapesCache joined
+       DiscoveryMiddleware's/LinkedDataMiddleware's caches on BoundedCache). -->
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>Frank.Tests</_Parameter1>
     </AssemblyAttribute>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>Frank.LinkedData.Tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Frank.Validation.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
 

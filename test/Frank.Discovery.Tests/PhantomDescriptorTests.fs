@@ -5,6 +5,7 @@ open System.Text.Json
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Metadata
+open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Expecto
 open Frank.Discovery
@@ -35,21 +36,19 @@ let filterReachableDescriptorsTests =
     testList
         "DiscoveryMiddleware — #418 filterReachableDescriptors (pure)"
         [ test "descriptor live via methodsByRel (ClassIri) is kept" {
-              let methodsByRel = Map.ofList [ "https://schema.org/Game", Set.ofList [ "GET" ] ]
+              let liveKeys = Set.ofList [ "https://schema.org/Game" ]
               let d = mkDescriptor "Game" (Some "https://schema.org/Game") None None
 
-              let result =
-                  DiscoveryMiddleware.filterReachableDescriptors methodsByRel Map.empty Set.empty [ d ]
+              let result = DiscoveryMiddleware.filterReachableDescriptors liveKeys [ d ]
 
               Expect.equal result [ d ] "live-by-relation descriptor is kept"
           }
 
           test "descriptor live via methodsByType (RequestClrTypeName, accepted request body) is kept" {
-              let methodsByType = Map.ofList [ "App.MoveRequest", Set.ofList [ "POST" ] ]
+              let liveKeys = Set.ofList [ "App.MoveRequest" ]
               let d = mkDescriptor "MoveRequest" None (Some "App.MoveRequest") None
 
-              let result =
-                  DiscoveryMiddleware.filterReachableDescriptors Map.empty methodsByType Set.empty [ d ]
+              let result = DiscoveryMiddleware.filterReachableDescriptors liveKeys [ d ]
 
               Expect.equal result [ d ] "live-by-request-type descriptor is kept"
           }
@@ -58,13 +57,12 @@ let filterReachableDescriptorsTests =
               // Mirrors the real regression: MoveResult (`produces typeof<MoveResult> 200`)
               // is never accepted as a request body and never backs its own route by
               // relation — only IProducesResponseTypeMetadata correlates it.
-              let producedTypes = Set.ofList [ "App.MoveResult" ]
+              let liveKeys = Set.ofList [ "App.MoveResult" ]
 
               let d =
                   mkDescriptor "MoveResult" (Some "https://schema.org/MoveResult") (Some "App.MoveResult") None
 
-              let result =
-                  DiscoveryMiddleware.filterReachableDescriptors Map.empty Map.empty producedTypes [ d ]
+              let result = DiscoveryMiddleware.filterReachableDescriptors liveKeys [ d ]
 
               Expect.equal result [ d ] "live-by-declared-response-type descriptor is kept"
           }
@@ -74,15 +72,14 @@ let filterReachableDescriptorsTests =
               // and is never referenced by anything.
               let orphan = mkDescriptor "MoveLog" (Some "https://schema.org/ItemList") None None
 
-              let result =
-                  DiscoveryMiddleware.filterReachableDescriptors Map.empty Map.empty Set.empty [ orphan ]
+              let result = DiscoveryMiddleware.filterReachableDescriptors Set.empty [ orphan ]
 
               Expect.isEmpty result "orphaned descriptor (no live signal, no rt reference) is dropped"
           }
 
           test
               "descriptor with no live signal, but IS the rt target of a live descriptor, is kept (embedded-child regression guard)" {
-              let methodsByType = Map.ofList [ "App.MoveRequest", Set.ofList [ "POST" ] ]
+              let liveKeys = Set.ofList [ "App.MoveRequest" ]
 
               let moveRequest =
                   mkDescriptor "MoveRequest" None (Some "App.MoveRequest") (Some "https://example.org/Outcome")
@@ -93,11 +90,7 @@ let filterReachableDescriptorsTests =
               let outcome = mkDescriptor "Outcome" (Some "https://example.org/Outcome") None None
 
               let result =
-                  DiscoveryMiddleware.filterReachableDescriptors
-                      Map.empty
-                      methodsByType
-                      Set.empty
-                      [ moveRequest; outcome ]
+                  DiscoveryMiddleware.filterReachableDescriptors liveKeys [ moveRequest; outcome ]
 
               Expect.contains result moveRequest "the live descriptor itself is kept"
 
@@ -109,12 +102,12 @@ let filterReachableDescriptorsTests =
 
           test
               "unrelated non-live descriptor is still dropped even when SOME OTHER live descriptor exists (no false-positive keep-everything)" {
-              let methodsByRel = Map.ofList [ "https://schema.org/Game", Set.ofList [ "GET" ] ]
+              let liveKeys = Set.ofList [ "https://schema.org/Game" ]
               let game = mkDescriptor "Game" (Some "https://schema.org/Game") None None
               let orphan = mkDescriptor "MoveLog" (Some "https://schema.org/ItemList") None None
 
               let result =
-                  DiscoveryMiddleware.filterReachableDescriptors methodsByRel Map.empty Set.empty [ game; orphan ]
+                  DiscoveryMiddleware.filterReachableDescriptors liveKeys [ game; orphan ]
 
               Expect.contains result game "live descriptor kept"
 
@@ -174,6 +167,99 @@ let private phantomConfig: DiscoveryConfig =
 
 /// Fixture response type for IProducesResponseTypeMetadata — stands in for MoveResult.
 type private MoveResultFixture = { Status: string }
+
+// ── #422 Finding C: correlationExtractors is a genuine fold over a list ──────────────
+
+/// #422 Finding C: filterReachableDescriptors/isLiveDescriptor used to hand-enumerate three
+/// separately-named signals (relation / accepted-request-type / produced-response-type),
+/// each requiring its own extraction function, its own map/set, and its own threaded
+/// parameter — already had to grow a 3rd signal mid-#418 to fix the MoveResult regression.
+/// correlationExtractors/liveCorrelationKeysWith replace that with a single pluggable list
+/// of `RouteEndpoint -> string list` extractors folded into ONE liveCorrelationKeys set —
+/// adding a future signal is exactly one function appended to the list, and
+/// isLiveDescriptor/filterReachableDescriptors never change. These tests prove the fold is
+/// real (not just renamed plumbing) by removing an extractor from the list — via
+/// liveCorrelationKeysWith's own `extractors` parameter, from OUTSIDE the module, with zero
+/// changes to isLiveDescriptor/filterReachableDescriptors — and observing the live set
+/// shrink accordingly.
+let private endpointDataSourceOf (endpoints: RouteEndpoint list) : EndpointDataSource =
+    { new EndpointDataSource() with
+        member _.Endpoints =
+            endpoints |> List.map (fun re -> re :> Endpoint) |> ResizeArray :> _
+
+        member _.GetChangeToken() =
+            Microsoft.Extensions.FileProviders.NullChangeToken.Singleton :> Microsoft.Extensions.Primitives.IChangeToken }
+
+[<Tests>]
+let correlationExtractorsTests =
+    testList
+        "DiscoveryMiddleware — #422 correlationExtractors is a fold over a list"
+        [ test "liveCorrelationKeys (the full extractor list) unions all three signals across endpoints" {
+              let dataSource =
+                  endpointDataSourceOf
+                      [ routeEndpoint
+                            "/games/{id}"
+                            [| "GET" |]
+                            [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata) ]
+                        routeEndpoint
+                            "/games/{id}"
+                            [| "POST" |]
+                            [ box (
+                                  AcceptsMetadata([| "application/json" |], typeof<MoveRequestFixture>, false)
+                                  :> IAcceptsMetadata
+                              )
+                              box (
+                                  ProducesResponseTypeMetadata(200, typeof<MoveResultFixture>, [| "application/json" |])
+                                  :> obj
+                              ) ] ]
+
+              let fullKeys = DiscoveryMiddleware.liveCorrelationKeys dataSource
+
+              Expect.contains fullKeys "https://schema.org/Game" "relation-IRI signal present"
+
+              Expect.contains
+                  fullKeys
+                  (Frank.ClrTypeName.normalizeFullName typeof<MoveRequestFixture>.FullName)
+                  "accepted-request-type signal present"
+
+              Expect.contains
+                  fullKeys
+                  (Frank.ClrTypeName.normalizeFullName typeof<MoveResultFixture>.FullName)
+                  "produced-response-type signal present"
+          }
+
+          test
+              "removing ONE extractor from the list (outside isLiveDescriptor/filterReachableDescriptors) shrinks the live set accordingly — proves a genuine fold, not hand-wired signals" {
+              let dataSource =
+                  endpointDataSourceOf
+                      [ routeEndpoint
+                            "/games/{id}"
+                            [| "POST" |]
+                            [ box (
+                                  AcceptsMetadata([| "application/json" |], typeof<MoveRequestFixture>, false)
+                                  :> IAcceptsMetadata
+                              )
+                              box (
+                                  ProducesResponseTypeMetadata(200, typeof<MoveResultFixture>, [| "application/json" |])
+                                  :> obj
+                              ) ] ]
+
+              // Only the produced-response-type extractor — dropping the accepted-request-type
+              // extractor from the list, with zero code changes anywhere else.
+              let onlyProducedTypeExtractor = [ DiscoveryMiddleware.producedResponseTypesOf ]
+
+              let narrowedKeys =
+                  DiscoveryMiddleware.liveCorrelationKeysWith onlyProducedTypeExtractor dataSource
+
+              Expect.contains
+                  narrowedKeys
+                  (Frank.ClrTypeName.normalizeFullName typeof<MoveResultFixture>.FullName)
+                  "the remaining (produced-response-type) extractor's signal is still present"
+
+              Expect.isFalse
+                  (Set.contains (Frank.ClrTypeName.normalizeFullName typeof<MoveRequestFixture>.FullName) narrowedKeys)
+                  "the REMOVED (accepted-request-type) extractor's signal is gone from the live set — proves the set is a genuine fold over the extractor list, not independently hand-wired"
+          } ]
 
 let private startPhantomServer () =
     let endpoints: Microsoft.AspNetCore.Http.Endpoint[] =
