@@ -161,17 +161,28 @@ let tests =
               // re-walks via usedContextEntries/graphUriNodes AND again for serialization.
               let unshared = buildGraph ()
               unshared.Triples |> Seq.map (fun t -> t.ToString()) |> Seq.toList |> ignore
-              let unsharedJson = ProvenanceGraph.compactGraph [ "schema", "https://schema.org/" ] unshared
+
+              let unsharedJson =
+                  ProvenanceGraph.compactGraph [ "schema", "https://schema.org/" ] unshared
 
               // #431 follow-up: scanTriples's single walk feeds both the fingerprint (reprs)
               // and compactGraphWithUris's context filtering (uris) — only the serialization
               // pass inside compactGraphWithUris re-walks the graph.
               let shared = buildGraph ()
               let uris, reprs = ProvenanceGraph.scanTriples shared
-              let sharedJson = ProvenanceGraph.compactGraphWithUris [ "schema", "https://schema.org/" ] shared uris
 
-              Expect.equal unshared.TriplesAccessCount 3 "unshared fingerprint + compactGraph pays 3 separate triple walks"
-              Expect.equal shared.TriplesAccessCount 2 "shared scanTriples + compactGraphWithUris pays only 2 (fingerprint scan + serialization)"
+              let sharedJson =
+                  ProvenanceGraph.compactGraphWithUris [ "schema", "https://schema.org/" ] shared uris
+
+              Expect.equal
+                  unshared.TriplesAccessCount
+                  3
+                  "unshared fingerprint + compactGraph pays 3 separate triple walks"
+
+              Expect.equal
+                  shared.TriplesAccessCount
+                  2
+                  "shared scanTriples + compactGraphWithUris pays only 2 (fingerprint scan + serialization)"
 
               Expect.equal reprs.Length 1 "scanTriples returned the one asserted triple's string repr"
               Expect.equal sharedJson unsharedJson "sharing the walk must not change the compacted JSON-LD output"
