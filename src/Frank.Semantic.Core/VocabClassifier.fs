@@ -118,8 +118,85 @@ module VocabClassifier =
         else
             Proposed
 
+    // ── Ownership derived from the app's own produced artifact (#419) ─────────
+
+    // A deployed app may bind a different domain than any dev-time/CLI-supplied base URI,
+    // so no externally supplied URL can be a build-time static-analysis fact (#419 rework —
+    // see EmitterShared.declaredOnlyBases, the same "derive ownership from the app's own
+    // resolved resource identity IRIs" pattern already used by the emitters for #396).
+    // This resolves CURIEs directly against the lock's own prefix map rather than reusing
+    // Frank.Semantic's VocabularyRegistry.tryResolveIri: Frank.Semantic.Core has no
+    // dotNetRdf/FCS dependency by design (Frank.Analyzers depends on Core alone — see
+    // Frank.Analyzers.fsproj — so the analyzer's real build/editor channel can compute
+    // ownership with zero manual flags, config, or FCS evaluation).
+    let private expandCurie (prefixes: Map<string, Uri>) (curie: string) : Uri option =
+        match curie.IndexOf(':') with
+        | -1 -> None
+        | idx ->
+            let prefix = curie.[.. idx - 1]
+            let local = curie.[idx + 1 ..]
+
+            Map.tryFind prefix prefixes
+            |> Option.bind (fun baseUri ->
+                match Uri.TryCreate(baseUri.AbsoluteUri + local, UriKind.Absolute) with
+                | true, u -> Some u
+                | false, _ -> None)
+
+    // Every CURIE that identifies one of the app's own resources: the type IRI of every
+    // non-Excluded Mapping, every non-Excluded field's IRI, and every Confirmed union
+    // case's IRI. Mirrors ResolvedModel.build's inclusion rules (buildResource/buildField/
+    // buildCase) so the derived ownership set matches what the app actually emits.
+    let private ownResourceIdentityCuries (lock: LockFile) : string list =
+        let included = lock.Mappings |> List.filter (fun m -> m.Status <> Excluded)
+
+        let typeCuries = included |> List.choose (fun m -> m.Iri)
+
+        let fieldCuries =
+            included
+            |> List.collect (fun m ->
+                MappingShape.activePayloadFields m.Shape
+                |> List.filter (fun f -> f.Status <> Excluded)
+                |> List.choose (fun f -> f.Iri))
+
+        let caseCuries =
+            included
+            |> List.collect (fun m ->
+                MappingShape.caseMappings m.Shape
+                |> List.filter (fun c -> c.Status = MappingStatus.Confirmed)
+                |> List.choose (fun c -> c.Iri))
+
+        typeCuries @ fieldCuries @ caseCuries
+
+    /// The set of normalized authorities the app's own lock demonstrably owns, derived
+    /// solely from the produced artifact (lock.Mappings) — never from an externally
+    /// supplied base URI. See EmitterShared.declaredOnlyBases for the equivalent
+    /// ResolvedModel-based computation used by the emitters (#396); this variant works
+    /// directly off LockFile so it is available in Frank.Semantic.Core's FCS/dotNetRdf-free
+    /// load closure (#419).
+    let ownedIdentityAuthorities (lock: LockFile) : Set<string> =
+        let prefixes = buildPrefixMap lock.Vocabularies lock.DeclaredPrefixes
+
+        ownResourceIdentityCuries lock
+        |> List.choose (expandCurie prefixes)
+        |> List.choose (fun u -> normalizeAuthority u.AbsoluteUri)
+        |> Set.ofList
+
+    // True iff `prefix` is declared in `lock.DeclaredPrefixes` and its IRI's authority
+    // matches one of the app's own resolved resource-identity authorities (#419).
+    let private isOwnedDeclaredPrefix (ownAuthorities: Set<string>) (lock: LockFile) (prefix: string) : bool =
+        match Map.tryFind prefix lock.DeclaredPrefixes with
+        | None -> false
+        | Some iri ->
+            match normalizeAuthority iri with
+            | None -> false
+            | Some authority -> Set.contains authority ownAuthorities
+
     /// Classify each referenced namespace prefix against a pre-built URI index.
     /// Prefer when byUri is already built at the call site to avoid redundant Map construction.
+    /// #419: when the prefix has no `lock.Vocabularies` entry (never fetched), distinguishes
+    /// an app-owned declared prefix (LocallyServedUnconfirmed, backed by the app's own
+    /// resolved resource identity — see ownedIdentityAuthorities) from a genuinely external,
+    /// uncached one (Undereferenceable). No base URI, config, or flag is ever consulted.
     /// Pure, deterministic, offline-safe. `now` is injected — never reads the system clock.
     let classifyReferencedVocabWith
         (lock: LockFile)
@@ -128,12 +205,17 @@ module VocabClassifier =
         (referencedNs: string list)
         : VocabState list =
         let policy = SlaPolicy.defaultPolicy
+        let ownAuthorities = ownedIdentityAuthorities lock
 
         referencedNs
         |> List.map (fun prefix ->
             match lookupEntry lock byUri prefix with
             | Some entry -> classifyEntry policy prefix entry now
-            | None -> Undereferenceable)
+            | None ->
+                if isOwnedDeclaredPrefix ownAuthorities lock prefix then
+                    LocallyServedUnconfirmed
+                else
+                    Undereferenceable)
 
     /// Classify each referenced namespace prefix against the lock using the default SLA policy.
     /// Pure, deterministic, offline-safe. `now` is injected — never reads the system clock.

@@ -54,10 +54,7 @@ let private at1Lock: LockFile =
       Generated = fixedNow
       Integrity = None
       Vocabularies = Map.ofList [ "schema", confirmedSchemaEntry ]
-      DeclaredPrefixes =
-        Map.ofList
-            [ "schema", "https://schema.org/"
-              "ttt", "https://example.org/tictactoe#" ]
+      DeclaredPrefixes = Map.ofList [ "schema", "https://schema.org/"; "ttt", "https://example.org/tictactoe#" ]
       Mappings = [ moveRequestMapping ] }
 
 // AT2 lock: "ttt" is in Vocabularies and Confirmed
@@ -73,10 +70,7 @@ let private confirmedTttEntry =
 
 let private at2Lock: LockFile =
     { at1Lock with
-        Vocabularies =
-          Map.ofList
-              [ "schema", confirmedSchemaEntry
-                "ttt", confirmedTttEntry ] }
+        Vocabularies = Map.ofList [ "schema", confirmedSchemaEntry; "ttt", confirmedTttEntry ] }
 
 // AT4 lock: only schema (Confirmed), no ttt
 let private schemaOnlyJson =
@@ -113,7 +107,10 @@ let private localEntry =
     { v1Empty with
         Uri = "https://local.example.org/"
         Owned = true
-        Validated = { IsValidated = false; Reason = None; LastChecked = None }
+        Validated =
+            { IsValidated = false
+              Reason = None
+              LastChecked = None }
         FetchedAt = fixedNow.AddDays(-1.0)
         Hash = "sha256:local" }
 
@@ -122,7 +119,10 @@ let private proposedEntry =
     { v1Empty with
         Uri = "https://prop.example.org/"
         Owned = false
-        Validated = { IsValidated = false; Reason = None; LastChecked = None }
+        Validated =
+            { IsValidated = false
+              Reason = None
+              LastChecked = None }
         FetchedAt = fixedNow.AddDays(-1.0)
         Hash = "sha256:prop" }
 
@@ -131,7 +131,10 @@ let private staleEntry =
     { v1Empty with
         Uri = "https://stale.example.org/"
         Owned = false
-        Validated = { IsValidated = false; Reason = None; LastChecked = None }
+        Validated =
+            { IsValidated = false
+              Reason = None
+              LastChecked = None }
         FetchedAt = fixedNow.AddDays(-60.0)
         Hash = "sha256:stale" }
 
@@ -171,10 +174,7 @@ let private at6Lock: LockFile =
       Generated = fixedNow
       Integrity = None
       Vocabularies = Map.ofList [ "schema", confirmedSchemaEntry ]
-      DeclaredPrefixes =
-        Map.ofList
-            [ "sdo", "https://schema.org/"
-              "unpub", "https://example.org/private#" ]
+      DeclaredPrefixes = Map.ofList [ "sdo", "https://schema.org/"; "unpub", "https://example.org/private#" ]
       Mappings =
         [ { FSharpType = "App.Aliased"
             Iri = None
@@ -202,7 +202,10 @@ let private at6Json =
 let private mismatchedEntry =
     { v1Empty with
         Uri = "https://DIFFERENT.org/#"
-        Validated = { IsValidated = true; Reason = None; LastChecked = None }
+        Validated =
+            { IsValidated = true
+              Reason = None
+              LastChecked = None }
         FetchedAt = fixedNow.AddDays(-1.0)
         Hash = "sha256:mismatch" }
 
@@ -231,28 +234,40 @@ let private fiveStateLock: LockFile =
             [ "conf",
               { v1Empty with
                   Uri = "https://conf.example.org/"
-                  Validated = { IsValidated = true; Reason = None; LastChecked = None }
+                  Validated =
+                      { IsValidated = true
+                        Reason = None
+                        LastChecked = None }
                   FetchedAt = fixedNow.AddDays(-1.0)
                   Hash = "sha256:conf" }
               "prop",
               { v1Empty with
                   Uri = "https://prop.example.org/"
                   Owned = false
-                  Validated = { IsValidated = false; Reason = None; LastChecked = None }
+                  Validated =
+                      { IsValidated = false
+                        Reason = None
+                        LastChecked = None }
                   FetchedAt = fixedNow.AddDays(-1.0)
                   Hash = "sha256:prop" }
               "local",
               { v1Empty with
                   Uri = "https://local.example.org/"
                   Owned = true
-                  Validated = { IsValidated = false; Reason = None; LastChecked = None }
+                  Validated =
+                      { IsValidated = false
+                        Reason = None
+                        LastChecked = None }
                   FetchedAt = fixedNow.AddDays(-1.0)
                   Hash = "sha256:local" }
               "stale",
               { v1Empty with
                   Uri = "https://stale.example.org/"
                   Owned = false
-                  Validated = { IsValidated = false; Reason = None; LastChecked = None }
+                  Validated =
+                      { IsValidated = false
+                        Reason = None
+                        LastChecked = None }
                   FetchedAt = fixedNow.AddDays(-60.0)
                   Hash = "sha256:stale" } ]
       DeclaredPrefixes =
@@ -270,7 +285,13 @@ let private fiveStateLock: LockFile =
             Status = Unresolved
             Alternates = []
             Rt = None
-            Shape = MappingShape.Record [ { Name = "X"; Iri = None; Confidence = 0.0; Source = Convention; Status = Unresolved } ] }
+            Shape =
+              MappingShape.Record
+                  [ { Name = "X"
+                      Iri = None
+                      Confidence = 0.0
+                      Source = Convention
+                      Status = Unresolved } ] }
           { FSharpType = "App.Prop"
             Iri = None
             Confidence = 0.0
@@ -278,7 +299,13 @@ let private fiveStateLock: LockFile =
             Status = Unresolved
             Alternates = []
             Rt = None
-            Shape = MappingShape.Record [ { Name = "X"; Iri = None; Confidence = 0.0; Source = Convention; Status = Unresolved } ] }
+            Shape =
+              MappingShape.Record
+                  [ { Name = "X"
+                      Iri = None
+                      Confidence = 0.0
+                      Source = Convention
+                      Status = Unresolved } ] }
           { FSharpType = "App.Under"
             Iri = None
             Confidence = 0.0
@@ -286,7 +313,13 @@ let private fiveStateLock: LockFile =
             Status = Unresolved
             Alternates = []
             Rt = None
-            Shape = MappingShape.Record [ { Name = "X"; Iri = None; Confidence = 0.0; Source = Convention; Status = Unresolved } ] }
+            Shape =
+              MappingShape.Record
+                  [ { Name = "X"
+                      Iri = None
+                      Confidence = 0.0
+                      Source = Convention
+                      Status = Unresolved } ] }
           { FSharpType = "App.Local"
             Iri = None
             Confidence = 0.0
@@ -294,7 +327,13 @@ let private fiveStateLock: LockFile =
             Status = Unresolved
             Alternates = []
             Rt = None
-            Shape = MappingShape.Record [ { Name = "X"; Iri = None; Confidence = 0.0; Source = Convention; Status = Unresolved } ] }
+            Shape =
+              MappingShape.Record
+                  [ { Name = "X"
+                      Iri = None
+                      Confidence = 0.0
+                      Source = Convention
+                      Status = Unresolved } ] }
           { FSharpType = "App.Stale"
             Iri = None
             Confidence = 0.0
@@ -302,7 +341,13 @@ let private fiveStateLock: LockFile =
             Status = Unresolved
             Alternates = []
             Rt = None
-            Shape = MappingShape.Record [ { Name = "X"; Iri = None; Confidence = 0.0; Source = Convention; Status = Unresolved } ] } ] }
+            Shape =
+              MappingShape.Record
+                  [ { Name = "X"
+                      Iri = None
+                      Confidence = 0.0
+                      Source = Convention
+                      Status = Unresolved } ] } ] }
 
 let private fiveStateJson =
     """{ "schemaVersion": 1, "resolved": [
@@ -372,7 +417,12 @@ let vocabWarningTests =
 
               Expect.equal w.Prefix "ttt" "AT1: prefix is ttt"
               Expect.equal w.Iri "https://example.org/tictactoe#" "AT1: IRI is exact namespace IRI"
-              Expect.equal (w.Location |> Option.map (fun l -> l.Type)) (Some "MoveRequest") "AT1: type is MoveRequest (simple name)"
+
+              Expect.equal
+                  (w.Location |> Option.map (fun l -> l.Type))
+                  (Some "MoveRequest")
+                  "AT1: type is MoveRequest (simple name)"
+
               Expect.equal (w.Location |> Option.bind (fun l -> l.Field)) (Some "Position") "AT1: field is Position"
               Expect.equal w.State VocabState.Undereferenceable "AT1: state is typed VocabState"
               Expect.isFalse (w.Iri = w.Prefix) "AT1: IRI must differ from bare prefix"
@@ -391,7 +441,12 @@ let vocabWarningTests =
           test "AT3: status format has dedicated Warnings section for Undereferenceable ttt" {
               let output = Status.format fixedNow at1Lock
               Expect.stringContains output "Warnings:" "AT3: Warnings: section header present"
-              Expect.stringContains output "https://example.org/tictactoe#" "AT3: Warnings section includes resolved IRI"
+
+              Expect.stringContains
+                  output
+                  "https://example.org/tictactoe#"
+                  "AT3: Warnings section includes resolved IRI"
+
               Expect.stringContains output "publish" "AT3: Warnings section includes host-it hint"
               // Inline vocab table retained
               Expect.stringContains output "Vocabularies:" "AT3: inline Vocabularies table retained"
@@ -533,7 +588,10 @@ let vocabWarningTests =
               let doc = Expect.wantOk (Accept.parseResolved json) "parse"
               let _, summary = Accept.apply at1Lock doc Manual emptyOracle
               let tttWarnings = summary.Warnings |> List.filter (fun w -> w.Prefix = "ttt")
-              Expect.isNonEmpty tttWarnings "item2: accept must warn when absolute IRI references Undereferenceable namespace"
+
+              Expect.isNonEmpty
+                  tttWarnings
+                  "item2: accept must warn when absolute IRI references Undereferenceable namespace"
           }
 
           // item3-RED: field under tictactoe-extra namespace must not be attributed to tictactoe namespace
@@ -579,7 +637,8 @@ let vocabWarningTests =
 
               Expect.isFalse
                   (tttW.Hint.Contains("tictactoe# as"))
-                  "item4: hint must not carry # before 'as dereferenceable'" }
+                  "item4: hint must not carry # before 'as dereferenceable'"
+          }
 
           // item1-regression: CURIE prefix in Vocabularies-only reaches the guard and never emits bare-prefix iri
           test "item1-regression: CURIE prefix in Vocabularies-only reaches the guard and never emits a bare-prefix iri" {
@@ -591,4 +650,5 @@ let vocabWarningTests =
               let vocWarnings = summary.Warnings |> List.filter (fun w -> w.Prefix = "voc")
               Expect.isEmpty vocWarnings "item1-regression: Vocabularies-only prefix must not produce any warning"
               let bareIriWarnings = summary.Warnings |> List.filter (fun w -> w.Iri = w.Prefix)
-              Expect.isEmpty bareIriWarnings "item1-regression: no warning may carry a bare prefix label as its IRI" } ]
+              Expect.isEmpty bareIriWarnings "item1-regression: no warning may carry a bare prefix label as its IRI"
+          } ]

@@ -49,7 +49,7 @@ let private fixture name = Path.Combine(fixturesDir, $"{name}.fs")
 
 let private fixedNow = DateTimeOffset(2026, 7, 9, 12, 0, 0, TimeSpan.Zero)
 
-let private emptyLock : LockFile =
+let private emptyLock: LockFile =
     { SchemaVersion = 2
       Generated = fixedNow
       Integrity = None
@@ -82,7 +82,9 @@ let private schemaNsUri = "https://schema.org/"
 
 let private tttLockUnfetched = makeLock [ "ttt", tttNsUri ] []
 let private tttLockFetched = makeLock [ "ttt", tttNsUri ] [ "ttt", tttNsUri ]
-let private schemaLockFetched = makeLock [ "schema", schemaNsUri ] [ "schema", schemaNsUri ]
+
+let private schemaLockFetched =
+    makeLock [ "schema", schemaNsUri ] [ "schema", schemaNsUri ]
 
 // ── classifyReferencedVocab pure-fn tests (replaces checkUndereferenceableVocab) ──
 
@@ -147,14 +149,21 @@ let analyzerTests =
         "UndereferenceableVocabAnalyzer"
         [
           // AT1: ttt not in lock, file references ttt:X -> FRANK002
-          expectFrank002 "VocabWithRouteAndTttRef" tttLockUnfetched "AT1: warns when ttt not in lock and file references ttt prefix"
+          expectFrank002
+              "VocabWithRouteAndTttRef"
+              tttLockUnfetched
+              "AT1: warns when ttt not in lock and file references ttt prefix"
 
           // AT2: route does NOT suppress FRANK002; file must reference prefix for scoping
           testCase "AT2 new: route /tictactoe does NOT suppress FRANK002 (hint only)"
           <| fun _ ->
               let tree = parseFixture (fixture "VocabWithRouteAndTttRef")
               let msgs = analyzeWithLock (Some(Ok tttLockUnfetched)) fixedNow tree
-              Expect.isGreaterThanOrEqual (frank002 msgs).Length 1 "Route does not suppress FRANK002 -- route is hint only"
+
+              Expect.isGreaterThanOrEqual
+                  (frank002 msgs).Length
+                  1
+                  "Route does not suppress FRANK002 -- route is hint only"
 
           // AT3: ttt in Vocabularies (validated) -> no FRANK002; file references ttt: so suppression is exercised
           expectNoFrank002 "VocabWithRouteAndTttRef" tttLockFetched "AT3: no warning when ttt is dereferenceable"

@@ -138,7 +138,8 @@ let formatByPackageTests =
 
 // ── A-C10: Status surface agrees with classifier ──────────────────────────────
 
-let private fixedNow = System.DateTimeOffset(2026, 7, 9, 12, 0, 0, System.TimeSpan.Zero)
+let private fixedNow =
+    System.DateTimeOffset(2026, 7, 9, 12, 0, 0, System.TimeSpan.Zero)
 
 let private lockWithVocabs (vocabs: Map<string, VocabularyEntry>) (prefixes: Map<string, string>) : LockFile =
     { SchemaVersion = 2
@@ -192,14 +193,93 @@ let ac10StatusSurfaceTests =
               Expect.equal (List.head states) VocabState.Confirmed "classifier: schema is Confirmed"
 
               let output = Status.format fixedNow lf
-              Expect.stringContains output "  schema: Confirmed" "status surface agrees with classifier: schema: Confirmed"
+
+              Expect.stringContains
+                  output
+                  "  schema: Confirmed"
+                  "status surface agrees with classifier: schema: Confirmed"
           }
 
           test "undereferenceable vocab: status format shows Undereferenceable" {
-              let lf =
-                  lockWithVocabs Map.empty (Map.ofList [ "ex", "https://example.org/" ])
+              let lf = lockWithVocabs Map.empty (Map.ofList [ "ex", "https://example.org/" ])
 
               let output = Status.format fixedNow lf
               Expect.stringContains output "ex" "status output mentions ex"
               Expect.stringContains output "Undereferenceable" "status output shows Undereferenceable"
+          } ]
+
+// ── #419 AC4: status distinguishes declared-only owned vs. genuinely-external prefixes ──
+// Ownership is derived from the lock's own Mappings (the produced artifact) — never a
+// base URI/flag/config — since a deployed app may bind a different domain than any
+// dev-time value (#419 rework).
+
+let private lockWithVocabsAndMappings
+    (vocabs: Map<string, VocabularyEntry>)
+    (prefixes: Map<string, string>)
+    (mappings: Mapping list)
+    : LockFile =
+    { lockWithVocabs vocabs prefixes with
+        Mappings = mappings }
+
+[<Tests>]
+let issue419StatusTests =
+    testList
+        "#419 AC4: frank semantic status distinguishes owned-unfetched from external-unfetched"
+        [ test
+              "declared-only, never-fetched prefix backing the app's own Confirmed mapping identity reports LocallyServedUnconfirmed" {
+              let ownedLock =
+                  lockWithVocabsAndMappings
+                      Map.empty
+                      (Map.ofList [ "ttt", "https://example.org/tictactoe#" ])
+                      [ mappingWith "App.Move" (Some "ttt:Move") Confirmed ]
+
+              let output = Status.format fixedNow ownedLock
+
+              Expect.stringContains
+                  output
+                  "  ttt: LocallyServedUnconfirmed"
+                  "owned-unfetched prefix reports LocallyServedUnconfirmed"
+          }
+
+          test
+              "declared-only, never-fetched, genuinely external prefix (Wikidata) with no Mappings evidence reports Undereferenceable" {
+              let externalLock =
+                  lockWithVocabsAndMappings
+                      Map.empty
+                      (Map.ofList
+                          [ "wd", "https://www.wikidata.org/entity/"
+                            "ttt", "https://example.org/tictactoe#" ])
+                      [ mappingWith "App.Move" (Some "ttt:Move") Confirmed ]
+
+              let output = Status.format fixedNow externalLock
+
+              Expect.stringContains
+                  output
+                  "  wd: Undereferenceable"
+                  "external-unfetched prefix reports Undereferenceable"
+          }
+
+          test "owned-unfetched and external-unfetched prefixes in the SAME lock produce different message text" {
+              let lf =
+                  lockWithVocabsAndMappings
+                      Map.empty
+                      (Map.ofList
+                          [ "wd", "https://www.wikidata.org/entity/"
+                            "ttt", "https://example.org/tictactoe#" ])
+                      [ mappingWith "App.Move" (Some "ttt:Move") Confirmed ]
+
+              let output = Status.format fixedNow lf
+
+              Expect.stringContains
+                  output
+                  "  ttt: LocallyServedUnconfirmed"
+                  "ttt (backed by real identity evidence) is LocallyServedUnconfirmed"
+
+              Expect.stringContains output "  wd: Undereferenceable" "wd (never used as identity) is Undereferenceable"
+
+              // Undereferenceable additionally gets a Warnings: host-it hint; LocallyServedUnconfirmed does not.
+              let warningsIdx = output.IndexOf "Warnings:"
+              Expect.isTrue (warningsIdx >= 0) "external-unfetched gets a Warnings section"
+              Expect.isTrue (output.[warningsIdx..].Contains "wd") "Warnings section names wd"
+              Expect.isFalse (output.[warningsIdx..].Contains " ttt ") "Warnings section does not name ttt"
           } ]

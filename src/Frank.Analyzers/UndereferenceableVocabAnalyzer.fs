@@ -200,6 +200,10 @@ let private termDiagnostics
 ///   Some (Error msg) → tampered/unreadable lock → FRANK003 diagnostic
 ///   Some (Ok lock)   → classify vocabs + terms
 /// `now` is injected; Core never reads the clock.
+/// #419: a declared-but-unfetched owned prefix classifies as LocallyServedUnconfirmed
+/// (Info nudge) instead of Undereferenceable (Warning), ownership derived entirely from
+/// the lock's own Mappings (see VocabClassifier.ownedIdentityAuthorities) — never from a
+/// base URI, config, or flag, so the editor/CLI analyzer channel needs none of those.
 /// For the CLI/CI path use analyzeWithLockCli which suppresses the clock-dependent FRANK004.
 let analyzeWithLock
     (lockResult: Result<LockFile, string> option)

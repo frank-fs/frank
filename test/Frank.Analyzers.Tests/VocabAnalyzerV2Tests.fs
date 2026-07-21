@@ -566,6 +566,77 @@ let analyzerV2Tests =
                    |> List.forall (fun m -> m.Severity = FSharp.Analyzers.SDK.Severity.Info))
                   "FRANK010 nudge must be Info severity"
 
+          testCase
+              "#419 AC3: declared-only prefix backed by the app's own Confirmed mapping identity (no Vocabularies entry, no base URI) -> FRANK005 nudge, not FRANK002 warning"
+          <| fun _ ->
+              // sdo declared, NEVER fetched (no Vocabularies entry), but the lock's own
+              // Mappings identify one of the app's own types via a sdo:-prefixed CURIE — the
+              // produced artifact itself is the ownership evidence, no base URI/flag/config
+              // involved (#419 rework). Prior to #419 this fell into the None branch and was
+              // mis-classified Undereferenceable regardless of this evidence.
+              let ownedMapping: Mapping =
+                  { FSharpType = "App.OwnedThing"
+                    Iri = Some "sdo:Game"
+                    Confidence = 1.0
+                    Source = Convention
+                    Status = MappingStatus.Confirmed
+                    Alternates = []
+                    Rt = None
+                    Shape = MappingShape.Record [] }
+
+              let lf =
+                  stampedLock
+                      { emptyLock with
+                          Vocabularies = Map.empty
+                          DeclaredPrefixes = Map.ofList [ "sdo", "https://schema.org/" ]
+                          Mappings = [ ownedMapping ] }
+
+              // VocabSdoRef references sdo:Game/sdo:Person — no resource route in file.
+              let tree = parseFixture (fixture "VocabSdoRef")
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+
+              Expect.isEmpty
+                  (filterCode "FRANK002" msgs)
+                  "#419 AC3: owned-but-unfetched must NOT produce the harsher FRANK002/makeUndereferenceable warning"
+
+              let frank005 = filterCode "FRANK005" msgs
+
+              Expect.isGreaterThanOrEqual
+                  frank005.Length
+                  1
+                  "#419 AC3: owned-but-unfetched must produce the softer FRANK005/makeOwnershipNudge instead"
+
+              Expect.isTrue
+                  (frank005
+                   |> List.forall (fun m -> m.Severity = FSharp.Analyzers.SDK.Severity.Info))
+                  "#419 AC3: ownership nudge is Info, not Warning"
+
+              Expect.isTrue
+                  (frank005
+                   |> List.exists (fun m -> m.Message.Contains "recorded as owned but not yet confirmed"))
+                  "#419 AC3: message text is the ownership nudge, not the Undereferenceable warning"
+
+          testCase
+              "#419: declared-only prefix with NO Mappings evidence of ownership -> still FRANK002 (analyzer needs zero flags either way)"
+          <| fun _ ->
+              // sdo declared, never fetched, and never used to identify any of the app's own
+              // resources -> no evidence of ownership -> must stay the harsher warning. This is
+              // the control case proving the analyzer draws ownership from the artifact, not
+              // from guessing.
+              let lf =
+                  stampedLock
+                      { emptyLock with
+                          Vocabularies = Map.empty
+                          DeclaredPrefixes = Map.ofList [ "sdo", "https://schema.org/" ] }
+
+              let tree = parseFixture (fixture "VocabSdoRef")
+              let msgs = analyzeWithLock (Some(Ok lf)) fixedNow tree
+
+              Expect.isGreaterThanOrEqual
+                  (filterCode "FRANK002" msgs).Length
+                  1
+                  "#419: no ownership evidence in the lock's own Mappings -> Undereferenceable/FRANK002, same as before #419"
+
           testCase "Diagnostic range is not Range.range0 (real file range)"
           <| fun _ ->
               // VocabWithRouteAndTttRef references ttt:Thing and ttt:Move so ttt is in-scope.
