@@ -229,6 +229,32 @@ let private resolveHrefAgainst (baseUri: Uri) (href: string) : string =
 /// body whose keys are the client-observed, already-resolved IRIs) — never reimplemented.
 let resolveHref (origin: string) (href: string) : string = resolveHrefAgainst (Uri origin) href
 
+/// Origin-keyed build-once-per-distinct-origin memoization, shared by
+/// resolvedAlpsCache/cachedResolvedAlps and resolvedHomeResourcesCache/
+/// cachedResolvedHomeResources below (#398 /simplify item 6 was duplicated verbatim
+/// between the two; this is the single extraction). `cache`/`onBuild` are owned by the
+/// calling DiscoveryMiddleware instance so this function stays free of module-level
+/// mutable state (Rule 13) — the caller supplies its own dictionary and build-count
+/// callback. The `Lazy` value under each key guarantees `build` runs at most once per
+/// origin, even if two requests race on a brand-new origin simultaneously. Mirrors
+/// ValidationMiddleware's getOrBuildShapesGraph shape (src/Frank.Validation/
+/// ValidationMiddleware.fs).
+let private getOrBuildByOrigin
+    (cache: ConcurrentDictionary<string, Lazy<'T>>)
+    (onBuild: unit -> unit)
+    (origin: string)
+    (build: unit -> 'T)
+    : 'T =
+    cache
+        .GetOrAdd(
+            origin,
+            (fun _ ->
+                Lazy<'T>(fun () ->
+                    onBuild ()
+                    build ()))
+        )
+        .Value
+
 /// Resolve every Href/Rt in a descriptor tree (top-level and nested children) against a
 /// pre-parsed live request origin Uri (#398) — parsed ONCE by the caller and threaded
 /// through the whole recursive walk, not re-parsed at every leaf (#398 /simplify items
@@ -401,17 +427,13 @@ type DiscoveryMiddleware
     let mutable resolvedAlpsBuildCount = 0
 
     let cachedResolvedAlps (origin: string) : AlpsDescriptor list =
-        resolvedAlpsCache
-            .GetOrAdd(
-                origin,
-                (fun _ ->
-                    Lazy<AlpsDescriptor list>(fun () ->
-                        System.Threading.Interlocked.Increment(&resolvedAlpsBuildCount) |> ignore
-
-                        cachedAlpsDescriptors.Value
-                        |> List.map (resolveDescriptorHrefsAgainst (Uri origin))))
-            )
-            .Value
+        getOrBuildByOrigin
+            resolvedAlpsCache
+            (fun () -> System.Threading.Interlocked.Increment(&resolvedAlpsBuildCount) |> ignore)
+            origin
+            (fun () ->
+                cachedAlpsDescriptors.Value
+                |> List.map (resolveDescriptorHrefsAgainst (Uri origin)))
 
     // Mirrors resolvedAlpsCache/cachedResolvedAlps exactly, applied to JSON Home's
     // resources instead of the ALPS descriptor tree — same instance-level-dictionary
@@ -423,17 +445,13 @@ type DiscoveryMiddleware
     let mutable resolvedHomeBuildCount = 0
 
     let cachedResolvedHomeResources (origin: string) : JsonHomeResource list =
-        resolvedHomeResourcesCache
-            .GetOrAdd(
-                origin,
-                (fun _ ->
-                    Lazy<JsonHomeResource list>(fun () ->
-                        System.Threading.Interlocked.Increment(&resolvedHomeBuildCount) |> ignore
-
-                        cachedHomeResources.Value
-                        |> List.map (resolveJsonHomeResourceAgainst (Uri origin))))
-            )
-            .Value
+        getOrBuildByOrigin
+            resolvedHomeResourcesCache
+            (fun () -> System.Threading.Interlocked.Increment(&resolvedHomeBuildCount) |> ignore)
+            origin
+            (fun () ->
+                cachedHomeResources.Value
+                |> List.map (resolveJsonHomeResourceAgainst (Uri origin)))
 
     let handleOptions (ctx: HttpContext) : Task =
         let requestPath = ctx.Request.Path.Value

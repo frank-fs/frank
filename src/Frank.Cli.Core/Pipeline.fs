@@ -294,8 +294,8 @@ let private buildMappings
             |> Result.mapError (fun e -> $"vocab fetch failed: {e}")
             |> Result.map (fun (terms, vocabEntries) ->
                 let scored = typeInfos |> List.map (ConventionEngine.scoreDetailed terms registry)
-                let fresh = scored |> List.map fst
-                let notices = scored |> List.choose snd
+                let fresh, noticeOpts = List.unzip scored
+                let notices = noticeOpts |> List.choose id
                 vocabEntries, fresh, registry, notices)))
 
 /// Pipeline core with the vocabulary fetcher and clock injected.

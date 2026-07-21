@@ -83,4 +83,9 @@ val buildOracle: vocabs: Map<string, LockFile.VocabularyEntry> -> cacheDir: stri
 /// Used by the status --format json path (standalone array) and accept --format json (embedded in summary).
 val vocabWarningsToJson: warnings: VocabWarning list -> string
 
+/// Serialize one EquivalentClassNotice as a single-line JSON object string, escaping
+/// FSharpType/ExplicitIri properly (they can contain quotes/backslashes/backticks) —
+/// never hand-built via printfn string interpolation.
+val equivalentClassNoticeToJson: n: EquivalentClassNotice -> string
+
 val summaryToJson: s: AcceptSummary -> string

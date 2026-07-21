@@ -202,10 +202,7 @@ let private printEquivalentClassNotices (fmt: Pipeline.OutputFormat) (notices: E
                 n.ExplicitIri
     | Pipeline.Json ->
         for n in notices do
-            printfn
-                """{"notice":"equivalentClassCollapse","fsharpType":"%s","explicitIri":"%s"}"""
-                n.FSharpType
-                n.ExplicitIri
+            printfn "%s" (Accept.equivalentClassNoticeToJson n)
 
 // ── Command handlers ──────────────────────────────────────────────────────────
 

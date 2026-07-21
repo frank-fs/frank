@@ -333,6 +333,20 @@ let acceptTests =
                   "round-trip preserves quotes and backslash"
           }
 
+          test "json output: equivalentClassNoticeToJson round-trips a type name containing quote and backtick" {
+              let notice: EquivalentClassNotice =
+                  { FSharpType = "MyApp.Tricky<`a>+\"Weird\""
+                    ExplicitIri = "https://schema.org/Foo\"bar" }
+
+              let json = Accept.equivalentClassNoticeToJson notice
+
+              let doc = System.Text.Json.Nodes.JsonNode.Parse json
+
+              Expect.equal (doc.["notice"].GetValue<string>()) "equivalentClassCollapse" "notice"
+              Expect.equal (doc.["fsharpType"].GetValue<string>()) notice.FSharpType "fsharpType round-trips"
+              Expect.equal (doc.["explicitIri"].GetValue<string>()) notice.ExplicitIri "explicitIri round-trips"
+          }
+
           test "accept a union investment produces a Union mapping with confirmed cases" {
               let unresolvedPayload =
                   [ { Name = "position"
