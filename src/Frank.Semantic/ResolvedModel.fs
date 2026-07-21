@@ -243,7 +243,24 @@ module ResolvedModel =
             match buildFields prefixes registry m.FSharpType includedFields with
             | Error e -> Error e
             | Ok fields ->
-                let equivalentClass = registry.EquivalentClasses |> Map.tryFind m.FSharpType
+                // #425: suppress a declared equivalentClass that resolves equal to classIri —
+                // e.g. when ConventionEngine.applyExplicitClass already overrode ClassIri to the
+                // same explicit equivalentClass target, nothing distinct is left to assert.
+                // Root-cause fix upstream of Ontology.addClass's #417 defensive guard, which stays
+                // in place for hand-constructed ClassDecl values.
+                let equivalentClass =
+                    registry.EquivalentClasses
+                    |> Map.tryFind m.FSharpType
+                    |> Option.filter (fun e ->
+                        // AbsoluteUri string compare, not F#'s structural `<>` on Uri: System.Uri
+                        // equality ignores the Fragment component by default, which would wrongly
+                        // treat same-host, different-fragment IRIs (Frank's owned-vocab convention
+                        // is host + '#LocalName') as tautological. Mirrors Ontology.addClass's #417
+                        // guard (Ontology.fs:82), which already compares .AbsoluteUri for this reason.
+                        match classIri with
+                        | Some c -> e.AbsoluteUri <> c.AbsoluteUri
+                        | None -> true)
+
                 let seeAlso = registry.SeeAlso |> Map.tryFind m.FSharpType |> Option.defaultValue []
                 let provClass = registry.ProvClasses |> Map.tryFind m.FSharpType
 
