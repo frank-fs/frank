@@ -3,6 +3,7 @@ module Frank.Discovery.DiscoveryMiddleware
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
+open Microsoft.AspNetCore.Routing.Template
 open Microsoft.Extensions.Logging
 
 /// Build JSON Home resource entries from live endpoints.
@@ -57,13 +58,17 @@ val internal reconcileAlpsTypes:
         AlpsDescriptor list
 
 /// Real HTTP methods registered for the given request path, from every endpoint whose
-/// route template matches — the OPTIONS Allow header's source of truth.
-val internal methodsForPath: dataSource: EndpointDataSource -> requestPath: string -> string list
+/// (already cache-parsed, #421) route template matches — the OPTIONS Allow header's
+/// source of truth. Takes the RouteTemplate cache built once per middleware instance,
+/// never a raw EndpointDataSource re-parsed per call.
+val internal methodsForPath: routeTemplates: (RouteEndpoint * RouteTemplate) list -> requestPath: string -> string list
 
 /// Declared relation IRI(s) for the given request path, from ResourceRelationMetadata on
-/// every endpoint whose route template matches. Used to scope rel="type" Link headers to
-/// only the resource actually matched (#398).
-val internal relationsForPath: dataSource: EndpointDataSource -> requestPath: string -> string list
+/// every endpoint whose (already cache-parsed, #421) route template matches. Used to scope
+/// rel="type" Link headers to only the resource actually matched (#398). Shares the same
+/// RouteTemplate cache as methodsForPath — a request needing both never parses twice.
+val internal relationsForPath:
+    routeTemplates: (RouteEndpoint * RouteTemplate) list -> requestPath: string -> string list
 
 /// Static discovery for the application:
 ///  - OPTIONS → `Allow` (methods from matching endpoints + HEAD + OPTIONS) + `Link rel="describedby"`
@@ -88,5 +93,10 @@ type DiscoveryMiddleware =
     /// the resolved JSON Home resources list was actually (re)built — proves build-once-
     /// per-distinct-origin, not once per request, mirroring ResolvedAlpsBuildCount above.
     member internal ResolvedHomeBuildCount: int
+
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of times
+    /// TemplateParser.Parse was actually invoked — proves parse-once-per-endpoint at
+    /// cache-build time, not once per OPTIONS request (#421).
+    member internal RouteTemplateParseCount: int
 
     member Invoke: ctx: HttpContext -> Task

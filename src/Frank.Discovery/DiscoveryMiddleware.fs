@@ -310,27 +310,49 @@ let internal reconcileAlpsTypes
 
     descriptors |> List.map reconcile
 
-// ── #398: per-request path matching shared by Allow and rel="type" scoping ───
+// ── #398/#421: per-request path matching shared by Allow and rel="type" scoping ───
 
-/// RouteEndpoints whose route template matches the given raw request path, regardless
-/// of the HTTP method each declares — the one-time template-match step shared by
-/// methodsForPath and relationsForPath. TemplateMatcher is not thread-safe — a fresh
-/// instance is constructed per candidate route, mirroring the prior inline usage.
-let private endpointsForPath (dataSource: EndpointDataSource) (requestPath: string) : RouteEndpoint list =
-    let pathString = PathString(requestPath)
+/// One endpoint paired with its pre-parsed, immutable RouteTemplate (src/CLAUDE.md:
+/// "cache immutable RouteTemplate objects via TemplateParser.Parse; create TemplateMatcher
+/// per-request" — TemplateMatcher itself is NOT thread-safe and must never be cached, but
+/// the RouteTemplate it matches against is safe to share and must be, #421).
+type private EndpointTemplate = RouteEndpoint * RouteTemplate
 
+/// Parse every registered endpoint's route template exactly once — the cache-build step
+/// #421 introduces so methodsForPath/relationsForPath below stop re-parsing the SAME
+/// templates from raw strings on every OPTIONS request. `onParse` is called once per
+/// endpoint parsed, so callers (the DiscoveryMiddleware instance) can count real
+/// TemplateParser.Parse invocations without this pure function owning any counter state
+/// itself (Holzmann 14: side effects surfaced at the call site).
+let private buildRouteTemplates (onParse: unit -> unit) (dataSource: EndpointDataSource) : EndpointTemplate list =
     scanRouteEndpoints dataSource
-    |> Seq.filter (fun re ->
+    |> Seq.map (fun re ->
         let raw = re.RoutePattern.RawText
         let pattern = if raw.StartsWith('/') then raw.TrimStart('/') else raw
-        let matcher = TemplateMatcher(TemplateParser.Parse(pattern), RouteValueDictionary())
-        matcher.TryMatch(pathString, RouteValueDictionary()))
+        onParse ()
+        re, TemplateParser.Parse(pattern))
     |> Seq.toList
 
+/// RouteEndpoints whose (already-parsed, cached) route template matches the given raw
+/// request path, regardless of the HTTP method each declares — the one-time template-match
+/// step shared by methodsForPath and relationsForPath. TemplateMatcher is not thread-safe —
+/// a fresh instance is still constructed per candidate route on every call (#421 only caches
+/// the RouteTemplate parse, never the matcher itself, per the project's own rule).
+let private endpointsForPath (routeTemplates: EndpointTemplate list) (requestPath: string) : RouteEndpoint list =
+    let pathString = PathString(requestPath)
+
+    routeTemplates
+    |> List.filter (fun (_, template) ->
+        let matcher = TemplateMatcher(template, RouteValueDictionary())
+        matcher.TryMatch(pathString, RouteValueDictionary()))
+    |> List.map fst
+
 /// Real HTTP methods registered for the given request path, from every endpoint whose
-/// route template matches — the OPTIONS Allow header's source of truth.
-let internal methodsForPath (dataSource: EndpointDataSource) (requestPath: string) : string list =
-    endpointsForPath dataSource requestPath
+/// route template matches — the OPTIONS Allow header's source of truth. Takes the
+/// already-built RouteTemplate cache (#421), never a raw EndpointDataSource — the caller
+/// (handleOptions) builds/reuses that cache once per middleware instance lifetime.
+let internal methodsForPath (routeTemplates: EndpointTemplate list) (requestPath: string) : string list =
+    endpointsForPath routeTemplates requestPath
     |> List.choose httpMethodsOf
     |> List.collect id
     |> List.distinct
@@ -339,9 +361,10 @@ let internal methodsForPath (dataSource: EndpointDataSource) (requestPath: strin
 /// every endpoint whose route template matches. Used to scope rel="type" Link headers to
 /// only the resource actually matched (#398) — a route carrying no relation (e.g. "/",
 /// "/tictactoe") yields an empty list, and every codegen-emitted DescribedByLink for
-/// OTHER resources is withheld, not broadcast.
-let internal relationsForPath (dataSource: EndpointDataSource) (requestPath: string) : string list =
-    endpointsForPath dataSource requestPath
+/// OTHER resources is withheld, not broadcast. Takes the already-built RouteTemplate cache
+/// (#421), shared with methodsForPath — a request needing both never parses twice.
+let internal relationsForPath (routeTemplates: EndpointTemplate list) (requestPath: string) : string list =
+    endpointsForPath routeTemplates requestPath
     |> List.choose relationOf
     |> List.distinct
 
@@ -413,6 +436,28 @@ type DiscoveryMiddleware
              |> List.map (fun (classIri, links) -> classIri, links |> List.map (fun l -> l.Link))
              |> Map.ofList)
 
+    // #421: every registered endpoint's RouteTemplate, parsed once — src/CLAUDE.md's own
+    // documented rule ("cache immutable RouteTemplate objects via TemplateParser.Parse;
+    // create TemplateMatcher per-request") was honored for the matcher half but not the
+    // parse half; methodsForPath/relationsForPath (the Allow header and rel="type" scoping
+    // sources of truth) used to re-parse every endpoint's raw route string from scratch on
+    // every single OPTIONS request. Same "endpoint set is fixed after startup" rationale as
+    // cachedHomeResources/cachedAlpsDescriptors above — and here that invariant isn't just
+    // assumed: Frank's own ResourceEndpointDataSource.GetChangeToken() returns
+    // NullChangeToken.Singleton (src/Frank/Builder.fs), i.e. it declares itself as never
+    // changing after construction. A third-party EndpointDataSource composed into the same
+    // app that DOES fire change tokens (e.g. hot-reloaded Razor Pages) would need this cache
+    // to move to change-token-driven invalidation — this project has no such case anywhere
+    // yet (every other Lazy<_> cache in this file makes the identical assumption), so a
+    // plain build-once Lazy is the right-sized fix, not speculative invalidation plumbing.
+    let mutable routeTemplateParseCount = 0
+
+    let cachedRouteTemplates =
+        lazy
+            (buildRouteTemplates
+                (fun () -> System.Threading.Interlocked.Increment(&routeTemplateParseCount) |> ignore)
+                endpointDataSource)
+
     // #398 /simplify item 6: resolved-descriptor-tree cache, origin-keyed — mirrors
     // LinkedDataMiddleware.cachedStaticBody's origin-keyed Lazy memoization (#382),
     // applied here to handleAlpsProfile's per-request href/rt resolution, which used to
@@ -455,7 +500,7 @@ type DiscoveryMiddleware
 
     let handleOptions (ctx: HttpContext) : Task =
         let requestPath = ctx.Request.Path.Value
-        let methods = methodsForPath endpointDataSource requestPath
+        let methods = methodsForPath cachedRouteTemplates.Value requestPath
 
         let methods =
             if List.contains "GET" methods && not (List.contains "HEAD" methods) then
@@ -482,7 +527,7 @@ type DiscoveryMiddleware
         // #398: scope rel="type" links to the matched route's own declared relation(s) —
         // a route with no declared relation gets zero rel="type" links.
         let scopedLinks =
-            relationsForPath endpointDataSource requestPath
+            relationsForPath cachedRouteTemplates.Value requestPath
             |> List.collect (fun relation ->
                 describedByLinksByRelation.Value
                 |> Map.tryFind relation
@@ -548,6 +593,11 @@ type DiscoveryMiddleware
     /// the resolved JSON Home resources list was actually (re)built — proves build-once-
     /// per-distinct-origin, not once per request, mirroring ResolvedAlpsBuildCount above.
     member internal _.ResolvedHomeBuildCount = resolvedHomeBuildCount
+
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of times
+    /// TemplateParser.Parse was actually invoked — proves parse-once-per-endpoint at
+    /// cache-build time, not once per OPTIONS request (#421).
+    member internal _.RouteTemplateParseCount = routeTemplateParseCount
 
     member _.Invoke(ctx: HttpContext) : Task =
         let path = ctx.Request.Path.Value
