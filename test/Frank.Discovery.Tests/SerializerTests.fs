@@ -237,7 +237,7 @@ let jsonHomeTests =
                   (fun () -> JsonHomeSerializer.serialize resources |> ignore)
                   "partially-covered href-template must throw for the unmapped variable"
 
-          testCase "MINOR-4: all template variables covered → no throw (sample passes)"
+          testCase "MINOR-4: all template variables covered → no throw (fixture passes)"
           <| fun _ ->
               let resources =
                   [ { Relation = "https://schema.org/Game"

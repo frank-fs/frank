@@ -325,9 +325,9 @@ let fallbackRelationTests =
                   "the un-resolved, still-relative fallback relation never appears" ]
 
 [<Tests>]
-let jsonHomeFromSampleConfigTests =
+let jsonHomeFromDeclaredConfigTests =
     testList
-        "JSON Home uses sampleConfig (existing test compat)"
+        "JSON Home uses declared config fixture (existing test compat)"
         [ testCase "GET / with json-home Accept serves schema.org/Game from endpoint metadata"
           <| fun _ ->
               use app = startServer sampleConfig
