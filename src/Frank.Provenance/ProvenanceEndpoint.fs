@@ -4,10 +4,72 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.Primitives
 
+/// Write an RFC 9457 problem+json 404 — every not-found branch in this module uses this
+/// instead of a bare status code, so a client dereferencing a provenance IRI that 404s
+/// gets a machine-readable reason (Fielding review finding, gap 1).
+let private notFound (ctx: HttpContext) (typeUri: string) (title: string) (detail: string) : Task =
+    Frank.ProblemJson.write ctx 404 typeUri title detail
+
+// Cheap content fingerprint over an already-built graph's triples — sorted (ordinal, so no
+// ICU/globalization dependency) for order-independence, then hashed via the same SHA-256
+// helper the rest of the codebase's ETag machinery uses. Computed from the graph directly,
+// NOT the serialized JSON-LD string, so it costs a single linear pass with no context
+// resolution / JSON-LD compaction — unlike ProvenanceGraph.compactGraph, which additionally
+// builds the @context (a triple-node scan of its own) and runs the full expand→compact
+// pipeline. Fingerprint stability across identical requests only requires the SAME
+// (config, records) to build the SAME triples, which every ProvenanceGraph builder already
+// guarantees deterministically.
+let private graphFingerprint (g: VDS.RDF.IGraph) : string =
+    g.Triples
+    |> Seq.map (fun t -> t.ToString())
+    |> Seq.sort
+    |> String.concat "\n"
+    |> System.Text.Encoding.UTF8.GetBytes
+    |> Frank.ETagFormat.computeFromBytes
+
+/// Single function backing every provenance JSON-LD 200 response (#424). Adds Vary: Accept
+/// (gap 2) and a content-derived ETag + immutable Cache-Control (gap 3) — provenance nodes
+/// represent a historical fact and never change once recorded, so the representation can be
+/// cached indefinitely and round-tripped via If-None-Match.
+///
+/// Deliberately inline rather than routed through Frank.ConditionalRequestMiddleware +
+/// IETagProviderFactory (src/Frank/ConditionalRequestMiddleware.fs), even though that
+/// mechanism already short-circuits to 304 before the handler runs: IETagProvider.ComputeETag
+/// only receives an opaque `instanceId: string` (from ETagMetadata.ResolveInstanceId, which
+/// only sees HttpContext) — it has no access to the graph the handler is about to build. To
+/// compute a matching ETag independently, a provider would have to re-derive the SAME
+/// resource/nodeId decoding this module already does (tryParseStateEntityKey, the "entity-"
+/// dispatch, origin resolution) and re-run the SAME store queries and SAME graph-build calls
+/// as handle/handleStateEntity/handleActivityNode — i.e. duplicate this module's dispatch
+/// logic into a second copy, with the attendant risk that the two copies drift and the
+/// provider's ETag stops matching what the handler would actually serve. Computing the
+/// fingerprint from the SAME `g: IGraph` the handler just built, in the SAME function that
+/// serves it, makes that drift structurally impossible — the tradeoff standard
+/// ConditionalRequestMiddleware makes (provider is authoritative, independent of the handler)
+/// doesn't hold here without re-solving the whole dispatch problem a second time.
 let private serveJsonLd (config: ProvenanceConfig) (g: VDS.RDF.IGraph) (ctx: HttpContext) : Task =
-    ctx.Response.StatusCode <- 200
-    ctx.Response.ContentType <- "application/ld+json"
-    ctx.Response.WriteAsync(ProvenanceGraph.compactGraph config.DeclaredPrefixes g)
+    let etag = Frank.ETagFormat.quote (graphFingerprint g)
+
+    Frank.AcceptNegotiation.appendVaryAccept ctx.Response
+    ctx.Response.Headers.ETag <- etag
+    ctx.Response.Headers.CacheControl <- "max-age=31536000, immutable"
+
+    let ifNoneMatch = ctx.Request.Headers.IfNoneMatch.ToString()
+
+    if
+        not (System.String.IsNullOrEmpty ifNoneMatch)
+        && Frank.ETagComparison.anyMatch (Some etag) ifNoneMatch
+    then
+        // 304 short-circuit BEFORE compactGraph — the expensive step (@context resolution +
+        // full JSON-LD expand→compact) never runs when the client already has this
+        // representation. Only the cheap fingerprint above was paid for.
+        ctx.Response.StatusCode <- 304
+        Task.CompletedTask
+    else
+        let body = ProvenanceGraph.compactGraph config.DeclaredPrefixes g
+        ctx.Response.StatusCode <- 200
+        ctx.Response.ContentType <- "application/ld+json"
+        ctx.Response.WriteAsync(body)
 
 let private handleStateEntity
     (store: IProvenanceStore)
@@ -18,14 +80,26 @@ let private handleStateEntity
     : Task =
     match ProvenanceGraph.tryParseStateEntityKey stateKey with
     | None ->
-        ctx.Response.StatusCode <- 404
-        Task.CompletedTask
+        notFound
+            ctx
+            "https://frankfs.dev/problems/unknown-state-entity"
+            "Unknown state entity"
+            (sprintf "'%s' is not a valid state entity key" stateKey)
     | Some(resourceUri, k) ->
         task {
             let! records = store.QueryByResource resourceUri
 
             if k < 0 || k > records.Length then
-                ctx.Response.StatusCode <- 404
+                do!
+                    notFound
+                        ctx
+                        "https://frankfs.dev/problems/state-entity-index-out-of-range"
+                        "State entity index out of range"
+                        (sprintf
+                            "state entity index %d is out of range for resource '%s' (valid range 0..%d)"
+                            k
+                            resourceUri
+                            records.Length)
             else
                 let g = ProvenanceGraph.buildStateEntityNodeGraph origin resourceUri records k
                 do! serveJsonLd config g ctx
@@ -42,12 +116,27 @@ let private handleActivityNode
         let! recordOpt = store.QueryByActivityId nodeIri
 
         match recordOpt with
-        | None -> ctx.Response.StatusCode <- 404
+        | None ->
+            do!
+                notFound
+                    ctx
+                    "https://frankfs.dev/problems/unknown-activity"
+                    "Unknown activity"
+                    (sprintf "no provenance activity found for '%s'" nodeIri)
         | Some record ->
             let! allRecords = store.QueryByResource record.ResourceUri
 
             match allRecords |> List.tryFindIndex (fun r -> r.Id = record.Id) with
-            | None -> ctx.Response.StatusCode <- 404
+            | None ->
+                do!
+                    notFound
+                        ctx
+                        "https://frankfs.dev/problems/activity-not-in-lineage"
+                        "Activity not found in resource lineage"
+                        (sprintf
+                            "activity '%s' was not found in the recorded lineage for resource '%s'"
+                            nodeIri
+                            record.ResourceUri)
             | Some posIdx ->
                 let g = ProvenanceGraph.buildActivityNodeGraph origin record posIdx
                 do! serveJsonLd config g ctx
@@ -120,8 +209,11 @@ let handleNode (store: IProvenanceStore) (config: ProvenanceConfig) (ctx: HttpCo
         | _ -> ""
 
     if System.String.IsNullOrEmpty nodeId then
-        ctx.Response.StatusCode <- 404
-        Task.CompletedTask
+        notFound
+            ctx
+            "https://frankfs.dev/problems/missing-node-id"
+            "Missing node identifier"
+            "the request path did not include a provenance node identifier"
     else
         match Frank.OriginValidation.tryValidateOrigin ctx.Request with
         | None ->
