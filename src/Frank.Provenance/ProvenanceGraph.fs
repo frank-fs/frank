@@ -5,22 +5,66 @@ open VDS.RDF
 open Newtonsoft.Json.Linq
 open Frank.Semantic
 
-let private provContextObj =
-    JObject.Parse(
-        """{"prov":"http://www.w3.org/ns/prov#","http":"http://www.w3.org/2011/http#","rdfs":"http://www.w3.org/2000/01/rdf-schema#"}"""
-    )
+// ── Context and compaction utilities ─────────────────────────────────────────
+
+let private toUriOption (node: INode) : Uri option =
+    match node with
+    | :? IUriNode as n -> Some n.Uri
+    | _ -> None
+
+let private graphUriNodes (g: IGraph) : Uri list =
+    g.Triples
+    |> Seq.collect (fun t ->
+        [ toUriOption t.Subject; toUriOption t.Predicate; toUriOption t.Object ]
+        |> List.choose id)
+    |> Seq.toList
+
+let private tryMatchRelativeNs (storedNs: string) (uris: Uri list) : string option =
+    uris
+    |> List.tryFind (fun u ->
+        let pathAndFrag = u.AbsolutePath + u.Fragment
+        pathAndFrag.StartsWith(storedNs, StringComparison.Ordinal))
+    |> Option.map (fun u ->
+        let port = if u.IsDefaultPort then "" else ":" + string u.Port
+        u.Scheme + "://" + u.Host + port + storedNs)
+
+let private tryMatchAbsoluteNs (storedNs: string) (uris: Uri list) : string option =
+    uris
+    |> List.tryFind (fun u -> u.AbsoluteUri.StartsWith(storedNs, StringComparison.Ordinal))
+    |> Option.map (fun _ -> storedNs)
+
+/// Build the @context entry list from DeclaredPrefixes, retaining only those whose
+/// namespace actually prefixes a URI node in the graph. For host-relative stored namespaces
+/// (starting with "/"), the absolute namespace is derived from the matching graph URI's own
+/// scheme+host — no app-owned-vs-external classification is performed.
+let usedPrefixContext (declared: (string * string) list) (g: IGraph) : (string * string) list =
+    let uris = graphUriNodes g
+
+    declared
+    |> List.choose (fun (prefix, storedNs) ->
+        let tryMatch =
+            if storedNs.StartsWith("/", StringComparison.Ordinal) then
+                tryMatchRelativeNs storedNs uris
+            else
+                tryMatchAbsoluteNs storedNs uris
+
+        tryMatch |> Option.map (fun resolvedNs -> prefix, resolvedNs))
+
+// PROV-O's own namespaces (prov/http/rdfs). #412: run these through usedPrefixContext just
+// like app-declared DeclaredPrefixes — no unconditional always-present base context.
+let private provDeclaredPrefixes: (string * string) list =
+    [ "prov", ProvVocabulary.Namespace
+      "http", ProvVocabulary.Http.Namespace
+      "rdfs", "http://www.w3.org/2000/01/rdf-schema#" ]
 
 let private compact (graph: IGraph) (extraContext: (string * string) list) : string =
-    let ctx =
-        if List.isEmpty extraContext then
-            provContextObj.DeepClone() :?> JObject
-        else
-            let merged = provContextObj.DeepClone() :?> JObject
+    let ctx = JObject()
 
-            for (k, v) in extraContext do
-                merged.[k] <- JToken.op_Implicit v
+    for (k, v) in usedPrefixContext provDeclaredPrefixes graph do
+        ctx.[k] <- JToken.op_Implicit v
 
-            merged
+    for (k, v) in extraContext do
+        ctx.[k] <- JToken.op_Implicit v
 
     RdfSerialization.compactWithContext graph ctx
 
@@ -267,50 +311,5 @@ let buildStateEntityNodeGraph
         addStateEntityNode g stateNode gameIriNode (Some activityNode) (Some priorNode) record.DomainType
 
     g
-
-// ── Context and compaction utilities ─────────────────────────────────────────
-
-let private toUriOption (node: INode) : Uri option =
-    match node with
-    | :? IUriNode as n -> Some n.Uri
-    | _ -> None
-
-let private graphUriNodes (g: IGraph) : Uri list =
-    g.Triples
-    |> Seq.collect (fun t ->
-        [ toUriOption t.Subject; toUriOption t.Predicate; toUriOption t.Object ]
-        |> List.choose id)
-    |> Seq.toList
-
-let private tryMatchRelativeNs (storedNs: string) (uris: Uri list) : string option =
-    uris
-    |> List.tryFind (fun u ->
-        let pathAndFrag = u.AbsolutePath + u.Fragment
-        pathAndFrag.StartsWith(storedNs, StringComparison.Ordinal))
-    |> Option.map (fun u ->
-        let port = if u.IsDefaultPort then "" else ":" + string u.Port
-        u.Scheme + "://" + u.Host + port + storedNs)
-
-let private tryMatchAbsoluteNs (storedNs: string) (uris: Uri list) : string option =
-    uris
-    |> List.tryFind (fun u -> u.AbsoluteUri.StartsWith(storedNs, StringComparison.Ordinal))
-    |> Option.map (fun _ -> storedNs)
-
-/// Build the @context entry list from DeclaredPrefixes, retaining only those whose
-/// namespace actually prefixes a URI node in the graph. For host-relative stored namespaces
-/// (starting with "/"), the absolute namespace is derived from the matching graph URI's own
-/// scheme+host — no app-owned-vs-external classification is performed.
-let usedPrefixContext (declared: (string * string) list) (g: IGraph) : (string * string) list =
-    let uris = graphUriNodes g
-
-    declared
-    |> List.choose (fun (prefix, storedNs) ->
-        let tryMatch =
-            if storedNs.StartsWith("/", StringComparison.Ordinal) then
-                tryMatchRelativeNs storedNs uris
-            else
-                tryMatchAbsoluteNs storedNs uris
-
-        tryMatch |> Option.map (fun resolvedNs -> prefix, resolvedNs))
 
 let compactGraph (extraCtx: (string * string) list) (g: IGraph) : string = compact g extraCtx

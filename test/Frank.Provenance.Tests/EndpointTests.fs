@@ -24,6 +24,26 @@ let private mkRecord id resource =
       EndedAt = DateTimeOffset.UnixEpoch
       BodyAttributes = [] }
 
+/// #412: extract the set of @context prefix keys present in a JSON-LD body.
+let private ctxKeys (body: string) : Set<string> =
+    use doc = JsonDocument.Parse body
+    let root = doc.RootElement
+    let mutable ctxEl = Unchecked.defaultof<JsonElement>
+
+    if not (root.TryGetProperty("@context", &ctxEl)) then
+        Set.empty
+    else
+        let keysOf (el: JsonElement) =
+            if el.ValueKind = JsonValueKind.Object then
+                el.EnumerateObject() |> Seq.map (fun p -> p.Name) |> Set.ofSeq
+            else
+                Set.empty
+
+        match ctxEl.ValueKind with
+        | JsonValueKind.Object -> keysOf ctxEl
+        | JsonValueKind.Array -> ctxEl.EnumerateArray() |> Seq.map keysOf |> Seq.fold Set.union Set.empty
+        | _ -> Set.empty
+
 let private countOccurrences (sub: string) (s: string) =
     let mutable count = 0
     let mutable idx = 0
@@ -100,6 +120,39 @@ let private startEndpointServerWithSchemaAttrs () =
     app.MapGet(
         "/provenance",
         Func<HttpContext, System.Threading.Tasks.Task>(ProvenanceEndpoint.handle resolvedStore tttConfig)
+    )
+    |> ignore
+
+    app.StartAsync().GetAwaiter().GetResult()
+    app
+
+/// #412: server exposing both /provenance and /provenance/{nodeId}, seeded with the given
+/// records under resource "http://localhost/r". Records' Id must be "http://localhost/provenance/<suffix>"
+/// to route through handleActivityNode via nodeId=<suffix>.
+let private startNodeServer (records: ProvenanceRecord list) =
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+
+    let store =
+        new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance) :> IProvenanceStore
+
+    builder.Services.AddSingleton<IProvenanceStore>(store) |> ignore
+    builder.Services.AddSingleton<ProvenanceConfig>(defaultConfig) |> ignore
+    let app = builder.Build()
+    let resolvedStore = app.Services.GetRequiredService<IProvenanceStore>()
+
+    for r in records do
+        resolvedStore.Append r
+
+    app.MapGet(
+        "/provenance",
+        Func<HttpContext, System.Threading.Tasks.Task>(ProvenanceEndpoint.handle resolvedStore defaultConfig)
+    )
+    |> ignore
+
+    app.MapGet(
+        "/provenance/{nodeId}",
+        Func<HttpContext, System.Threading.Tasks.Task>(ProvenanceEndpoint.handleNode resolvedStore defaultConfig)
     )
     |> ignore
 
@@ -655,4 +708,92 @@ let tests =
                   client.GetAsync(sprintf "/provenance/entity-%s" negativeKKey) |> Async.AwaitTask
 
               Expect.equal (int resp.StatusCode) 404 "crafted negative-k key must return 404 not 500"
+          }
+
+          testCaseAsync "#412 AC1: bare state-entity @context has prov only, http and rdfs absent"
+          <| async {
+              let resourceUri = "http://localhost/r"
+              let records = [ mkRecord "http://localhost/provenance/act-1" resourceUri ]
+              use app = startNodeServer records
+              use client = app.GetTestClient()
+              let fullIri = ProvenanceGraph.stateEntityIri "http://localhost" resourceUri 0
+              let nodeId = fullIri.Substring(fullIri.LastIndexOf('/') + 1)
+
+              let! (resp: HttpResponseMessage) = client.GetAsync(sprintf "/provenance/%s" nodeId) |> Async.AwaitTask
+              let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+              let keys = ctxKeys body
+              Expect.isTrue (keys.Contains "prov") "@context has 'prov'"
+              Expect.isFalse (keys.Contains "http") "@context must NOT have 'http' — unused in bare state entity"
+              Expect.isFalse (keys.Contains "rdfs") "@context must NOT have 'rdfs' — unused in bare state entity"
+          }
+
+          testCaseAsync "#412 AC2: activity node @context includes prov and http; rdfs absent without agent label"
+          <| async {
+              let record = mkRecord "http://localhost/provenance/act-1" "http://localhost/r"
+              use app = startNodeServer [ record ]
+              use client = app.GetTestClient()
+              let! (resp: HttpResponseMessage) = client.GetAsync("/provenance/act-1") |> Async.AwaitTask
+              let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+              let keys = ctxKeys body
+              Expect.isTrue (keys.Contains "prov") "@context has 'prov'"
+              Expect.isTrue (keys.Contains "http") "@context has 'http' (http:methodName/statusCodeValue used)"
+              Expect.isFalse (keys.Contains "rdfs") "@context must NOT have 'rdfs' — no rdfs:label triple present"
+          }
+
+          testCaseAsync "#412 AC2b: activity node @context includes rdfs when agent has a label"
+          <| async {
+              let record =
+                  { mkRecord "http://localhost/provenance/act-1" "http://localhost/r" with
+                      Agent =
+                          { Id = "urn:agent:alice"
+                            Label = Some "alice" } }
+
+              use app = startNodeServer [ record ]
+              use client = app.GetTestClient()
+              let! (resp: HttpResponseMessage) = client.GetAsync("/provenance/act-1") |> Async.AwaitTask
+              let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+              let keys = ctxKeys body
+              Expect.isTrue (keys.Contains "rdfs") "@context has 'rdfs' — rdfs:label triple present on agent"
+          }
+
+          testCaseAsync "#412 AC3: lineage batch @context is exactly the union of prefixes actually used"
+          <| async {
+              let record =
+                  { mkRecord "http://localhost/provenance/act-1" "http://localhost/r" with
+                      Agent =
+                          { Id = "urn:agent:alice"
+                            Label = Some "alice" } }
+
+              use app = startNodeServer [ record ]
+              use client = app.GetTestClient()
+
+              let! (resp: HttpResponseMessage) =
+                  client.GetAsync("/provenance?resource=http://localhost/r") |> Async.AwaitTask
+
+              let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+              let keys = ctxKeys body
+
+              Expect.equal
+                  keys
+                  (Set.ofList [ "prov"; "http"; "rdfs" ])
+                  "@context is exactly {prov, http, rdfs} — all three used"
+          }
+
+          testCaseAsync "#412 AC3b: lineage batch @context omits rdfs when no agent has a label"
+          <| async {
+              let records = [ mkRecord "http://localhost/provenance/act-1" "http://localhost/r" ]
+              use app = startNodeServer records
+              use client = app.GetTestClient()
+
+              let! (resp: HttpResponseMessage) =
+                  client.GetAsync("/provenance?resource=http://localhost/r") |> Async.AwaitTask
+
+              let! body = resp.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.equal (int resp.StatusCode) 200 "status 200"
+              let keys = ctxKeys body
+              Expect.equal keys (Set.ofList [ "prov"; "http" ]) "@context is exactly {prov, http} — rdfs unused"
           } ]
