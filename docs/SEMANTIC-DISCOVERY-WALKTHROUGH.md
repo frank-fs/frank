@@ -400,6 +400,20 @@ curl -s -H "Accept: application/ld+json" http://localhost:5732/games/demo1
 curl -s -H "Accept: text/turtle" http://localhost:5732/games/demo1
 ```
 
+Verified response headers (200, `GET /games/demo1`, `Accept: application/ld+json`):
+
+```
+Vary: Accept
+Link: </vocabulary>; rel="describedby",
+      <http://localhost:5732/provenance?resource=http%3A%2F%2Flocalhost%3A5732%2Fgames%2Fdemo1>; rel="http://www.w3.org/ns/prov#has_provenance"; anchor="http://localhost:5732/games/demo1"
+Content-Type: application/ld+json
+```
+
+The `Link rel="describedby"` header is #420's two-hop discovery path: it points at `/vocabulary`,
+not the instance body, because `seeAlso` facts live at the class level and are never duplicated
+per-instance (headers-only HATEOAS). A naive client reaches Game's real-world identity by
+following this header, never by hardcoding `/vocabulary` — shown below, after the instance body.
+
 Verified JSON-LD (200, `Content-Type: application/ld+json`):
 
 ```json
@@ -440,6 +454,60 @@ Verified Turtle (200, `Content-Type: text/turtle`):
 case IRI in `GeneratedSemantics.fs`. The game graph factory in `Program.fs` reads
 `GeneratedSemantics.moveResultCaseIri` to select the correct schema.org status IRI — the
 handler never hardcodes the string.
+
+### Linked data: game vocabulary (two-hop `seeAlso`→Wikidata discovery)
+
+Follow the `describedby` link from the previous response to reach Game's real-world identity.
+`Vocabulary.fs` declares three Wikidata `seeAlso` facts for `Game`:
+
+```fsharp
+seeAlso typeof<Game> "wikidata:Q210339"
+seeAlso typeof<Game> "wikidata:Q573573"
+seeAlso typeof<Game> "wikidata:Q573520"
+```
+
+These facts live at the class level, not the instance — a client that GETs `/games/demo1` never
+sees them inline. It reaches them by following the `describedby` header to `/vocabulary`:
+
+```bash
+curl -s -H "Accept: application/ld+json" http://localhost:5732/vocabulary
+```
+
+Verified response (200, `Content-Type: application/ld+json`):
+
+```json
+{"@context":[
+  {"@base":"http://localhost:5732"},
+  "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+  "http://www.w3.org/2000/01/rdf-schema#",
+  "http://www.w3.org/2002/07/owl#",
+  "https://schema.org"
+],
+"@graph":[
+  {"@id":"https://schema.org/ActionStatusType","@type":"owl:Class"},
+  {"@id":"https://schema.org/Game","@type":"owl:Class",
+   "rdfs:seeAlso":[
+     {"@id":"http://www.wikidata.org/entity/Q210339"},
+     {"@id":"http://www.wikidata.org/entity/Q573573"},
+     {"@id":"http://www.wikidata.org/entity/Q573520"}
+   ]},
+  {"@id":"https://schema.org/identifier","@type":"rdf:Property","rdfs:domain":{"@id":"https://schema.org/Game"}},
+  {"@id":"https://schema.org/result","@type":"rdf:Property","rdfs:domain":{"@id":"https://schema.org/Game"}},
+  {"@id":"https://schema.org/ItemList","@type":"owl:Class"},
+  {"@id":"https://schema.org/item","@type":"rdf:Property","rdfs:domain":{"@id":"https://schema.org/ItemList"}},
+  {"@id":"https://schema.org/numberOfItems","@type":"rdf:Property","rdfs:domain":{"@id":"https://schema.org/ItemList"}},
+  {"@id":"https://schema.org/MoveAction","@type":"owl:Class"},
+  {"@id":"tictactoe#square","@type":"rdf:Property","rdfs:domain":{"@id":"https://schema.org/MoveAction"}},
+  {"@id":"https://schema.org/agent","@type":"rdf:Property","rdfs:domain":{"@id":"https://schema.org/MoveAction"}}
+]}
+```
+
+`schema:Game`'s three `rdfs:seeAlso` triples resolve to Wikidata's tic-tac-toe (Q210339),
+noughts-and-crosses (Q573573), and paper-and-pencil game (Q573520) entities — the exact set
+`Vocabulary.fs` declares, and the exact set `SemanticTests.fs`'s `AT-S6` asserts (no more, no
+fewer). A naive client that never hardcodes `/vocabulary` still reaches these triples purely by
+following the `describedby` link off the `/games/demo1` response — this is the two-hop discovery
+path #420 shipped.
 
 ### Provenance
 
