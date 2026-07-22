@@ -44,13 +44,22 @@ Frank was inspired by @filipw's [Building Microservices with ASP.NET Core (witho
 
 ## Packages
 
-| Package             | Description                                             | NuGet                                                                                                            |
-| ------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **Frank**           | Core computation expressions for WebHost and routing    | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank/7.2.0)           |
-| **Frank.Auth**      | Resource-level authorization extensions                 | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.Auth/7.2.0)      |
-| **Frank.OpenApi**   | Native OpenAPI document generation with F# type schemas | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.OpenApi/7.2.0)   |
-| **Frank.Datastar**  | Datastar SSE integration for reactive hypermedia        | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.Datastar/7.2.0)  |
-| **Frank.Analyzers** | F# Analyzers for compile-time error detection           | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.Analyzers/7.2.0) |
+| Package                 | Description                                                                                              | NuGet                                                                                                              |
+| ------------------------ | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Frank**               | Core computation expressions for WebHost and routing                                                      | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank/7.2.0)           |
+| **Frank.Auth**          | Resource-level authorization extensions                                                                    | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.Auth/7.2.0)      |
+| **Frank.OpenApi**       | Native OpenAPI document generation with F# type schemas                                                    | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.OpenApi/7.2.0)   |
+| **Frank.Datastar**      | Datastar SSE integration for reactive hypermedia                                                           | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.Datastar/7.2.0)  |
+| **Frank.Analyzers**     | F# Analyzers for compile-time error detection                                                              | [![NuGet](https://img.shields.io/badge/nuget-v7.2.0-blue)](https://www.nuget.org/packages/Frank.Analyzers/7.2.0) |
+| **Frank.Semantic**      | Vocabulary CE and registry types for Frank semantic discovery                                              | Ships with v7.3.2 — not yet published to NuGet.org (pending)                                                     |
+| **Frank.Semantic.Core** | Lock types and vocabulary classification for Frank semantic discovery — no dotNetRdf, no FCS dependency    | Ships with v7.3.2 — not yet published to NuGet.org (pending)                                                     |
+| **Frank.Discovery**     | JSON Home directory, ALPS profile, `OPTIONS`/`Allow`, and `Link rel=describedby` discovery middleware      | Ships with v7.3.2 — not yet published to NuGet.org (pending)                                                     |
+| **Frank.LinkedData**    | Content-negotiation middleware for serving RDF graphs (JSON-LD, Turtle, RDF/XML)                           | Ships with v7.3.2 — not yet published to NuGet.org (pending)                                                     |
+| **Frank.Validation**    | SHACL validation interpreter for Frank shape declarations                                                  | Ships with v7.3.2 — not yet published to NuGet.org (pending)                                                     |
+| **Frank.Provenance**    | Request-level W3C PROV-O for Frank resources                                                               | Ships with v7.3.2 — not yet published to NuGet.org (pending)                                                     |
+| **Frank.Cli**           | `frank` CLI — semantic discovery tooling (`extract`/`clarify`/`accept`/`refresh`/`status`)                 | Not a NuGet library — run via `dotnet run --project src/Frank.Cli` (see [below](#semantic-discovery))            |
+
+`Frank`, `Frank.Auth`, `Frank.OpenApi`, `Frank.Datastar`, and `Frank.Analyzers` are multi-targeted (net8.0/net9.0/net10.0) and already published. The six packages introduced in v7.3.2 target net10.0 only, per [#401](https://github.com/frank-fs/frank/issues/401) — with one deliberate exception: **Frank.Semantic.Core** stays multi-target (net8.0/net9.0/net10.0) because Frank.Analyzers' FRANK002 CI canary needs it at net8.0. **Frank.Cli** is a console executable (`<IsPackable>false</IsPackable>`), not a published library — it's built and run from source, not `dotnet add package`d.
 
 ### Package Dependency Graph
 
@@ -64,7 +73,19 @@ Frank (core)
 │
 ├── Frank.Datastar ────────────── Frank
 │
-└── Frank.Analyzers ──────────── (FSharp.Analyzers.SDK analyzer, no runtime dependency)
+├── Frank.Analyzers ──────────── (FSharp.Analyzers.SDK analyzer, no runtime dependency)
+│
+├── Frank.Discovery ──────────── Frank
+│
+├── Frank.Semantic.Core ───────── (standalone — no Frank/dotNetRdf dependency)
+│
+├── Frank.Semantic ─────────────── Frank.Semantic.Core
+│   │
+│   ├── Frank.Validation ───────── Frank, Frank.Semantic, Frank.Semantic.Core
+│   ├── Frank.LinkedData ───────── Frank, Frank.Semantic, Frank.Semantic.Core
+│   └── Frank.Provenance ───────── Frank, Frank.Semantic
+│
+└── Frank.Cli ──────────────────── Frank.Cli.Core (internal, unpublished; also backs Frank.Cli.MSBuild) → Frank.Semantic
 ```
 
 ---
@@ -531,6 +552,53 @@ Frank.Analyzers works with:
 - **JetBrains Rider**
 
 Warnings appear inline as you type, helping catch issues before you even compile.
+
+---
+
+## Semantic Discovery
+
+v7.3.2 adds a semantic-discovery pipeline: authors declare a `vocabulary { }` block once, run the `frank` CLI to score domain types against that vocabulary and record reviewed decisions in a lock file, and a build-time MSBuild target regenerates four modules consumed by the packages below. No JSON-LD terms, ALPS descriptors, or PROV-O classes are hand-authored at runtime — everything traces back to the reviewed lock file. These seven packages are grouped under one heading rather than a `## Frank.X` section apiece (see `## Frank.Auth`, `## Frank.OpenApi` above) — a deliberate deviation from that convention, because they share a single lock-file/CLI workflow; deep-dive code samples live in the walkthrough, not here.
+
+- **Frank.Semantic** — the `vocabulary { }` computation expression, the vocabulary registry, and the Jaro-Winkler convention-matching engine that proposes type-to-term mappings.
+- **Frank.Semantic.Core** — the lock-file types (`LockFile.read`/`write` do the I/O; everything else is pure) and vocabulary classification logic that `Frank.Semantic` and the CLI build on. Published as its own package (multi-target — see the Packages table above for why).
+- **Frank.Discovery** — serves the JSON Home directory, ALPS profile, `OPTIONS`/`Allow`, and `Link rel=describedby` headers, correlated against your app's live registered endpoints.
+- **Frank.LinkedData** — content-negotiates `GET` responses as JSON-LD, Turtle, or RDF/XML, driven by the generated `@context` and ontology mappings.
+- **Frank.Validation** — a SHACL interpreter that validates request bodies against shapes generated from the lock file.
+- **Frank.Provenance** — records request-level W3C PROV-O activity/entity/agent triples and serves them from a provenance endpoint.
+- **Frank.Cli** (`frank`) — the `extract`/`clarify`/`accept`/`refresh`/`status` commands that drive the lock-file workflow above. Not published as a NuGet library — see the Packages table above.
+
+### Installation
+
+Once v7.3.2 is tagged and these packages are published, install what you need directly from NuGet.org:
+
+```bash
+dotnet add package Frank.Semantic
+dotnet add package Frank.Discovery
+dotnet add package Frank.LinkedData
+dotnet add package Frank.Validation
+dotnet add package Frank.Provenance
+```
+
+`Frank.Semantic.Core` comes in transitively via `Frank.Semantic` — you don't add it directly. The `frank` CLI isn't `dotnet add package`d — see the Packages table above.
+
+#### Before v7.3.2 is tagged (temporary)
+
+These packages aren't yet published to NuGet.org — `dotnet add package` against NuGet.org will fail with `NU1101` until the tag ships. Build and pack them from this repository instead, then install from that local feed:
+
+```bash
+dotnet pack Frank.sln -o ./local-feed
+dotnet add package Frank.Semantic --source ./local-feed
+dotnet add package Frank.Discovery --source ./local-feed
+dotnet add package Frank.LinkedData --source ./local-feed
+dotnet add package Frank.Validation --source ./local-feed
+dotnet add package Frank.Provenance --source ./local-feed
+```
+
+Pack the whole solution, not a single project — `Frank.Semantic`, `Frank.Discovery`, `Frank.LinkedData`, `Frank.Validation`, and `Frank.Provenance` all depend on other in-repo packages (`Frank`, `Frank.Semantic.Core`) that must also be present in `./local-feed` for restore to resolve. Delete this subsection once the packages are published — the primary instructions above already work.
+
+### Full walkthrough
+
+The complete Sketch → Lift → Generate → Inspect → Iterate loop — the `vocabulary { }` block, `frank semantic extract`/`clarify`/`accept`/`status`, the MSBuild code-generation target, and real JSON Home / ALPS / JSON-LD / SHACL / PROV-O output captured from the `sample/TicTacToe-v732` reference app — is documented step by step in [docs/SEMANTIC-DISCOVERY-WALKTHROUGH.md](docs/SEMANTIC-DISCOVERY-WALKTHROUGH.md).
 
 ---
 
