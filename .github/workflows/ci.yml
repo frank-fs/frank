@@ -65,10 +65,13 @@ jobs:
       - name: E2E (TicTacToe discovery)
         # APIRequestContext only — no browser install needed; the Playwright driver
         # is bundled with Microsoft.Playwright.NUnit and works on the ubuntu runner
-        # without additional setup.  AT-S6 dereferences schema.org and wikidata live;
-        # GitHub-hosted runners have unrestricted egress so the live-deref check runs
-        # exactly as designed (no skip guard).  The E2E project is intentionally
-        # excluded from Frank.sln (MSBuild-target OOM history) and invoked directly.
+        # without additional setup.  This default (no-filter) run uses the loopback
+        # SchemaOrgStub — AT-S6 dereferences schema.org/wikidata terms against that
+        # stub, not the live web, so it stays deterministic regardless of egress.
+        # The live-network proof (AT-S6-live) is [<Explicit>]-gated and runs only in
+        # the separate "E2E (live network)" job below.  The E2E project is
+        # intentionally excluded from Frank.sln (MSBuild-target OOM history) and
+        # invoked directly.
         env:
           DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
         run: dotnet test sample/TicTacToe-v732.E2E/TicTacToe.v732.E2E.fsproj
@@ -91,3 +94,27 @@ jobs:
           SOURCE: "https://api.nuget.org/v3/index.json"
         run: |
           dotnet nuget push out/*.*nupkg --source $SOURCE --api-key $API_KEY --skip-duplicate
+
+  e2e-live-network:
+    name: E2E (live network)
+    runs-on: ubuntu-latest
+    # Separate job (not a step in `build`) so its status is reported and reviewable
+    # independently of the required default pipeline, and continue-on-error so a
+    # schema.org egress outage cannot red the whole CI run — it's a live-network
+    # proof, not a gate. Runs AT-S6-live (SemanticTests.fs), the [<Explicit>]
+    # +[<Category("LiveNetwork")>] test that dereferences real schema.org term
+    # IRIs; the default E2E job above never selects it.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use dotnet CLI
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      - name: E2E (TicTacToe discovery, LiveNetwork category)
+        env:
+          DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
+        run: dotnet test sample/TicTacToe-v732.E2E/TicTacToe.v732.E2E.fsproj --filter "TestCategory=LiveNetwork"
