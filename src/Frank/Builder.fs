@@ -3,6 +3,7 @@ namespace Frank
 module Builder =
 
     open System
+    open System.IO
     open System.Threading.Tasks
     open Microsoft.AspNetCore.Builder
     open Microsoft.AspNetCore.Hosting
@@ -32,6 +33,33 @@ module Builder =
             s.Substring(0, s.Length - 1)
         else
             s
+
+    /// When a GET endpoint also answers HEAD (RFC 7231 §7.4.1), the underlying handler still
+    /// runs so it computes the same headers (ETag, Content-Type, Content-Length) GET would —
+    /// but the body itself must never reach the client. ASP.NET Core does not suppress this
+    /// automatically for an arbitrary RequestDelegate (only individual middleware, e.g.
+    /// StaticFileMiddleware, special-cases HEAD this way internally); this wrapper applies
+    /// that same swap once at the source so handler authors never need to check
+    /// ctx.Request.Method themselves.
+    let private suppressBodyForHead (inner: RequestDelegate) : RequestDelegate =
+        RequestDelegate(fun ctx ->
+            task {
+                if not (HttpMethods.IsHead ctx.Request.Method) then
+                    do! inner.Invoke ctx
+                else
+                    let originalBody = ctx.Response.Body
+                    use discardedBody = new MemoryStream()
+                    ctx.Response.Body <- discardedBody
+
+                    try
+                        do! inner.Invoke ctx
+                    finally
+                        ctx.Response.Body <- originalBody
+
+                    if not (ctx.Response.Headers.ContainsKey "Content-Length") then
+                        ctx.Response.ContentLength <- discardedBody.Length
+            }
+            :> Task)
 
     let private inferNameFromRoute (routeTemplate: string) =
         let trimmed = routeTemplate.TrimStart('/')
@@ -127,13 +155,32 @@ module Builder =
 
             let routePattern = Patterns.RoutePatternFactory.Parse routeTemplate
 
+            // RFC 7231 §7.4.1: HEAD is GET without a body. Fold HEAD into the GET endpoint's
+            // registered methods (unless the spec already declares an explicit HEAD handler)
+            // so the REGISTERED method set matches what OPTIONS/JSON-Home advertise — one source
+            // of truth, not a middleware-side patch (see DiscoveryMiddleware.advertisedMethods).
+            let hasExplicitHead =
+                handlers |> List.exists (fun (httpMethod, _) -> HttpMethods.IsHead httpMethod)
+
             let endpoints =
                 [| for httpMethod, handler in handlers ->
                        let displayName = httpMethod + " " + resolvedName
+                       let foldsHead = HttpMethods.IsGet httpMethod && not hasExplicitHead
 
-                       let builder = RouteEndpointBuilder(handler, routePattern, 0)
+                       let registeredMethods =
+                           if foldsHead then
+                               [| httpMethod; HttpMethods.Head |]
+                           else
+                               [| httpMethod |]
+
+                       let effectiveHandler = if foldsHead then suppressBodyForHead handler else handler
+
+                       let builder = RouteEndpointBuilder(effectiveHandler, routePattern, 0)
                        builder.DisplayName <- displayName
-                       builder.Metadata.Add(HttpMethodMetadata [| httpMethod |])
+                       builder.Metadata.Add(HttpMethodMetadata registeredMethods)
+                       // Metadata reflects the ORIGINAL handler (not the HEAD body-suppression
+                       // wrapper), so ApiExplorer/OpenAPI/etc. still see the real handler's
+                       // MethodInfo — the wrapper is purely a runtime body-write concern.
                        builder.Metadata.Add(handler.Method)
 
                        for convention in metadata do
