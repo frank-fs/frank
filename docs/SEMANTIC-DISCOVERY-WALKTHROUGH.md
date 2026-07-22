@@ -89,6 +89,10 @@ dotnet add package Frank.Validation
 dotnet add package Frank.Provenance
 ```
 
+These packages aren't yet published to NuGet.org — `dotnet add package` here will fail with `NU1101` until v7.3.2 tags. Until then, use the local-feed install flow in README's [Semantic Discovery](../README.md#semantic-discovery) section instead.
+
+`Frank.Semantic.Core` (lock-file types + vocabulary classification, no dotNetRdf/FCS dependency) is not listed above because it ships as a transitive dependency of `Frank.Semantic` — restoring `Frank.Semantic` pulls it in automatically. It's also published independently, multi-targeted (net8.0/net9.0/net10.0) rather than net10.0-only — see README's Packages table for why; you would only `dotnet add package Frank.Semantic.Core` directly if you needed the lock-file/classification types without the rest of `Frank.Semantic`'s dotNetRdf-based vocabulary machinery.
+
 Then add the MSBuild code-generation target to your `.fsproj`:
 
 ```xml
