@@ -9,31 +9,7 @@ open Microsoft.Extensions.Hosting
 open Expecto
 open Frank.Builder
 open Frank.Discovery
-
-/// Mirrors WebHostBuilder.Run's NET10 wiring sequence (ResourceEndpointDataSource built
-/// from the FULLY composed spec.Endpoints and registered as a DI singleton BEFORE
-/// Build(), then added to IEndpointRouteBuilder.DataSources after) but with TestServer +
-/// non-blocking Start() instead of the real Run() (which blocks forever waiting for host
-/// shutdown) — the same test-only seam MiddlewareOrderingTests.fs (Frank.Tests) already
-/// establishes for exercising WebHostSpec composition without invoking the CE's terminal,
-/// blocking Run member.
-let private runSpecOnTestServer (spec: WebHostSpec) : WebApplication =
-    let builder = WebApplication.CreateBuilder()
-    builder.WebHost.UseTestServer() |> ignore
-    let dataSource = ResourceEndpointDataSource(spec.Endpoints)
-    builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
-    spec.Services builder.Services |> ignore
-    let app = builder.Build()
-
-    (app :> IApplicationBuilder)
-    |> spec.BeforeRoutingMiddleware
-    |> fun app -> app.UseRouting()
-    |> spec.Middleware
-    |> ignore
-
-    (app :> IEndpointRouteBuilder).DataSources.Add(dataSource)
-    app.Start()
-    app
+open Frank.Discovery.Tests.TestHelpers
 
 /// #411 AC2: useDiscoveryWith produces identical, correct results regardless of where it's
 /// placed in a webHost CE block relative to `resource` declarations. #397/#400's DI-based
@@ -80,7 +56,7 @@ let tests =
                   |> fun s -> builder.UseDiscoveryWith(s, config)
                   |> fun s -> builder.Resource(s, gameResource)
 
-              use app = runSpecOnTestServer spec
+              use app = runWebHostSpecOnTestServer spec
               use client = app.GetTestClient()
               let resp = client.GetAsync("/alps/test").GetAwaiter().GetResult()
               Expect.equal (int resp.StatusCode) 200 "ALPS profile served"

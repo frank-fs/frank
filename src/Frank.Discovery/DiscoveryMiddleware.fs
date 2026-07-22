@@ -115,6 +115,28 @@ let internal classIriHrefMap (descriptors: AlpsDescriptor list) : Map<string, st
         | _ -> None)
     |> Map.ofList
 
+/// The advertised HTTP method set for a route, derived from its real registered methods:
+/// HEAD is added when GET is present (RFC 7231 §7.4.1 — HEAD is GET without a body),
+/// OPTIONS is always added (every server handles OPTIONS), and the result is sorted for a
+/// stable wire order. The ONE place this computation lives — handleOptions (Allow header)
+/// and homeResourcesFromEndpoints (JSON Home Allow field) both call it instead of each
+/// keeping its own copy, so the advertised set can never independently drift between the
+/// two (#432, Constitution rule 8).
+let internal advertisedMethods (methods: string list) : string list =
+    let withHead =
+        if List.contains "GET" methods && not (List.contains "HEAD" methods) then
+            "HEAD" :: methods
+        else
+            methods
+
+    let withOptions =
+        if not (List.contains "OPTIONS" withHead) then
+            "OPTIONS" :: withHead
+        else
+            withHead
+
+    withOptions |> List.sort
+
 /// Build JSON Home resource entries from live endpoints.
 /// Endpoints carrying ResourceRelationMetadata contribute to one merged entry per
 /// (Relation, Href) pair — a resource with both GET and POST produces a single entry
@@ -136,18 +158,6 @@ let homeResourcesFromEndpoints
     (classIriToHref: Map<string, string>)
     (dataSource: EndpointDataSource)
     : JsonHomeResource list =
-    let addHead (methods: string list) =
-        if List.contains "GET" methods && not (List.contains "HEAD" methods) then
-            "HEAD" :: methods
-        else
-            methods
-
-    let addOptions (methods: string list) =
-        if not (List.contains "OPTIONS" methods) then
-            "OPTIONS" :: methods
-        else
-            methods
-
     scanRouteEndpoints dataSource
     |> Seq.choose (fun re ->
         match relationOf re, httpMethodsOf re with
@@ -160,9 +170,7 @@ let homeResourcesFromEndpoints
             |> Seq.collect (fun (_, _, methods) -> methods)
             |> Seq.distinct
             |> Seq.toList
-            |> addHead
-            |> addOptions
-            |> List.sort
+            |> advertisedMethods
 
         let varMeanings =
             resourceHrefVars |> Map.tryFind relation |> Option.defaultValue Map.empty
@@ -651,26 +659,15 @@ type DiscoveryMiddleware
 
     let handleOptions (ctx: HttpContext) : Task =
         let requestPath = ctx.Request.Path.Value
-        let methods = methodsForPath cachedRouteTemplates.Value requestPath
 
         let methods =
-            if List.contains "GET" methods && not (List.contains "HEAD" methods) then
-                "HEAD" :: methods
-            else
-                methods
-
-        // RFC 7231 §7.4.1: OPTIONS is always handled by the server, so always advertise it.
-        let methods =
-            if not (List.contains "OPTIONS" methods) then
-                "OPTIONS" :: methods
-            else
-                methods
+            methodsForPath cachedRouteTemplates.Value requestPath |> advertisedMethods
 
         if not methods.IsEmpty then
             // Single comma-joined value — one wire-level header line, matching ASP.NET
             // Core's own built-in Allow serialization (HttpMethodMatcherPolicy) instead of
             // one line per method (#398).
-            ctx.Response.Headers.["Allow"] <- StringValues(methods |> List.sort |> String.concat ", ")
+            ctx.Response.Headers.["Allow"] <- StringValues(methods |> String.concat ", ")
 
         let profileLink = sprintf "<%s>; rel=\"describedby\"" config.ProfileUri
         ctx.Response.Headers.Append("Link", profileLink)
@@ -760,7 +757,28 @@ type DiscoveryMiddleware
     /// ResolvedAlpsCacheSize above, for the resolved-JSON-Home cache (#405).
     member internal _.ResolvedHomeCacheSize = resolvedHomeResourcesCache.Count
 
-    member _.Invoke(ctx: HttpContext) : Task =
+    /// #432: emit `describedby` on a GET whose path matches a registered resource route —
+    /// the SAME route-match methodsForPath already computes for the Allow header, never a
+    /// second/parallel matcher. The endpoint writes its own body, so the header cannot be
+    /// set after next.Invoke returns; OnStarting is registered BEFORE calling next.Invoke
+    /// and fires just before headers are sent, whether or not the handler writes a body
+    /// (e.g. a 304 short-circuit from the HTTP-caching layer). Gated on 200/304 so an
+    /// error response from the matched route (4xx/5xx) is not mislabeled as describing a
+    /// resource it never served (src/CLAUDE.md: gate OnStarting registration on a real
+    /// route match to avoid a closure allocation on every request — the caller only reaches
+    /// this branch once methodsForPath has already proven a match).
+    member private _.EmitDescribedByOnStarting(ctx: HttpContext) : unit =
+        let profileLink = sprintf "<%s>; rel=\"describedby\"" config.ProfileUri
+
+        ctx.Response.OnStarting(fun () ->
+            let status = ctx.Response.StatusCode
+
+            if status = 200 || status = 304 then
+                ctx.Response.Headers.Append("Link", profileLink)
+
+            Task.CompletedTask)
+
+    member this.Invoke(ctx: HttpContext) : Task =
         let path = ctx.Request.Path.Value
         let isGet = HttpMethods.IsGet ctx.Request.Method
 
@@ -770,5 +788,8 @@ type DiscoveryMiddleware
             handleAlpsProfile ctx
         elif isGet && path = config.HomeRoute && acceptsJsonHome ctx then
             handleJsonHome ctx
+        elif isGet && not (List.isEmpty (methodsForPath cachedRouteTemplates.Value path)) then
+            this.EmitDescribedByOnStarting ctx
+            next.Invoke ctx
         else
             next.Invoke ctx

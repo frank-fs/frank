@@ -9,7 +9,9 @@ open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.Routing.Patterns
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
+open Microsoft.Extensions.Primitives
 open Frank.Builder
 open Frank.Discovery
 
@@ -227,6 +229,69 @@ let startVocabServer (config: DiscoveryConfig) =
     let app = buildDiscoveryApp None config endpoints
     app.StartAsync().GetAwaiter().GetResult()
     app
+
+/// #432: build+start a WebHostSpec on TestServer via the SAME NET10 wiring sequence
+/// WebHostBuilder.Run itself performs (ResourceEndpointDataSource built from the FULLY
+/// composed spec.Endpoints, registered as a DI singleton BEFORE Build(), then added to
+/// IEndpointRouteBuilder.DataSources after) — substituting non-blocking Start() for the
+/// real, blocking Run(). Public so any Discovery.Tests module composing a real
+/// `webHost`-shaped WebHostSpec (via `useDiscoveryWith`/`resource`/`get`) reuses this one
+/// seam instead of re-declaring it (Constitution rule 8) — the same substitution
+/// Frank.Tests' MiddlewareOrderingTests.fs already establishes for the same reason.
+let runWebHostSpecOnTestServer (spec: WebHostSpec) : WebApplication =
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+    let dataSource = ResourceEndpointDataSource(spec.Endpoints)
+    builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
+    spec.Services builder.Services |> ignore
+    let app = builder.Build()
+
+    (app :> IApplicationBuilder)
+    |> spec.BeforeRoutingMiddleware
+    |> fun app -> app.UseRouting()
+    |> spec.Middleware
+    |> ignore
+
+    (app :> IEndpointRouteBuilder).DataSources.Add(dataSource)
+    app.Start()
+    app
+
+/// #432 F-CONF fixture: `GET /games/{id}` registered through the REAL `resource`/`get` CE
+/// (Frank.Builder.ResourceBuilder), composed into a real `useDiscoveryWith` WebHostSpec and
+/// run via runWebHostSpecOnTestServer above — never the hand-built `routeEndpoint` test
+/// double the rest of this file uses. The advertised⟹served gap (#431's GET-only `get` CE
+/// registration) only reproduces through this real registration path. The handler honors
+/// `If-None-Match: "v1"` with a 304 — a minimal stand-in for the Wave-1 HTTP-caching
+/// layer's real ETag short-circuit (ConditionalRequestMiddleware), sufficient to prove
+/// DiscoveryMiddleware's describedby-on-GET emission fires on 304 as well as 200 without
+/// pulling in that middleware's separate ETagCache/IETagProviderFactory DI wiring.
+let buildFConfApp (config: DiscoveryConfig) : WebApplication =
+    let handler (ctx: HttpContext) =
+        task {
+            let ifNoneMatch = ctx.Request.Headers.IfNoneMatch.ToString()
+
+            if ifNoneMatch = "\"v1\"" then
+                ctx.Response.StatusCode <- StatusCodes.Status304NotModified
+            else
+                ctx.Response.Headers.ETag <- StringValues "\"v1\""
+                ctx.Response.ContentType <- "application/json"
+                do! ctx.Response.WriteAsync "{}"
+        }
+
+    let gameResource =
+        resource "/games/{id}" {
+            relation "https://schema.org/Game"
+            get handler
+        }
+
+    let builder = WebHostBuilder([||])
+
+    let spec =
+        WebHostSpec.Empty
+        |> fun s -> builder.UseDiscoveryWith(s, config)
+        |> fun s -> builder.Resource(s, gameResource)
+
+    runWebHostSpecOnTestServer spec
 
 /// Spin a TestServer with THREE routes carrying different relation exposure:
 ///   - "/tictactoe" — routed, but declares NO ResourceRelationMetadata.

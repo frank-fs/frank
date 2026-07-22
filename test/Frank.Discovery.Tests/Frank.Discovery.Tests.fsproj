@@ -22,6 +22,7 @@
     <Compile Include="RelationTests.fs" />
     <Compile Include="ResolverTests.fs" />
     <Compile Include="ValidatorTests.fs" />
+    <Compile Include="ConformanceTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
