@@ -4,6 +4,7 @@ module Builder =
 
     open System
     open System.IO
+    open System.Threading
     open System.Threading.Tasks
     open Microsoft.AspNetCore.Builder
     open Microsoft.AspNetCore.Hosting
@@ -34,13 +35,56 @@ module Builder =
         else
             s
 
+    /// Discards every byte written to it, retaining only a running count — the zero-buffer
+    /// sink `suppressBodyForHead` swaps in for `ctx.Response.Body` on a HEAD request, so the
+    /// wrapped GET handler's body writes cost no memory (no backing byte array, unlike a
+    /// MemoryStream). Write-only and forward-only: Read/Seek/SetLength/Position-set are
+    /// unsupported, matching CanRead=false/CanSeek=false.
+    type private CountingSinkStream() =
+        inherit Stream()
+        let mutable written = 0L
+
+        member _.WrittenLength = written
+
+        override _.CanRead = false
+        override _.CanSeek = false
+        override _.CanWrite = true
+        override _.Length = written
+
+        override _.Position
+            with get () = written
+            and set _ = raise (NotSupportedException "CountingSinkStream is forward-only")
+
+        override _.Flush() = ()
+        override _.FlushAsync(_cancellationToken: CancellationToken) = Task.CompletedTask
+
+        override _.Read(_buffer: byte[], _offset: int, _count: int) =
+            raise (NotSupportedException "CountingSinkStream is write-only")
+
+        override _.Seek(_offset: int64, _origin: SeekOrigin) : int64 =
+            raise (NotSupportedException "CountingSinkStream is forward-only")
+
+        override _.SetLength(_value: int64) =
+            raise (NotSupportedException "CountingSinkStream is forward-only")
+
+        override _.Write(_buffer: byte[], _offset: int, count: int) = written <- written + int64 count
+
+        override _.WriteAsync(_buffer: byte[], _offset: int, count: int, _cancellationToken: CancellationToken) : Task =
+            written <- written + int64 count
+            Task.CompletedTask
+
+        override _.WriteAsync(buffer: ReadOnlyMemory<byte>, _cancellationToken: CancellationToken) : ValueTask =
+            written <- written + int64 buffer.Length
+            ValueTask.CompletedTask
+
     /// When a GET endpoint also answers HEAD (RFC 7231 §7.4.1), the underlying handler still
     /// runs so it computes the same headers (ETag, Content-Type, Content-Length) GET would —
     /// but the body itself must never reach the client. ASP.NET Core does not suppress this
     /// automatically for an arbitrary RequestDelegate (only individual middleware, e.g.
     /// StaticFileMiddleware, special-cases HEAD this way internally); this wrapper applies
     /// that same swap once at the source so handler authors never need to check
-    /// ctx.Request.Method themselves.
+    /// ctx.Request.Method themselves. The discard target is a CountingSinkStream (above),
+    /// never a MemoryStream — the handler's body bytes are counted, not retained.
     let private suppressBodyForHead (inner: RequestDelegate) : RequestDelegate =
         RequestDelegate(fun ctx ->
             task {
@@ -48,7 +92,7 @@ module Builder =
                     do! inner.Invoke ctx
                 else
                     let originalBody = ctx.Response.Body
-                    use discardedBody = new MemoryStream()
+                    use discardedBody = new CountingSinkStream()
                     ctx.Response.Body <- discardedBody
 
                     try
@@ -56,8 +100,17 @@ module Builder =
                     finally
                         ctx.Response.Body <- originalBody
 
-                    if not (ctx.Response.Headers.ContainsKey "Content-Length") then
-                        ctx.Response.ContentLength <- discardedBody.Length
+                    // HasStarted guard: a handler that already flushed headers before this
+                    // wrapper regains control (e.g. streamed/chunked output) cannot have its
+                    // Content-Length backfilled after the fact — ASP.NET Core throws
+                    // InvalidOperationException on any header mutation once the response has
+                    // started, so the backfill is skipped rather than crashing a HEAD request
+                    // whose GET counterpart streams.
+                    if
+                        not ctx.Response.HasStarted
+                        && not (ctx.Response.Headers.ContainsKey "Content-Length")
+                    then
+                        ctx.Response.ContentLength <- discardedBody.WrittenLength
             }
             :> Task)
 

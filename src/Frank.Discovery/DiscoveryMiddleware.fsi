@@ -71,7 +71,7 @@ val internal relationsForPath:
     routeTemplates: (RouteEndpoint * RouteTemplate) list -> requestPath: string -> string list
 
 /// Static discovery for the application:
-///  - OPTIONS → `Allow` (methods from matching endpoints + HEAD + OPTIONS) + `Link rel="describedby"`
+///  - OPTIONS → `Allow` (methods from matching endpoints + HEAD + OPTIONS) + `Link rel="profile"`
 ///  - GET ProfileUri → ALPS profile (application/alps+json)
 ///  - GET HomeRoute with `Accept: application/json-home` → JSON Home directory
 /// Anything else falls through. Runs after UseRouting, before endpoint execution.

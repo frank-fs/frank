@@ -37,11 +37,7 @@ type SemanticTests() =
         this.Playwright.APIRequest.NewContextAsync(APIRequestNewContextOptions(BaseURL = Server.Url()))
 
     /// Every parsed `<url>; rel="..."[; type="..."]` segment across all Link response
-    /// headers (RFC 8288) — the one raw-header-split step shared by LinkRels (rel->url,
-    /// last-wins) and DescribedByOfType below (rel+type->url). Needed because a matched
-    /// GET can now carry TWO `rel="describedby"` links (#432 bounce-back: the ALPS
-    /// profile and the vocabulary document), disambiguated only by their `type` target
-    /// attribute.
+    /// headers (RFC 8288) — the one raw-header-split step LinkRels below builds on.
     static member private LinkParts(resp: IAPIResponse) : (string * string * string option) list =
         let raw =
             resp.Headers
@@ -74,9 +70,11 @@ type SemanticTests() =
                 None)
         |> Array.toList
 
-    /// rel -> url from one or more Link headers (RFC 8288). Last-wins per rel — correct
-    /// for every call site here EXCEPT a GET ld+json response, which now carries two
-    /// `describedby` links (#432 bounce-back) and must use DescribedByOfType instead.
+    /// rel -> url from one or more Link headers (RFC 8288). Last-wins per rel. The ALPS
+    /// profile link is `rel="profile"` (RFC 6906 — an Application-Level Profile is not
+    /// itself the resource's representation format) and the vocabulary document is the
+    /// sole `rel="describedby"` (#432 review fix 3) — the two relations never collide on
+    /// the same response, so plain last-wins is correct everywhere this is used.
     static member private LinkRels(resp: IAPIResponse) : IDictionary<string, string> =
         let rels = Dictionary<string, string>()
 
@@ -85,16 +83,6 @@ type SemanticTests() =
                 rels.[rel] <- url
 
         rels
-
-    /// Select the `rel="describedby"` Link whose `type` target attribute equals
-    /// `mediaType` exactly — disambiguates the two coexisting describedby links a
-    /// matched GET now carries (#432 bounce-back): the ALPS profile
-    /// (type="application/alps+json") and the vocabulary document
-    /// (type="application/ld+json"). None when no describedby link carries that type.
-    static member private DescribedByOfType(resp: IAPIResponse, mediaType: string) : string option =
-        SemanticTests.LinkParts resp
-        |> List.tryFind (fun (rel, _, t) -> rel = "describedby" && t = Some mediaType)
-        |> Option.map (fun (_, url, _) -> url)
 
     member private this.Options(ctx: IAPIRequestContext, url: string) =
         ctx.FetchAsync(url, APIRequestContextOptions(Method = "OPTIONS"))
@@ -637,11 +625,13 @@ type SemanticTests() =
             )
         }
 
-    // ── AT-S2: OPTIONS yields Allow ⊇ {GET,OPTIONS,POST} + Link rel=describedby → ALPS ──
+    // ── AT-S2: OPTIONS yields Allow ⊇ {GET,OPTIONS,POST} + Link rel=profile → ALPS ──
     // ALPS MoveAction must carry rt = https://schema.org/Game — move is a POST transition
     // on the game resource, not a separate resource. OPTIONS must be in Allow (RFC 7231 §7.4.1).
+    // The ALPS profile link is rel="profile" (RFC 6906) — describedby is reserved for the
+    // vocabulary document (#432 review fix 3).
     [<Test>]
-    member this.``AT-S2 OPTIONS carries Allow and Link rel=describedby to ALPS``() =
+    member this.``AT-S2 OPTIONS carries Allow and Link rel=profile to ALPS``() =
         task {
             use! ctx = this.NewContext()
             let! resp = this.Options(ctx, "/games/at-s2")
@@ -658,9 +648,9 @@ type SemanticTests() =
             )
 
             let rels = SemanticTests.LinkRels resp
-            Assert.That(rels.ContainsKey "describedby", Is.True, "OPTIONS missing Link rel=describedby")
+            Assert.That(rels.ContainsKey "profile", Is.True, "OPTIONS missing Link rel=profile (RFC 6906) to ALPS")
 
-            let alpsUrl = rels.["describedby"]
+            let alpsUrl = rels.["profile"]
             let! alpsResp = ctx.GetAsync(alpsUrl)
             let! alpsBody = alpsResp.TextAsync()
             use alpsDoc = JsonDocument.Parse alpsBody
@@ -704,7 +694,7 @@ type SemanticTests() =
         task {
             use! ctx = this.NewContext()
             let! opts = this.Options(ctx, "/games/at-s3")
-            let alpsUrl = (SemanticTests.LinkRels opts).["describedby"]
+            let alpsUrl = (SemanticTests.LinkRels opts).["profile"]
             let! alps = ctx.GetAsync(alpsUrl)
             Assert.That(alps.Status, Is.EqualTo 200)
             let! body = alps.TextAsync()
@@ -905,8 +895,8 @@ type SemanticTests() =
             let! opts = this.Options(ctx, gameUrl)
             Assert.That(opts.Headers.ContainsKey "allow", Is.True, "OPTIONS missing Allow header")
             let rels = SemanticTests.LinkRels opts
-            Assert.That(rels.ContainsKey "describedby", Is.True, "OPTIONS missing Link rel=describedby")
-            let alpsUrl = rels.["describedby"]
+            Assert.That(rels.ContainsKey "profile", Is.True, "OPTIONS missing Link rel=profile (RFC 6906) to ALPS")
+            let alpsUrl = rels.["profile"]
 
             let! alpsResp = ctx.GetAsync alpsUrl
             Assert.That(alpsResp.Status, Is.EqualTo 200, sprintf "ALPS profile '%s' not 200" alpsUrl)
@@ -1010,20 +1000,18 @@ type SemanticTests() =
             // itself has none (asserted above: no example.org, only actionStatus/ttt:
             // terms) — a naive client discovers Game's real-world identity by following
             // the instance response's OWN Link rel="describedby" header to the
-            // vocabulary document, never by hardcoding "/vocabulary". #432 bounce-back:
-            // the matched GET now ALSO carries a describedby to the ALPS profile
-            // (type="application/alps+json") — select the vocabulary one by its
-            // type="application/ld+json" target attribute, not last-wins.
-            let vocabDescribedBy =
-                SemanticTests.DescribedByOfType(ldGame, "application/ld+json")
+            // vocabulary document, never by hardcoding "/vocabulary". The matched GET's
+            // ALPS link is rel="profile" (RFC 6906, #432 review fix 3), so the vocabulary
+            // document is once again the SOLE rel="describedby" on this response.
+            let vocabRels = SemanticTests.LinkRels ldGame
 
             Assert.That(
-                vocabDescribedBy.IsSome,
+                vocabRels.ContainsKey "describedby",
                 Is.True,
-                "Game ld+json missing Link rel=describedby; type=\"application/ld+json\" — seeAlso two-hop path unreachable"
+                "Game ld+json missing Link rel=describedby — seeAlso two-hop path unreachable"
             )
 
-            let vocabHref = vocabDescribedBy.Value
+            let vocabHref = vocabRels.["describedby"]
 
             let vocabUrl =
                 if vocabHref.StartsWith "/" then
@@ -1324,8 +1312,8 @@ type SemanticTests() =
             // ── Phase 1: Follow links to the ex: ALPS profile ──────────────────
             let! opts = this.Options(ctx, sprintf "/games/%s" gameId)
             let rels = SemanticTests.LinkRels opts
-            Assert.That(rels.ContainsKey "describedby", Is.True, "ex: server missing Link rel=describedby")
-            let alpsUrl = rels.["describedby"]
+            Assert.That(rels.ContainsKey "profile", Is.True, "ex: server missing Link rel=profile (RFC 6906)")
+            let alpsUrl = rels.["profile"]
             let! alpsResp = ctx.GetAsync alpsUrl
             Assert.That(alpsResp.Status, Is.EqualTo 200, "ex: server ALPS not 200")
             let! alpsBody = alpsResp.TextAsync()
@@ -1543,8 +1531,8 @@ type SemanticTests() =
 
             let! opts = this.Options(ctx, sprintf "/games/%s" gameId)
             let rels = SemanticTests.LinkRels opts
-            Assert.That(rels.ContainsKey "describedby", Is.True, "ex: server missing Link rel=describedby")
-            let alpsUrl = rels.["describedby"]
+            Assert.That(rels.ContainsKey "profile", Is.True, "ex: server missing Link rel=profile (RFC 6906)")
+            let alpsUrl = rels.["profile"]
             let! alpsResp = ctx.GetAsync alpsUrl
             Assert.That(alpsResp.Status, Is.EqualTo 200, "ex: server ALPS not 200")
             let! alpsBody = alpsResp.TextAsync()
@@ -1656,8 +1644,8 @@ type SemanticTests() =
             // ── Phase 2: Discover class/agent/square IRIs from ALPS ─────────
             let! opts = this.Options(ctx, gameUrl)
             let rels = SemanticTests.LinkRels opts
-            Assert.That(rels.ContainsKey "describedby", Is.True, "OPTIONS missing Link rel=describedby")
-            let alpsUrl = rels.["describedby"]
+            Assert.That(rels.ContainsKey "profile", Is.True, "OPTIONS missing Link rel=profile (RFC 6906)")
+            let alpsUrl = rels.["profile"]
             let! alpsResp = ctx.GetAsync alpsUrl
             Assert.That(alpsResp.Status, Is.EqualTo 200, "ALPS not 200")
             let! alpsBody = alpsResp.TextAsync()
@@ -1952,7 +1940,7 @@ type SemanticTests() =
     // pass an absence-only check even if some OTHER garbage domain leaked) but scoped
     // to the .Ex sample and covering every live surface the #415 thesis names together
     // in one standing regression test: /ex (Turtle), OPTIONS /games/{id} (Link headers),
-    // the ALPS profile reached via the OPTIONS describedby Link, and JSON Home. Turns
+    // the ALPS profile reached via the OPTIONS profile Link, and JSON Home. Turns
     // the manual `curl` verification from the #415 fix into a persisting guard — Vocabulary.
     // Ex.fs's ex:/ttt: prefixes are declared-only identity keys (RFC 2606 ".invalid"),
     // never themselves served; every IRI must instead resolve host-relative against the
@@ -1979,7 +1967,7 @@ type SemanticTests() =
             let! opts = this.Options(ctx, sprintf "/games/%s" gameId)
             Assert.That(opts.Status, Is.EqualTo 200, "OPTIONS /games/{id} not 200")
             let rels = SemanticTests.LinkRels opts
-            Assert.That(rels.ContainsKey "describedby", Is.True, ".Ex server missing Link rel=describedby")
+            Assert.That(rels.ContainsKey "profile", Is.True, ".Ex server missing Link rel=profile (RFC 6906)")
             Assert.That(rels.ContainsKey "type", Is.True, ".Ex server missing Link rel=type")
 
             let linkHeaderRaw =
@@ -2011,9 +1999,9 @@ type SemanticTests() =
                 sprintf "GET /ex must contain the real-origin ex:Game IRI '%s', got: %s" gameIri exBody
             )
 
-            // ── ALPS profile (reached via the discovered describedby Link, never
+            // ── ALPS profile (reached via the discovered profile Link, never
             // hardcoded): no placeholder domain, real-origin ex:Game IRI present. ────
-            let! alpsResp = ctx.GetAsync rels.["describedby"]
+            let! alpsResp = ctx.GetAsync rels.["profile"]
             Assert.That(alpsResp.Status, Is.EqualTo 200, "ALPS profile not 200")
             let! alpsBody = alpsResp.TextAsync()
             assertNoPlaceholder "ALPS profile body" alpsBody
@@ -2095,7 +2083,7 @@ type SemanticTests() =
         task {
             use! ctx = this.NewContext()
             let! opts = this.Options(ctx, "/games/at-s11")
-            let alpsUrl = (SemanticTests.LinkRels opts).["describedby"]
+            let alpsUrl = (SemanticTests.LinkRels opts).["profile"]
             let! alps = ctx.GetAsync(alpsUrl)
             Assert.That(alps.Status, Is.EqualTo 200, "ALPS profile not 200")
             let! body = alps.TextAsync()

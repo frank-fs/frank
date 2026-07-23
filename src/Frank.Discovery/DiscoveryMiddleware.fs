@@ -509,7 +509,7 @@ let internal relationsForPath (routeTemplates: EndpointTemplate list) (requestPa
     |> List.distinct
 
 /// Static discovery for the application:
-///  - OPTIONS → `Allow` (methods from matching endpoints + HEAD + OPTIONS) + `Link rel="describedby"`
+///  - OPTIONS → `Allow` (methods from matching endpoints + HEAD + OPTIONS) + `Link rel="profile"`
 ///  - GET ProfileUri → ALPS profile (application/alps+json)
 ///  - GET HomeRoute with `Accept: application/json-home` → JSON Home directory
 /// Anything else falls through. Runs after UseRouting, before endpoint execution.
@@ -521,6 +521,15 @@ type DiscoveryMiddleware
         resourceEndpointDataSource: Frank.Builder.ResourceEndpointDataSource,
         logger: ILogger<DiscoveryMiddleware>
     ) =
+
+    // #432 review fix 3/6: the ALPS profile is an Application-Level Profile, not the
+    // resource's own representation format — RFC 6906 `rel="profile"`, never
+    // `rel="describedby"` (which LinkedDataMiddleware's vocabulary document is now the
+    // sole occupant of, on GET/HEAD). config.ProfileUri is fixed per middleware instance,
+    // so the link string is built ONCE here and reused by both handleOptions and
+    // EmitDescribedByOnStarting below, instead of re-`sprintf`-ing it per request.
+    let profileLink =
+        sprintf "<%s>; rel=\"profile\"; type=\"application/alps+json\"" config.ProfileUri
 
     // Dedup by relation at the middleware boundary where the logger lives (Holzmann 14:
     // surface side-effects at the call site). JSON Home 'resources' is keyed by relation
@@ -669,9 +678,6 @@ type DiscoveryMiddleware
             // one line per method (#398).
             ctx.Response.Headers.["Allow"] <- StringValues(methods |> String.concat ", ")
 
-        let profileLink =
-            sprintf "<%s>; rel=\"describedby\"; type=\"application/alps+json\"" config.ProfileUri
-
         ctx.Response.Headers.Append("Link", profileLink)
 
         // #398: scope rel="type" links to the matched route's own declared relation(s) —
@@ -759,20 +765,17 @@ type DiscoveryMiddleware
     /// ResolvedAlpsCacheSize above, for the resolved-JSON-Home cache (#405).
     member internal _.ResolvedHomeCacheSize = resolvedHomeResourcesCache.Count
 
-    /// #432: emit `describedby` on a GET whose path matches a registered resource route —
-    /// the SAME route-match methodsForPath already computes for the Allow header, never a
-    /// second/parallel matcher. The endpoint writes its own body, so the header cannot be
-    /// set after next.Invoke returns; OnStarting is registered BEFORE calling next.Invoke
-    /// and fires just before headers are sent, whether or not the handler writes a body
-    /// (e.g. a 304 short-circuit from the HTTP-caching layer). Gated on 200/304 so an
-    /// error response from the matched route (4xx/5xx) is not mislabeled as describing a
-    /// resource it never served (src/CLAUDE.md: gate OnStarting registration on a real
-    /// route match to avoid a closure allocation on every request — the caller only reaches
-    /// this branch once methodsForPath has already proven a match).
+    /// #432: emit the ALPS `rel="profile"` link (RFC 6906, #432 review fix 3) on a GET or
+    /// HEAD whose path matches a registered resource route (RFC 7231 §4.3.2 — HEAD MUST
+    /// return the same headers GET would). The route match itself is the endpoint
+    /// `UseRouting` already resolved (Invoke below reads `ctx.GetEndpoint()`, #432 review
+    /// fix 4) — never a second/parallel matcher. The endpoint writes its own body, so the
+    /// header cannot be set after next.Invoke returns; OnStarting is registered BEFORE
+    /// calling next.Invoke and fires just before headers are sent, whether or not the
+    /// handler writes a body (e.g. a 304 short-circuit from the HTTP-caching layer). Gated
+    /// on 200/304 so an error response from the matched route (4xx/5xx) is not mislabeled
+    /// as describing a resource it never served.
     member private _.EmitDescribedByOnStarting(ctx: HttpContext) : unit =
-        let profileLink =
-            sprintf "<%s>; rel=\"describedby\"; type=\"application/alps+json\"" config.ProfileUri
-
         ctx.Response.OnStarting(fun () ->
             let status = ctx.Response.StatusCode
 
@@ -784,6 +787,7 @@ type DiscoveryMiddleware
     member this.Invoke(ctx: HttpContext) : Task =
         let path = ctx.Request.Path.Value
         let isGet = HttpMethods.IsGet ctx.Request.Method
+        let isHead = HttpMethods.IsHead ctx.Request.Method
 
         if HttpMethods.IsOptions ctx.Request.Method then
             handleOptions ctx
@@ -791,7 +795,12 @@ type DiscoveryMiddleware
             handleAlpsProfile ctx
         elif isGet && path = config.HomeRoute && acceptsJsonHome ctx then
             handleJsonHome ctx
-        elif isGet && not (List.isEmpty (methodsForPath cachedRouteTemplates.Value path)) then
+        // #432 review fix 2/4: HEAD must carry the SAME rel="profile" link GET does
+        // (RFC 7231 §4.3.2) — gated on the endpoint UseRouting already matched
+        // (ctx.GetEndpoint()), never a re-run of Frank's own template matcher on every
+        // request (that duplicated work methodsForPath still does for the Allow header,
+        // which OPTIONS needs regardless of what UseRouting resolved for THIS request).
+        elif (isGet || isHead) && not (isNull (ctx.GetEndpoint())) then
             this.EmitDescribedByOnStarting ctx
             next.Invoke ctx
         else

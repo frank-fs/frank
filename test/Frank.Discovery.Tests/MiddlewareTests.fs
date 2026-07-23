@@ -12,7 +12,7 @@ open Frank.Discovery.Tests.TestHelpers
 let tests =
     testList
         "DiscoveryMiddleware (TestServer)"
-        [ testCase "OPTIONS yields Allow and Link rel=describedby"
+        [ testCase "OPTIONS yields Allow and Link rel=profile"
           <| fun _ ->
               use app = startServer sampleConfig
               use client = app.GetTestClient()
@@ -22,10 +22,10 @@ let tests =
               let links = linkValues resp
 
               Expect.isTrue
-                  (links |> List.exists (fun l -> l.Contains "rel=\"describedby\""))
-                  "describedby Link present"
+                  (links |> List.exists (fun l -> l.Contains "rel=\"profile\""))
+                  "profile Link present (RFC 6906)"
 
-              Expect.isTrue (links |> List.exists (fun l -> l.Contains "/alps/test")) "profile URI in describedby Link"
+              Expect.isTrue (links |> List.exists (fun l -> l.Contains "/alps/test")) "profile URI in profile Link"
 
           testCase "GET profile URI serves ALPS with schema.org IRIs"
           <| fun _ ->
@@ -540,7 +540,7 @@ let describedByScopingTests =
               let resp = client.SendAsync(req).GetAwaiter().GetResult()
               Expect.isEmpty (typeLinks resp) "no rel=\"type\" link for the unrouted home path"
 
-          testCase "OPTIONS still carries the unconditional rel=\"describedby\" profile Link regardless of scoping"
+          testCase "OPTIONS still carries the unconditional rel=\"profile\" ALPS Link regardless of scoping"
           <| fun _ ->
               use app = startScopedRelationServer scopedRelationConfig
               use client = app.GetTestClient()
@@ -550,8 +550,8 @@ let describedByScopingTests =
 
               Expect.isTrue
                   (links
-                   |> List.exists (fun l -> l.Contains "rel=\"describedby\"" && l.Contains "/alps/test"))
-                  "profile describedby Link is unaffected by rel=\"type\" scoping" ]
+                   |> List.exists (fun l -> l.Contains "rel=\"profile\"" && l.Contains "/alps/test"))
+                  "profile Link is unaffected by rel=\"type\" scoping" ]
 
 // ── #398 AC3: Allow header is a single comma-joined wire-level value ─────────
 
