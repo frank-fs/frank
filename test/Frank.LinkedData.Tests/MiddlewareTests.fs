@@ -201,6 +201,33 @@ let tests =
               let vary = resp.Headers.Vary |> Seq.toList
               Expect.contains vary "Accept" "Vary: Accept must be present on 406 response"
 
+          testCase "GET /data Accept:application/xml (406) → RFC 9457 application/problem+json (#435)"
+          <| fun _ ->
+              use app = startServer sampleConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/data")
+              req.Headers.Add("Accept", "application/xml")
+              let (resp: HttpResponseMessage) = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 406 "406 Not Acceptable"
+
+              Expect.equal
+                  resp.Content.Headers.ContentType.MediaType
+                  "application/problem+json"
+                  "406 Content-Type must be application/problem+json (RFC 9457), not text/plain"
+
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              let mutable typeEl = Unchecked.defaultof<JsonElement>
+              let mutable titleEl = Unchecked.defaultof<JsonElement>
+              use doc = JsonDocument.Parse(body)
+              let root = doc.RootElement
+              Expect.isTrue (root.TryGetProperty("type", &typeEl)) "problem+json has 'type'"
+              Expect.isTrue (root.TryGetProperty("title", &titleEl)) "problem+json has 'title'"
+              Expect.equal (root.GetProperty("status").GetInt32()) 406 "problem+json 'status' == 406"
+              let detail = root.GetProperty("detail").GetString()
+              Expect.stringContains detail "application/ld+json" "detail names ld+json representation"
+              Expect.stringContains detail "text/turtle" "detail names turtle representation"
+              Expect.stringContains detail "application/rdf+xml" "detail names rdf+xml representation"
+
           testCase "#16 ld+json @context includes local ttt but not off-origin schema from graph.NamespaceMap"
           <| fun _ ->
               use app = startServer sampleConfigWithNamespaces
@@ -217,7 +244,10 @@ let tests =
               // #394: 'schema' is off-origin (schema.org, not this app's origin) — inline
               // @context[0] must not declare it, else schema: CURIEs always resolve offline
               // regardless of the remote @context array element.
-              Expect.isFalse (firstObj.TryGetProperty("schema", &schemaEl)) "@context must not have off-origin 'schema' prefix"
+              Expect.isFalse
+                  (firstObj.TryGetProperty("schema", &schemaEl))
+                  "@context must not have off-origin 'schema' prefix"
+
               Expect.isTrue (firstObj.TryGetProperty("ttt", &tttEl)) "@context has origin-local 'ttt' prefix"
               // #16 real compaction: @graph must contain the compacted ttt: IRI, not the full IRI.
               Expect.stringContains
@@ -229,8 +259,7 @@ let tests =
                   (body.Contains "/tictactoe#Square")
                   "full tictactoe#Square IRI must not appear in body after compaction"
 
-          testCase
-              "#394 inline @context[0] excludes off-origin external prefix but body compaction still uses it"
+          testCase "#394 inline @context[0] excludes off-origin external prefix but body compaction still uses it"
           <| fun _ ->
               use app = startServer sampleConfigWithExternalAndLocalNamespaces
               use client = app.GetTestClient()

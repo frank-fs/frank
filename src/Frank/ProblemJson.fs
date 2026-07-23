@@ -2,6 +2,7 @@ namespace Frank
 
 open System.IO
 open System.Text
+open System.Text.Encodings.Web
 open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
@@ -10,7 +11,9 @@ open Microsoft.AspNetCore.Http
 module ProblemJson =
 
     let private buildBody (typeUri: string) (title: string) (status: int) (detail: string) : string =
-        let opts = JsonWriterOptions(Indented = false)
+        let opts =
+            JsonWriterOptions(Indented = false, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping)
+
         use outStream = new MemoryStream()
         use writer = new Utf8JsonWriter(outStream, opts)
         writer.WriteStartObject()

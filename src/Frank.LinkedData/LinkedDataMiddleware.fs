@@ -211,9 +211,7 @@ module private Serializers =
 
     let respond406 (ctx: HttpContext) : Task =
         Frank.AcceptNegotiation.appendVaryAccept ctx.Response
-        ctx.Response.StatusCode <- 406
-        ctx.Response.ContentType <- "text/plain"
-        ctx.Response.WriteAsync(notAcceptableBody)
+        Frank.ProblemJson.write ctx 406 "about:blank" "Not Acceptable" notAcceptableBody
 
     /// When graph.BaseUri is set the writer already emitted @base; avoid duplicating it.
     let private turtleBody (graph: IGraph) (origin: string) : string =
