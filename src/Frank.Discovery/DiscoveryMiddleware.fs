@@ -669,7 +669,9 @@ type DiscoveryMiddleware
             // one line per method (#398).
             ctx.Response.Headers.["Allow"] <- StringValues(methods |> String.concat ", ")
 
-        let profileLink = sprintf "<%s>; rel=\"describedby\"" config.ProfileUri
+        let profileLink =
+            sprintf "<%s>; rel=\"describedby\"; type=\"application/alps+json\"" config.ProfileUri
+
         ctx.Response.Headers.Append("Link", profileLink)
 
         // #398: scope rel="type" links to the matched route's own declared relation(s) —
@@ -768,7 +770,8 @@ type DiscoveryMiddleware
     /// route match to avoid a closure allocation on every request — the caller only reaches
     /// this branch once methodsForPath has already proven a match).
     member private _.EmitDescribedByOnStarting(ctx: HttpContext) : unit =
-        let profileLink = sprintf "<%s>; rel=\"describedby\"" config.ProfileUri
+        let profileLink =
+            sprintf "<%s>; rel=\"describedby\"; type=\"application/alps+json\"" config.ProfileUri
 
         ctx.Response.OnStarting(fun () ->
             let status = ctx.Response.StatusCode

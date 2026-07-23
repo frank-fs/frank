@@ -36,28 +36,65 @@ type SemanticTests() =
     member this.NewContext() : Task<IAPIRequestContext> =
         this.Playwright.APIRequest.NewContextAsync(APIRequestNewContextOptions(BaseURL = Server.Url()))
 
-    /// rel -> url from one or more Link headers (RFC 8288).
-    static member private LinkRels(resp: IAPIResponse) : IDictionary<string, string> =
-        let rels = Dictionary<string, string>()
-
+    /// Every parsed `<url>; rel="..."[; type="..."]` segment across all Link response
+    /// headers (RFC 8288) — the one raw-header-split step shared by LinkRels (rel->url,
+    /// last-wins) and DescribedByOfType below (rel+type->url). Needed because a matched
+    /// GET can now carry TWO `rel="describedby"` links (#432 bounce-back: the ALPS
+    /// profile and the vocabulary document), disambiguated only by their `type` target
+    /// attribute.
+    static member private LinkParts(resp: IAPIResponse) : (string * string * string option) list =
         let raw =
             resp.Headers
             |> Seq.filter (fun kv -> kv.Key.ToLowerInvariant() = "link")
             |> Seq.map (fun kv -> kv.Value)
             |> String.concat ", "
 
-        for part in raw.Split(',') do
+        raw.Split(',')
+        |> Array.choose (fun part ->
             let seg = part.Trim()
 
             if seg.Contains "<" && seg.Contains ">" && seg.Contains "rel=" then
                 let url = seg.Substring(seg.IndexOf '<' + 1, seg.IndexOf '>' - seg.IndexOf '<' - 1)
 
-                let rel =
-                    seg.Substring(seg.IndexOf "rel=" + 4).Trim().Split(';').[0].Trim().Trim('"', '\'')
+                let attrs =
+                    seg.Substring(seg.IndexOf '>' + 1).Split(';')
+                    |> Array.choose (fun attr ->
+                        let attr = attr.Trim()
+                        let eq = attr.IndexOf '='
 
+                        if eq > 0 then
+                            Some(attr.Substring(0, eq).Trim(), attr.Substring(eq + 1).Trim().Trim('"', '\''))
+                        else
+                            None)
+                    |> Map.ofArray
+
+                let rel = attrs |> Map.tryFind "rel" |> Option.defaultValue ""
+                Some(rel, url, attrs |> Map.tryFind "type")
+            else
+                None)
+        |> Array.toList
+
+    /// rel -> url from one or more Link headers (RFC 8288). Last-wins per rel — correct
+    /// for every call site here EXCEPT a GET ld+json response, which now carries two
+    /// `describedby` links (#432 bounce-back) and must use DescribedByOfType instead.
+    static member private LinkRels(resp: IAPIResponse) : IDictionary<string, string> =
+        let rels = Dictionary<string, string>()
+
+        for rel, url, _ in SemanticTests.LinkParts resp do
+            if rel <> "" then
                 rels.[rel] <- url
 
         rels
+
+    /// Select the `rel="describedby"` Link whose `type` target attribute equals
+    /// `mediaType` exactly — disambiguates the two coexisting describedby links a
+    /// matched GET now carries (#432 bounce-back): the ALPS profile
+    /// (type="application/alps+json") and the vocabulary document
+    /// (type="application/ld+json"). None when no describedby link carries that type.
+    static member private DescribedByOfType(resp: IAPIResponse, mediaType: string) : string option =
+        SemanticTests.LinkParts resp
+        |> List.tryFind (fun (rel, _, t) -> rel = "describedby" && t = Some mediaType)
+        |> Option.map (fun (_, url, _) -> url)
 
     member private this.Options(ctx: IAPIRequestContext, url: string) =
         ctx.FetchAsync(url, APIRequestContextOptions(Method = "OPTIONS"))
@@ -973,16 +1010,20 @@ type SemanticTests() =
             // itself has none (asserted above: no example.org, only actionStatus/ttt:
             // terms) — a naive client discovers Game's real-world identity by following
             // the instance response's OWN Link rel="describedby" header to the
-            // vocabulary document, never by hardcoding "/vocabulary".
-            let ldRels = SemanticTests.LinkRels ldGame
+            // vocabulary document, never by hardcoding "/vocabulary". #432 bounce-back:
+            // the matched GET now ALSO carries a describedby to the ALPS profile
+            // (type="application/alps+json") — select the vocabulary one by its
+            // type="application/ld+json" target attribute, not last-wins.
+            let vocabDescribedBy =
+                SemanticTests.DescribedByOfType(ldGame, "application/ld+json")
 
             Assert.That(
-                ldRels.ContainsKey "describedby",
+                vocabDescribedBy.IsSome,
                 Is.True,
-                "Game ld+json missing Link rel=describedby — seeAlso two-hop path unreachable"
+                "Game ld+json missing Link rel=describedby; type=\"application/ld+json\" — seeAlso two-hop path unreachable"
             )
 
-            let vocabHref = ldRels.["describedby"]
+            let vocabHref = vocabDescribedBy.Value
 
             let vocabUrl =
                 if vocabHref.StartsWith "/" then

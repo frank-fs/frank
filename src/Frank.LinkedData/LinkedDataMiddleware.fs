@@ -349,7 +349,11 @@ type LinkedDataMiddleware
                 // so it appears on Serve/PassThrough/NotAcceptable alike — including the naive
                 // plain-JSON/no-Accept client the #420 thesis targets (finding 3).
                 vocabularyConfig.VocabularyRoute
-                |> Option.iter (fun route -> ctx.Response.Headers.Append("Link", $"<{route}>; rel=\"describedby\""))
+                |> Option.iter (fun route ->
+                    ctx.Response.Headers.Append(
+                        "Link",
+                        $"<{route}>; rel=\"describedby\"; type=\"application/ld+json\""
+                    ))
 
                 let acceptHeader =
                     match ctx.Request.Headers.TryGetValue "Accept" with
