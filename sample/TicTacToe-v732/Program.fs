@@ -210,6 +210,17 @@ let private parseMoveFromDoc (origin: string) (isLd: bool) (doc: JsonNode) =
 
         pos, plr
 
+/// Guard ONLY the parse step — an empty or malformed body throws JsonException (verified:
+/// this also covers the empty-body case, since zero JSON tokens is itself a JsonException),
+/// which must never escape to Kestrel as an unhandled 500 (Constitution rule 7). Downstream
+/// failures (unparseable move, missing fields, store conflicts) are handled by their own
+/// branches below, not folded into this catch.
+let private tryParseBody (body: string) : JsonNode option =
+    try
+        Some(JsonNode.Parse body)
+    with :? JsonException ->
+        None
+
 /// Parse and apply the move body against `id`, once `origin` is known-valid — the SAME
 /// origin-validation discipline handleAlpsProfile already applies before minting any
 /// origin-resolved href (#398 /simplify item 7).
@@ -217,26 +228,23 @@ let private performMove (ctx: HttpContext) (origin: string) (id: string) =
     task {
         use reader = new StreamReader(ctx.Request.Body)
         let! body = reader.ReadToEndAsync()
-        let doc = JsonNode.Parse body
-        let ld = isLdJson ctx
-        let position, player = parseMoveFromDoc origin ld doc
 
-        match position, player with
-        | Some pos, Some plr ->
-            match Move.TryParse(plr, pos) with
-            | None ->
-                ctx.Response.StatusCode <- 400
-                do! ctx.Response.WriteAsync("""{"title":"Unparseable move"}""")
-            | Some move ->
-                match store.Update(id, move) with
-                | None -> ctx.Response.StatusCode <- 404
-                | Some(Error(_, msg)) ->
-                    ctx.Response.StatusCode <- 409
-                    do! writeJson ctx (JsonObject(dict [ "title", (JsonValue.Create msg :> JsonNode) ]))
-                | Some result -> do! writeJson ctx (wireJson id result)
-        | _ ->
-            ctx.Response.StatusCode <- 400
-            do! ctx.Response.WriteAsync("""{"title":"Missing position or player"}""")
+        match tryParseBody body with
+        | None -> do! Frank.ProblemJson.write ctx 400 "about:blank" "Bad Request" "Request body is not valid JSON"
+        | Some doc ->
+            let ld = isLdJson ctx
+            let position, player = parseMoveFromDoc origin ld doc
+
+            match position, player with
+            | Some pos, Some plr ->
+                match Move.TryParse(plr, pos) with
+                | None -> do! Frank.ProblemJson.write ctx 400 "about:blank" "Bad Request" "Unparseable move"
+                | Some move ->
+                    match store.Update(id, move) with
+                    | None -> do! Frank.ProblemJson.write ctx 404 "about:blank" "Not Found" $"game {id} not found"
+                    | Some(Error(_, msg)) -> do! Frank.ProblemJson.write ctx 409 "about:blank" "Conflict" msg
+                    | Some result -> do! writeJson ctx (wireJson id result)
+            | _ -> do! Frank.ProblemJson.write ctx 400 "about:blank" "Bad Request" "Missing position or player"
     }
 
 /// A malformed Host header cannot mint resolvable hrefs (resolveHref's Uri(Uri origin, _)

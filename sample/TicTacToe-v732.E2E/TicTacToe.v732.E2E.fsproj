@@ -12,6 +12,7 @@
     <Compile Include="ServerFixture.fs" />
     <Compile Include="GameplayTests.fs" />
     <Compile Include="OriginRobustnessTests.fs" />
+    <Compile Include="ProblemJsonTests.fs" />
     <Compile Include="SchemaOrgStub.fs" />
     <Compile Include="SemanticTests.fs" />
     <Compile Include="ProvenanceLineageTests.fs" />
