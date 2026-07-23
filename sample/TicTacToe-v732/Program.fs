@@ -215,9 +215,18 @@ let private parseMoveFromDoc (origin: string) (isLd: bool) (doc: JsonNode) =
 /// which must never escape to Kestrel as an unhandled 500 (Constitution rule 7). Downstream
 /// failures (unparseable move, missing fields, store conflicts) are handled by their own
 /// branches below, not folded into this catch.
-let private tryParseBody (body: string) : JsonNode option =
+///
+/// A body of literal `null` is valid JSON — JsonNode.Parse returns a null JsonNode rather
+/// than throwing — and a valid-but-non-object body (`42`, `"x"`, `[]`) parses to a
+/// JsonValue/JsonArray that isn't string-indexable. Neither throws JsonException, so both
+/// would otherwise escape parseMoveFromDoc's `doc.["position"]` lookup as an unhandled NRE
+/// or InvalidOperationException. The move body must be a JSON object; anything else is
+/// rejected here, at the same parse-shape guard, not left to surface downstream (#436).
+let private tryParseBody (body: string) : JsonObject option =
     try
-        Some(JsonNode.Parse body)
+        match JsonNode.Parse body with
+        | :? JsonObject as o -> Some o
+        | _ -> None
     with :? JsonException ->
         None
 
@@ -230,7 +239,7 @@ let private performMove (ctx: HttpContext) (origin: string) (id: string) =
         let! body = reader.ReadToEndAsync()
 
         match tryParseBody body with
-        | None -> do! Frank.ProblemJson.write ctx 400 "about:blank" "Bad Request" "Request body is not valid JSON"
+        | None -> do! Frank.ProblemJson.write ctx 400 "about:blank" "Bad Request" "Request body must be a JSON object"
         | Some doc ->
             let ld = isLdJson ctx
             let position, player = parseMoveFromDoc origin ld doc

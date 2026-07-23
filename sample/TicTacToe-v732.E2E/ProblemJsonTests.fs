@@ -165,6 +165,67 @@ type MalformedBodyLogTests() =
             )
         }
 
+    /// #436 adversarial-gate finding: a body of literal `null` is VALID JSON —
+    /// JsonNode.Parse "null" returns a null JsonNode rather than throwing — so the
+    /// original guard's `try ... with :? JsonException` never caught it. The `Some doc`
+    /// branch then called `doc.["position"]` on a null reference, escaping as an
+    /// unhandled NullReferenceException 500. This must now be rejected at the parse-shape
+    /// guard, same as malformed JSON.
+    [<Test>]
+    member this.``POST with a null body returns a clean 4xx, not an unhandled 500, and logs no unhandled exception``() =
+        task {
+            use! created = (new HttpClient()).GetAsync(url + "/games/e2e-log-null")
+            Assert.That(created.StatusCode |> int, Is.EqualTo 200)
+
+            use! resp = this.Post("/games/e2e-log-null", "null")
+            Assert.That(resp.StatusCode |> int, Is.LessThan 500, "null body must not surface as a 5xx")
+            Assert.That(resp.StatusCode |> int, Is.GreaterThanOrEqualTo 400)
+
+            let captured = this.CapturedOutput()
+
+            Assert.That(
+                captured,
+                Does.Not.Contain("Unhandled exception"),
+                $"server output must contain no unhandled-exception log entry; captured:\n{captured}"
+            )
+
+            Assert.That(
+                captured,
+                Does.Not.Contain("NullReferenceException"),
+                $"server output must contain no NullReferenceException escape; captured:\n{captured}"
+            )
+        }
+
+    /// #436 adversarial-gate finding: a valid-but-non-object body (e.g. a bare JSON number)
+    /// parses to a JsonValue, which isn't string-indexable — indexing it by "position" throws
+    /// InvalidOperationException, not JsonException, so it also escaped the original guard.
+    [<Test>]
+    member this.``POST with a non-object JSON body (bare number) returns a clean 4xx, not an unhandled 500, and logs no unhandled exception``
+        ()
+        =
+        task {
+            use! created = (new HttpClient()).GetAsync(url + "/games/e2e-log-scalar")
+            Assert.That(created.StatusCode |> int, Is.EqualTo 200)
+
+            use! resp = this.Post("/games/e2e-log-scalar", "42")
+            Assert.That(resp.StatusCode |> int, Is.LessThan 500, "non-object body must not surface as a 5xx")
+            Assert.That(resp.StatusCode |> int, Is.GreaterThanOrEqualTo 400)
+
+            let captured = this.CapturedOutput()
+
+            Assert.That(
+                captured,
+                Does.Not.Contain("Unhandled exception"),
+                $"server output must contain no unhandled-exception log entry; captured:\n{captured}"
+            )
+
+            Assert.That(
+                captured,
+                Does.Not.Contain("InvalidOperationException"),
+                $"server output must contain no InvalidOperationException escape; captured:\n{captured}"
+            )
+        }
+
 /// Response-shape assertions against the shared ServerFixture instance (Server.Url()) —
 /// no dedicated log-capture needed here, only the wire-level content-type/body shape.
 [<TestFixture>]
@@ -230,6 +291,51 @@ type ProblemJsonTests() =
                 ctx.PostAsync(
                     "/games/e2e-problemjson-empty",
                     APIRequestContextOptions(Headers = dict [ "Content-Type", "application/json" ], DataByte = [||])
+                )
+
+            let! _ = this.AssertProblemJson(resp, 400)
+            ()
+        }
+
+    /// #436 adversarial-gate finding: `null` is valid JSON (JsonNode.Parse doesn't throw for
+    /// it), so it bypassed the original JsonException-only guard and NRE'd downstream. Must
+    /// now be rejected at the same parse-shape guard as malformed JSON.
+    [<Test>]
+    member this.``a null body against the schema: sample returns 400 application/problem+json``() =
+        task {
+            use! ctx = this.NewContext()
+            let! _ = ctx.GetAsync("/games/e2e-problemjson-null") // GET creates the game
+
+            let! resp =
+                ctx.PostAsync(
+                    "/games/e2e-problemjson-null",
+                    APIRequestContextOptions(
+                        Headers = dict [ "Content-Type", "application/json" ],
+                        DataByte = System.Text.Encoding.UTF8.GetBytes "null"
+                    )
+                )
+
+            let! _ = this.AssertProblemJson(resp, 400)
+            ()
+        }
+
+    /// #436 adversarial-gate finding: a valid-but-non-object body (bare array) parses fine
+    /// but isn't string-indexable — indexing it by "position" throws, not JsonException.
+    [<Test>]
+    member this.``a non-object JSON body (bare array) against the schema: sample returns 400 application/problem+json``
+        ()
+        =
+        task {
+            use! ctx = this.NewContext()
+            let! _ = ctx.GetAsync("/games/e2e-problemjson-array") // GET creates the game
+
+            let! resp =
+                ctx.PostAsync(
+                    "/games/e2e-problemjson-array",
+                    APIRequestContextOptions(
+                        Headers = dict [ "Content-Type", "application/json" ],
+                        DataByte = System.Text.Encoding.UTF8.GetBytes "[]"
+                    )
                 )
 
             let! _ = this.AssertProblemJson(resp, 400)
