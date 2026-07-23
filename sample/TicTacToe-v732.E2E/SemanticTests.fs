@@ -851,6 +851,10 @@ type SemanticTests() =
             let! homeJson = home.JsonAsync()
             let resources = homeJson.Value.GetProperty "resources"
 
+            // #434: /games is now also a live GET-capable resource (the ItemList
+            // collection) alongside /games/{id}, so picking "any GET resource" is no
+            // longer unambiguous — require the templated game route specifically,
+            // mirroring AT-S1's own "/games/{id}" href-template check.
             let templateFor (verb: string) =
                 resources.EnumerateObject()
                 |> Seq.tryPick (fun r ->
@@ -864,7 +868,9 @@ type SemanticTests() =
                         && allow.EnumerateArray() |> Seq.exists (fun m -> m.GetString() = verb)
 
                     if hasVerb && r.Value.TryGetProperty("href-template", &tmpl) then
-                        Some(tmpl.GetString())
+                        tmpl.GetString()
+                        |> Option.ofObj
+                        |> Option.filter (fun s -> s.Contains "/games/{id}")
                     else
                         None)
 
@@ -1371,6 +1377,10 @@ type SemanticTests() =
             let! homeJson = home.JsonAsync()
             let resources = homeJson.Value.GetProperty "resources"
 
+            // #434: /games is now also a live GET-capable resource (the ItemList
+            // collection) alongside /games/{id}, so picking "any GET resource" is no
+            // longer unambiguous — require the templated game route specifically,
+            // mirroring AT-S1's own "/games/{id}" href-template check.
             let templateFor (verb: string) =
                 resources.EnumerateObject()
                 |> Seq.tryPick (fun r ->
@@ -1384,7 +1394,9 @@ type SemanticTests() =
                         && allow.EnumerateArray() |> Seq.exists (fun m -> m.GetString() = verb)
 
                     if hasVerb && r.Value.TryGetProperty("href-template", &tmpl) then
-                        Some(tmpl.GetString())
+                        tmpl.GetString()
+                        |> Option.ofObj
+                        |> Option.filter (fun s -> s.Contains "/games/{id}")
                     else
                         None)
 
@@ -1604,6 +1616,10 @@ type SemanticTests() =
             let! homeJson = home.JsonAsync()
             let resources = homeJson.Value.GetProperty "resources"
 
+            // #434: /games is now also a live GET-capable resource (the ItemList
+            // collection) alongside /games/{id}, so picking "any GET resource" is no
+            // longer unambiguous — require the templated game route specifically,
+            // mirroring AT-S1's own "/games/{id}" href-template check.
             let templateFor (verb: string) =
                 resources.EnumerateObject()
                 |> Seq.tryPick (fun r ->
@@ -1617,7 +1633,9 @@ type SemanticTests() =
                         && allow.EnumerateArray() |> Seq.exists (fun m -> m.GetString() = verb)
 
                     if hasVerb && r.Value.TryGetProperty("href-template", &tmpl) then
-                        Some(tmpl.GetString())
+                        tmpl.GetString()
+                        |> Option.ofObj
+                        |> Option.filter (fun s -> s.Contains "/games/{id}")
                     else
                         None)
 
@@ -2063,23 +2081,20 @@ type SemanticTests() =
             )
         }
 
-    // ── AT-S11: phantom ALPS descriptor (MoveLog/ItemList) never served (#418) ───
+    // ── AT-S11: ItemList descriptor is now genuinely LIVE, not phantom (#418, #434) ──
     //
-    // Vocabulary.fs declares `equivalentClass typedefof<MoveLog<_>> "schema:ItemList"`
-    // purely to exercise the equivalentClass CE keyword — MoveLog backs zero registered
-    // route and is never embedded as a field of any routed resource (confirmed:
-    // Program.fs registers exactly 4 resources — /, /games/{id}, /tictactoe, /vocabulary —
-    // none is MoveLog). Its full ALPS descriptor (served Id "ItemList" — DiscoveryEmitter's
-    // Id is the ClassIri's local name, confirmed via the real generated GeneratedDiscovery.fs:
-    // `{ Id = "ItemList"; ClassIri = Some "https://schema.org/ItemList";
-    // RequestClrTypeName = Some "TicTacToe.Model.MoveLog`1" }`) must not be served: a client
-    // following it would find nothing. Paired with a positive presence check —
-    // "MoveAction" (live via IAcceptsMetadata: MoveRequest is the POST body type) and
-    // "ActionStatusType" (live via IProducesResponseTypeMetadata: MoveResult is the
-    // `produces typeof<MoveResult> 200` declared response type, and nests the "Won"/"Draw"/
-    // etc. case descriptors AT-S8 depends on) — so this is not an absence-only false-green.
+    // Vocabulary.fs declares `equivalentClass typedefof<MoveLog<_>> "schema:ItemList"`.
+    // Before #434, MoveLog backed zero registered route, so relation-drives-reachability
+    // correctly suppressed its ALPS descriptor as a phantom affordance (this test used to
+    // assert absence — see git history). #434 registers `/games` with
+    // `relation "https://schema.org/ItemList"`, making the SAME codegen-emitted descriptor
+    // (GeneratedDiscovery.fs: `{ Id = "ItemList"; ClassIri = Some "https://schema.org/ItemList" }`)
+    // genuinely reachable — a client following it now finds a real resource. Paired with the
+    // original positive presence check — "MoveAction" (live via IAcceptsMetadata) and
+    // "ActionStatusType" (live via IProducesResponseTypeMetadata) — both unaffected by #434,
+    // so this remains a regression guard, not an absence-only false-green.
     [<Test>]
-    member this.``AT-S11 phantom descriptor (MoveLog/ItemList) is never served in ALPS``() =
+    member this.``AT-S11 ItemList descriptor is served in ALPS now that /games is registered``() =
         task {
             use! ctx = this.NewContext()
             let! opts = this.Options(ctx, "/games/at-s11")
@@ -2090,8 +2105,8 @@ type SemanticTests() =
 
             Assert.That(
                 body.Contains "ItemList",
-                Is.False,
-                "MoveLog/ItemList must never be served — it backs zero route and is never embedded anywhere (#418)"
+                Is.True,
+                "MoveLog/ItemList must now be served — /games registers relation=schema:ItemList (#434)"
             )
 
             use doc = JsonDocument.Parse body
@@ -2104,8 +2119,8 @@ type SemanticTests() =
 
             Assert.That(
                 ids |> List.contains "ItemList",
-                Is.False,
-                "MoveLog's ItemList descriptor id must not appear at top level"
+                Is.True,
+                "MoveLog's ItemList descriptor id must now appear at top level (#434 un-suppresses it)"
             )
 
             Assert.That(
@@ -2119,4 +2134,103 @@ type SemanticTests() =
                 Is.True,
                 "ActionStatusType (live via IProducesResponseTypeMetadata's `produces typeof<MoveResult> 200`, nests the Won/Draw/etc. case descriptors) must still be served — regression guard"
             )
+        }
+
+    // ── AT-S12 (#434 AC1): GET /games serves schema:ItemList with real members ──────
+    //
+    // The reference app never proved collection discovery — /games had no route. This
+    // proves the GET body is a genuine schema:ItemList instance: the exact type IRI
+    // (not merely a substring hit) AND at least one member whose @id is the exact
+    // absolute /games/{id} IRI of a game the test itself just created.
+    [<Test>]
+    member this.``AT-S12 GET /games serves schema:ItemList whose members point to /games/{id}``() =
+        task {
+            use! ctx = this.NewContext()
+            let originBase = (Server.Url()).TrimEnd('/')
+            let seedId = "at-s12-seed"
+            // Seeds the game via GetOrCreate so membership is provable, not vacuous.
+            let! _ = ctx.GetAsync(sprintf "/games/%s" seedId)
+
+            let! resp = ctx.GetAsync "/games"
+            Assert.That(resp.Status, Is.EqualTo 200, "GET /games not 200")
+            let! body = resp.TextAsync()
+            use doc = JsonDocument.Parse body
+            let root = doc.RootElement
+
+            let mutable typeEl = Unchecked.defaultof<JsonElement>
+
+            Assert.That(root.TryGetProperty("@type", &typeEl), Is.True, "GET /games body missing @type")
+
+            Assert.That(
+                typeEl.GetString(),
+                Is.EqualTo "https://schema.org/ItemList",
+                sprintf "GET /games @type must be the exact schema:ItemList IRI, got body: %s" body
+            )
+
+            let mutable itemsEl = Unchecked.defaultof<JsonElement>
+
+            Assert.That(
+                root.TryGetProperty("https://schema.org/item", &itemsEl),
+                Is.True,
+                "GET /games body missing schema:item members array"
+            )
+
+            let memberIds =
+                itemsEl.EnumerateArray()
+                |> Seq.choose (fun el ->
+                    let mutable idEl = Unchecked.defaultof<JsonElement>
+
+                    if el.TryGetProperty("@id", &idEl) then
+                        Some(idEl.GetString())
+                    else
+                        None)
+                |> Set.ofSeq
+
+            let expectedMember = originBase + "/games/" + seedId
+
+            Assert.That(
+                memberIds.Contains expectedMember,
+                Is.True,
+                sprintf
+                    "GET /games members must include the exact IRI '%s', got: %s"
+                    expectedMember
+                    (String.concat ", " memberIds)
+            )
+
+            Assert.That(body.Contains "example.org", Is.False, "GET /games body must not contain example.org")
+        }
+
+    // ── AT-S13 (#434 AC2): JSON Home carries a reachable ItemList-typed entry ───────
+    //
+    // Fetches the href the entry actually advertises and confirms it resolves 200 —
+    // reachability, not mere presence of the relation key.
+    [<Test>]
+    member this.``AT-S13 JSON Home has an ItemList-typed entry whose href resolves 200``() =
+        task {
+            use! ctx = this.NewContext()
+
+            let! home =
+                ctx.GetAsync("/", APIRequestContextOptions(Headers = dict [ "Accept", "application/json-home" ]))
+
+            Assert.That(home.Status, Is.EqualTo 200, "JSON Home not 200")
+            let! homeJson = home.JsonAsync()
+            let resources = homeJson.Value.GetProperty "resources"
+
+            let itemListEntry =
+                resources.EnumerateObject()
+                |> Seq.tryFind (fun r -> r.Name = "https://schema.org/ItemList")
+                |> Option.defaultWith (fun () ->
+                    failwith "JSON Home missing an entry keyed by https://schema.org/ItemList")
+
+            let mutable hrefEl = Unchecked.defaultof<JsonElement>
+
+            Assert.That(
+                itemListEntry.Value.TryGetProperty("href", &hrefEl),
+                Is.True,
+                "ItemList JSON Home entry must carry a concrete href (/games has no template variables)"
+            )
+
+            let href = hrefEl.GetString()
+            let! resp = ctx.GetAsync href
+            Assert.That(resp.Status, Is.EqualTo 200, sprintf "ItemList entry href '%s' did not resolve 200" href)
         }

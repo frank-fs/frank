@@ -340,6 +340,66 @@ let private gameGraphFactory (ctx: HttpContext) : IGraph =
     let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
     buildGameGraph origin id (store.GetOrCreate id)
 
+/// #434: /games collection RDF graph — a schema:ItemList whose members are the live
+/// games' own /games/{id} IRIs. Predicates mirror codegen's own resolution for
+/// MoveLog<'T> (GeneratedDiscovery.fs ResourceHrefVars: "item" -> schema:item,
+/// "count" -> schema:numberOfItems), never a hand-picked schema.org term.
+let private buildGamesListGraph (origin: string) (games: (string * MoveResult) list) : IGraph =
+    let schemaPrefix = "https://schema.org/"
+    let rdfTypeIri = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+    let listIri = origin + "/games"
+    let g = new Graph()
+    g.NamespaceMap.AddNamespace("schema", UriFactory.Create schemaPrefix)
+    let listSubj = g.CreateUriNode(UriFactory.Create listIri)
+    let typePred = g.CreateUriNode(UriFactory.Create rdfTypeIri)
+
+    g.Assert(Triple(listSubj, typePred, g.CreateUriNode(UriFactory.Create(schemaPrefix + "ItemList"))))
+    |> ignore
+
+    let numberOfItemsPred =
+        g.CreateUriNode(UriFactory.Create(schemaPrefix + "numberOfItems"))
+
+    g.Assert(Triple(listSubj, numberOfItemsPred, g.CreateLiteralNode(string games.Length)))
+    |> ignore
+
+    let itemPred = g.CreateUriNode(UriFactory.Create(schemaPrefix + "item"))
+
+    for id, _ in games do
+        g.Assert(Triple(listSubj, itemPred, g.CreateUriNode(UriFactory.Create(origin + "/games/" + id))))
+        |> ignore
+
+    g :> IGraph
+
+/// Per-request games-list graph factory: reads the live store snapshot, builds the
+/// collection instance graph against the real request origin.
+let private gamesGraphFactory (ctx: HttpContext) : IGraph =
+    let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+    buildGamesListGraph origin (store.All())
+
+/// Default (non-negotiated) /games representation — a compact JSON-LD-shaped body
+/// naming the ItemList type and its members' absolute /games/{id} IRIs, mirroring
+/// gameHandler's always-served plain-JSON style.
+let private gamesListJson (origin: string) (games: (string * MoveResult) list) : JsonObject =
+    let obj = JsonObject()
+    obj.["@id"] <- JsonValue.Create(origin + "/games")
+    obj.["@type"] <- JsonValue.Create "https://schema.org/ItemList"
+    obj.["https://schema.org/numberOfItems"] <- JsonValue.Create games.Length
+    let items = JsonArray()
+
+    for id, _ in games do
+        let item = JsonObject()
+        item.["@id"] <- JsonValue.Create(origin + "/games/" + id)
+        items.Add item
+
+    obj.["https://schema.org/item"] <- items
+    obj
+
+let private gamesHandler (ctx: HttpContext) =
+    task {
+        let origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+        do! writeJson ctx (gamesListJson origin (store.All()))
+    }
+
 let private homeResource =
     resource "/" {
         name "Home"
@@ -370,6 +430,24 @@ let private gameResource =
                 produces typeof<MoveResult> 200
             }
         )
+    }
+
+/// #434: proves collection discovery end-to-end — MoveLog<_> -> schema:ItemList is
+/// mapped in Vocabulary.fs but backed no route, so relation-drives-reachability
+/// suppressed it as a phantom affordance (AT-S11, #418). Registering this resource
+/// with relation = the SAME ItemList IRI codegen already emits a descriptor for
+/// un-suppresses it — no codegen change required.
+let private gamesResource =
+    resource "/games" {
+        name "Games"
+        relation (TicTacToe.GeneratedSemantics.SemanticResource.MoveLog.Iri.AbsoluteUri)
+
+        linkedDataGraphWith
+            { LinkedDataConfig.Empty with
+                JsonLdContext = """{"@context":["https://schema.org/version/latest/schemaorg-current-https.jsonld"]}"""
+                GraphFactory = Some gamesGraphFactory }
+
+        get gamesHandler
     }
 
 let private tttVocabResource =
@@ -445,6 +523,7 @@ let main args =
         useLinkedDataVocabulary "/vocabulary"
         resource homeResource
         resource gameResource
+        resource gamesResource
         resource tttVocabResource
         resource appVocabularyResource
     }

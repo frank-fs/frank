@@ -9,6 +9,7 @@ type private Msg =
     | GetOrCreate of string * AsyncReplyChannel<MoveResult>
     | Get of string * AsyncReplyChannel<MoveResult option>
     | Update of string * Move * AsyncReplyChannel<MoveResult option>
+    | All of AsyncReplyChannel<(string * MoveResult) list>
 
 /// In-memory game store keyed by caller-supplied id. State lives inside the
 /// actor (no module-level mutable). Derived from TicTacToe.Web.Simple.GameStore.
@@ -52,6 +53,11 @@ type GameStore() =
                         | false, _ -> reply.Reply None
 
                         return! loop ()
+
+                    | All reply ->
+                        // Bounded: a snapshot of the current dictionary, not an unbounded loop.
+                        reply.Reply [ for KeyValue(id, r) in games -> id, r ]
+                        return! loop ()
                 }
 
             loop ())
@@ -64,3 +70,6 @@ type GameStore() =
 
     member _.Update(id: string, move: Move) : MoveResult option =
         agent.PostAndReply(fun ch -> Update(id, move, ch))
+
+    /// Snapshot of every live game (id, current state) — backs the /games collection.
+    member _.All() : (string * MoveResult) list = agent.PostAndReply(fun ch -> All ch)
