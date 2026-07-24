@@ -15,6 +15,7 @@
     <Compile Include="ETagCacheTests.fs" />
     <Compile Include="ConditionalRequestTests.fs" />
     <Compile Include="ConditionalRequestIntegrationTests.fs" />
+    <Compile Include="ConditionalRequestContextComputeTests.fs" />
     <Compile Include="HeadRegistrationIntegrationTests.fs" />
     <Compile Include="NameInferenceTests.fs" />
     <Compile Include="PlumbingHiddenTests.fs" />

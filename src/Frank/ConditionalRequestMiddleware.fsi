@@ -10,10 +10,7 @@ open Microsoft.Extensions.Logging
 /// against ETag-enabled endpoints and returns 304/412 short-circuit responses.
 type ConditionalRequestMiddleware =
     new:
-        next: RequestDelegate *
-        cache: ETagCache *
-        providerFactory: IETagProviderFactory *
-        logger: ILogger<ConditionalRequestMiddleware> ->
+        next: RequestDelegate * cache: ETagCache * logger: ILogger<ConditionalRequestMiddleware> ->
             ConditionalRequestMiddleware
 
     member Invoke: ctx: HttpContext -> Task
@@ -29,4 +26,20 @@ module ConditionalRequestMiddlewareExtensions =
 
     /// Register the conditional request middleware in the ASP.NET Core pipeline.
     /// Must be called after UseRouting() -- use via `plug useConditionalRequests`.
+    ///
+    /// Ordering contract (R10, #426): any middleware that emits Link headers (e.g.
+    /// describedby, prov) for an ETag-enabled endpoint MUST be registered OUTER to
+    /// (before) this middleware. A 304/412 short-circuit here skips everything registered
+    /// INNER to (after) it, including the terminal handler -- but headers already appended
+    /// to ctx.Response.Headers, or callbacks already registered via ctx.Response.OnStarting,
+    /// by an OUTER middleware before it called next.Invoke survive the short-circuit intact,
+    /// because ASP.NET Core flushes the response headers (running any OnStarting callbacks)
+    /// regardless of which middleware produced the final status code. Existing precedent:
+    /// LinkedDataMiddleware appends its `describedby` Link header directly to
+    /// ctx.Response.Headers before calling next.Invoke
+    /// (src/Frank.LinkedData/LinkedDataMiddleware.fs ~line 349-354); ProvenanceMiddleware
+    /// registers its `has_provenance` Link header via ctx.Response.OnStarting before calling
+    /// next.Invoke (src/Frank.Provenance/ProvenanceMiddleware.fs ~line 259-266). Both
+    /// patterns survive being wrapped by this middleware, as long as they are registered
+    /// outer to it.
     val useConditionalRequests: app: IApplicationBuilder -> IApplicationBuilder

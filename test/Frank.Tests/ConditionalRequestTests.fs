@@ -17,44 +17,29 @@ open Frank
 
 // -- Mock infrastructure --
 
-/// Mock ETag provider that returns configurable ETags by instance ID.
-type MockETagProvider(etagByInstanceId: Map<string, string>) =
-    interface IETagProvider with
-        member _.ComputeETag(instanceId) =
-            task { return Map.tryFind instanceId etagByInstanceId }
+/// Compute closure that looks up the resolved instance id in a fixed map.
+let private computeFromMap (etagByInstanceId: Map<string, string>) : ETagContext -> Task<string option> =
+    fun etagContext -> task { return Map.tryFind etagContext.InstanceId etagByInstanceId }
 
-/// Mock ETag provider that always throws, for error propagation tests.
-type ThrowingETagProvider(ex: exn) =
-    interface IETagProvider with
-        member _.ComputeETag(_instanceId) = raise ex
+/// Compute closure that always throws, for error propagation tests.
+let private computeThrowing (ex: exn) : ETagContext -> Task<string option> = fun _ -> raise ex
 
-/// Mutable mock provider that allows changing ETags between requests (for mutation tests).
-type MutableMockETagProvider(initialEtags: Map<string, string>) =
+/// Mutable compute source that allows changing ETags between requests (for mutation tests).
+type MutableEtagSource(initialEtags: Map<string, string>) =
     let mutable currentEtags = initialEtags
 
     member _.Update(newEtags) = currentEtags <- newEtags
 
-    interface IETagProvider with
-        member _.ComputeETag(instanceId) =
-            task { return Map.tryFind instanceId currentEtags }
-
-/// Mock provider factory that returns the given provider for any endpoint with ETagMetadata.
-type MockETagProviderFactory(provider: IETagProvider) =
-    interface IETagProviderFactory with
-        member _.CreateProvider(endpoint) =
-            let meta = endpoint.Metadata.GetMetadata<ETagMetadata>()
-
-            if isNull (box meta) then None else Some provider
+    member _.Compute(etagContext: ETagContext) : Task<string option> =
+        task { return Map.tryFind etagContext.InstanceId currentEtags }
 
 /// Creates a test server with the conditional request middleware and ETag-enabled endpoints.
-let createTestServer (provider: IETagProvider) =
-    let factory = MockETagProviderFactory(provider)
+let createTestServer (compute: ETagContext -> Task<string option>) =
     let cache = new ETagCache(100, NullLogger<ETagCache>.Instance)
     let builder = WebApplication.CreateBuilder([||])
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddRouting() |> ignore
     builder.Services.AddSingleton<ETagCache>(cache) |> ignore
-    builder.Services.AddSingleton<IETagProviderFactory>(factory) |> ignore
     builder.Services.AddLogging() |> ignore
     let app = builder.Build()
 
@@ -64,7 +49,7 @@ let createTestServer (provider: IETagProvider) =
     |> ignore
 
     let etagMetadata =
-        ETagMetadata("test", fun ctx -> ctx.Request.RouteValues.["id"] :?> string)
+        ETagMetadata((fun ctx -> ctx.Request.RouteValues.["id"] :?> string), compute)
 
     // ETag-enabled GET/HEAD endpoint
     app
@@ -100,8 +85,8 @@ let conditionalRequestTests =
         [
           // -- Pass-through tests --
           testTask "Non-ETag resource returns 200 with no ETag header" {
-              let provider = MockETagProvider(Map.empty)
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap Map.empty
+              let (client, _cache) = createTestServer compute
               let! (response: HttpResponseMessage) = client.GetAsync("/no-etag")
               Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
 
@@ -110,8 +95,8 @@ let conditionalRequestTests =
 
           // -- ETag generation on GET --
           testTask "GET to ETag-enabled resource returns ETag header" {
-              let provider = MockETagProvider(Map.ofList [ "42", "abc123" ])
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap (Map.ofList [ "42", "abc123" ])
+              let (client, _cache) = createTestServer compute
               let! (response: HttpResponseMessage) = client.GetAsync("/resource/42")
               Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
               Expect.isTrue (response.Headers.ETag <> null) "Should have ETag header"
@@ -121,8 +106,8 @@ let conditionalRequestTests =
 
           // -- 304 Not Modified --
           testTask "GET with matching If-None-Match returns 304 with no body" {
-              let provider = MockETagProvider(Map.ofList [ "42", "abc123" ])
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap (Map.ofList [ "42", "abc123" ])
+              let (client, _cache) = createTestServer compute
               let request = new HttpRequestMessage(HttpMethod.Get, "/resource/42")
               request.Headers.TryAddWithoutValidation("If-None-Match", "\"abc123\"") |> ignore
               let! (response: HttpResponseMessage) = client.SendAsync(request)
@@ -133,8 +118,8 @@ let conditionalRequestTests =
           }
 
           testTask "GET with non-matching If-None-Match returns 200 with ETag" {
-              let provider = MockETagProvider(Map.ofList [ "42", "abc123" ])
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap (Map.ofList [ "42", "abc123" ])
+              let (client, _cache) = createTestServer compute
               let request = new HttpRequestMessage(HttpMethod.Get, "/resource/42")
 
               request.Headers.TryAddWithoutValidation("If-None-Match", "\"different\"")
@@ -146,8 +131,8 @@ let conditionalRequestTests =
           }
 
           testTask "GET with If-None-Match: * on existing resource returns 304" {
-              let provider = MockETagProvider(Map.ofList [ "42", "abc123" ])
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap (Map.ofList [ "42", "abc123" ])
+              let (client, _cache) = createTestServer compute
               let request = new HttpRequestMessage(HttpMethod.Get, "/resource/42")
               request.Headers.TryAddWithoutValidation("If-None-Match", "*") |> ignore
               let! (response: HttpResponseMessage) = client.SendAsync(request)
@@ -155,8 +140,8 @@ let conditionalRequestTests =
           }
 
           testTask "GET with If-None-Match: * on non-existent resource returns 200" {
-              let provider = MockETagProvider(Map.empty)
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap Map.empty
+              let (client, _cache) = createTestServer compute
               let request = new HttpRequestMessage(HttpMethod.Get, "/resource/999")
               request.Headers.TryAddWithoutValidation("If-None-Match", "*") |> ignore
               let! (response: HttpResponseMessage) = client.SendAsync(request)
@@ -165,8 +150,8 @@ let conditionalRequestTests =
 
           // -- 412 Precondition Failed --
           testTask "POST with matching If-Match proceeds normally" {
-              let provider = MockETagProvider(Map.ofList [ "42", "abc123" ])
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap (Map.ofList [ "42", "abc123" ])
+              let (client, _cache) = createTestServer compute
               let request = new HttpRequestMessage(HttpMethod.Post, "/resource/42")
               request.Headers.TryAddWithoutValidation("If-Match", "\"abc123\"") |> ignore
               request.Content <- new StringContent("data")
@@ -175,8 +160,8 @@ let conditionalRequestTests =
           }
 
           testTask "POST with non-matching If-Match returns 412 with no body" {
-              let provider = MockETagProvider(Map.ofList [ "42", "abc123" ])
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap (Map.ofList [ "42", "abc123" ])
+              let (client, _cache) = createTestServer compute
               let request = new HttpRequestMessage(HttpMethod.Post, "/resource/42")
               request.Headers.TryAddWithoutValidation("If-Match", "\"stale\"") |> ignore
               request.Content <- new StringContent("data")
@@ -192,8 +177,8 @@ let conditionalRequestTests =
           }
 
           testTask "POST with If-Match: * on existing resource proceeds" {
-              let provider = MockETagProvider(Map.ofList [ "42", "abc123" ])
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap (Map.ofList [ "42", "abc123" ])
+              let (client, _cache) = createTestServer compute
               let request = new HttpRequestMessage(HttpMethod.Post, "/resource/42")
               request.Headers.TryAddWithoutValidation("If-Match", "*") |> ignore
               request.Content <- new StringContent("data")
@@ -202,8 +187,8 @@ let conditionalRequestTests =
           }
 
           testTask "POST with If-Match: * on non-existent resource returns 412" {
-              let provider = MockETagProvider(Map.empty)
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap Map.empty
+              let (client, _cache) = createTestServer compute
               let request = new HttpRequestMessage(HttpMethod.Post, "/resource/999")
               request.Headers.TryAddWithoutValidation("If-Match", "*") |> ignore
               request.Content <- new StringContent("data")
@@ -217,16 +202,16 @@ let conditionalRequestTests =
 
           // -- No conditional headers --
           testTask "GET without If-None-Match returns 200 with ETag" {
-              let provider = MockETagProvider(Map.ofList [ "42", "abc123" ])
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap (Map.ofList [ "42", "abc123" ])
+              let (client, _cache) = createTestServer compute
               let! (response: HttpResponseMessage) = client.GetAsync("/resource/42")
               Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
               Expect.isTrue (response.Headers.ETag <> null) "Should include ETag header"
           }
 
           testTask "POST without If-Match proceeds normally" {
-              let provider = MockETagProvider(Map.ofList [ "42", "abc123" ])
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap (Map.ofList [ "42", "abc123" ])
+              let (client, _cache) = createTestServer compute
               let request = new HttpRequestMessage(HttpMethod.Post, "/resource/42")
               request.Content <- new StringContent("data")
               let! (response: HttpResponseMessage) = client.SendAsync(request)
@@ -235,8 +220,8 @@ let conditionalRequestTests =
 
           // -- Cache invalidation after mutation --
           testTask "Successful mutation invalidates cache so next GET computes fresh ETag" {
-              let mutableProvider = MutableMockETagProvider(Map.ofList [ "42", "version1" ])
-              let (client, _cache) = createTestServer mutableProvider
+              let source = MutableEtagSource(Map.ofList [ "42", "version1" ])
+              let (client, _cache) = createTestServer source.Compute
 
               // First GET populates cache
               let! (response1: HttpResponseMessage) = client.GetAsync("/resource/42")
@@ -244,8 +229,8 @@ let conditionalRequestTests =
               let etag1 = response1.Headers.ETag.ToString()
               Expect.equal etag1 "\"version1\"" "Initial ETag should be version1"
 
-              // Update the provider to return a new ETag
-              mutableProvider.Update(Map.ofList [ "42", "version2" ])
+              // Update the source to return a new ETag
+              source.Update(Map.ofList [ "42", "version2" ])
 
               // POST invalidates the cache and caches the new value
               let postRequest = new HttpRequestMessage(HttpMethod.Post, "/resource/42")
@@ -261,8 +246,8 @@ let conditionalRequestTests =
 
           // -- PUT and DELETE methods --
           testTask "PUT with non-matching If-Match returns 412" {
-              let provider = MockETagProvider(Map.ofList [ "42", "abc123" ])
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap (Map.ofList [ "42", "abc123" ])
+              let (client, _cache) = createTestServer compute
               let request = new HttpRequestMessage(HttpMethod.Put, "/resource/42")
               request.Headers.TryAddWithoutValidation("If-Match", "\"stale\"") |> ignore
               request.Content <- new StringContent("data")
@@ -275,8 +260,8 @@ let conditionalRequestTests =
           }
 
           testTask "DELETE with non-matching If-Match returns 412" {
-              let provider = MockETagProvider(Map.ofList [ "42", "abc123" ])
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap (Map.ofList [ "42", "abc123" ])
+              let (client, _cache) = createTestServer compute
               let request = new HttpRequestMessage(HttpMethod.Delete, "/resource/42")
               request.Headers.TryAddWithoutValidation("If-Match", "\"stale\"") |> ignore
               let! (response: HttpResponseMessage) = client.SendAsync(request)
@@ -289,8 +274,8 @@ let conditionalRequestTests =
 
           // -- HEAD method --
           testTask "HEAD with matching If-None-Match returns 304" {
-              let provider = MockETagProvider(Map.ofList [ "42", "abc123" ])
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap (Map.ofList [ "42", "abc123" ])
+              let (client, _cache) = createTestServer compute
               let request = new HttpRequestMessage(HttpMethod.Head, "/resource/42")
               request.Headers.TryAddWithoutValidation("If-None-Match", "\"abc123\"") |> ignore
               let! (response: HttpResponseMessage) = client.SendAsync(request)
@@ -303,8 +288,8 @@ let conditionalRequestTests =
 
           // -- Multiple ETags in If-None-Match --
           testTask "GET with multiple If-None-Match values matches correctly" {
-              let provider = MockETagProvider(Map.ofList [ "42", "abc123" ])
-              let (client, _cache) = createTestServer provider
+              let compute = computeFromMap (Map.ofList [ "42", "abc123" ])
+              let (client, _cache) = createTestServer compute
               let request = new HttpRequestMessage(HttpMethod.Get, "/resource/42")
 
               request.Headers.TryAddWithoutValidation("If-None-Match", "\"other\", \"abc123\", \"another\"")
@@ -317,8 +302,8 @@ let conditionalRequestTests =
           // -- Error propagation --
           testTask "Exception from ETag provider propagates through middleware" {
               let expectedEx = InvalidOperationException("provider failure")
-              let provider = ThrowingETagProvider(expectedEx)
-              let (client, _cache) = createTestServer provider
+              let compute = computeThrowing expectedEx
+              let (client, _cache) = createTestServer compute
 
               let! threw =
                   task {

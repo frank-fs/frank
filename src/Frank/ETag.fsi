@@ -2,31 +2,32 @@ namespace Frank
 
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
-open Microsoft.AspNetCore.Routing
 
-/// Marker metadata indicating an endpoint participates in conditional requests.
-/// Carries the provider key and a function to resolve the instance ID from the request context.
+/// Context passed to an ETagMetadata's `compute` closure -- carries the resolved instance id
+/// AND the full HttpContext, so a handler-adjacent compute function can read route values,
+/// query strings, or anything else the endpoint itself would use to build its response,
+/// without re-deriving the endpoint's own dispatch logic in a separate implementation (#426).
+type ETagContext =
+    { InstanceId: string
+      HttpContext: HttpContext }
+
+/// Marker metadata indicating an endpoint participates in conditional requests. Carries a
+/// function to resolve the instance ID from the request context, and the `compute` closure
+/// that produces the resource's current ETag (raw, unquoted) given an ETagContext. Metadata
+/// presence on the endpoint IS the capability check -- there is no separate provider lookup.
+/// `compute` typically closes over whatever the endpoint needs (a store, a graph-builder,
+/// etc.) and resolves any Scoped services from `ctx.HttpContext.RequestServices` inside the
+/// closure body, at call time -- nothing is captured at DI-construction time (#426).
 [<Sealed>]
 type ETagMetadata =
-    new: providerKey: string * instanceIdResolver: (HttpContext -> string) -> ETagMetadata
-
-    /// The key used to look up the IETagProvider for this endpoint.
-    member ProviderKey: string
+    new: instanceIdResolver: (HttpContext -> string) * compute: (ETagContext -> Task<string option>) -> ETagMetadata
 
     /// Resolves the instance identifier from the current HTTP context.
     member ResolveInstanceId: ctx: HttpContext -> string
 
-/// Non-generic provider that computes an ETag for a given resource instance.
-type IETagProvider =
-    /// Computes a strong ETag value for the resource instance identified by instanceId.
+    /// Computes the resource's current ETag (raw, unquoted) for the given context.
     /// Returns None if no ETag can be computed (e.g., resource not found).
-    /// The returned string is the raw ETag value (without quotes); use ETagFormat to produce the wire format.
-    abstract ComputeETag: instanceId: string -> Task<string option>
-
-/// Factory that resolves an IETagProvider for a given endpoint.
-type IETagProviderFactory =
-    /// Returns an IETagProvider for the specified endpoint, or None if no provider is registered.
-    abstract CreateProvider: endpoint: Endpoint -> IETagProvider option
+    member Compute: (ETagContext -> Task<string option>)
 
 /// RFC 9110 strong ETag formatting utilities.
 /// Strong ETags are quoted strings: e.g., "abc123" on the wire is represented as \"abc123\".

@@ -27,46 +27,34 @@ type TestServer<'P>(app: WebApplication, client: HttpClient, provider: 'P, cache
             (cache :> IDisposable).Dispose()
             app.DisposeAsync()
 
-// -- Dictionary-backed IETagProvider for integration tests --
+// -- Dictionary-backed ETagMetadata compute source for integration tests --
 
-/// Mutable ETag provider wrapping an in-memory dictionary of instance ID -> raw ETag value.
-/// Raw values are unquoted; the middleware quotes them via ETagFormat.quote.
-type DictionaryETagProvider() =
+/// Mutable in-memory dictionary of instance ID -> raw ETag value, exposed as an
+/// ETagMetadata compute closure via `.Compute`. Raw values are unquoted; the middleware
+/// quotes them via ETagFormat.quote.
+type DictionaryETagSource() =
     let store = System.Collections.Generic.Dictionary<string, string>()
 
     member _.Set(instanceId: string, rawETag: string) = store.[instanceId] <- rawETag
 
     member _.Remove(instanceId: string) = store.Remove(instanceId) |> ignore
 
-    interface IETagProvider with
-        member _.ComputeETag(instanceId) =
-            task {
-                match store.TryGetValue(instanceId) with
-                | true, v -> return Some v
-                | false, _ -> return None
-            }
-
-/// Provider factory that returns the given provider for any endpoint with ETagMetadata.
-type DictionaryETagProviderFactory(provider: IETagProvider) =
-    interface IETagProviderFactory with
-        member _.CreateProvider(endpoint) =
-            let meta = endpoint.Metadata.GetMetadata<ETagMetadata>()
-            if isNull (box meta) then None else Some provider
+    member _.Compute(etagContext: ETagContext) : Task<string option> =
+        task {
+            match store.TryGetValue(etagContext.InstanceId) with
+            | true, v -> return Some v
+            | false, _ -> return None
+        }
 
 /// Creates a test server with the conditional request middleware and ETag-enabled endpoints.
-/// Returns the HttpClient, the DictionaryETagProvider, and the ETagCache.
+/// Returns the HttpClient, the DictionaryETagSource, and the ETagCache.
 let createIntegrationTestServer () =
-    let provider = DictionaryETagProvider()
-    let factory = DictionaryETagProviderFactory(provider)
+    let source = DictionaryETagSource()
     let cache = new ETagCache(100, NullLogger<ETagCache>.Instance)
     let builder = WebApplication.CreateBuilder([||])
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddRouting() |> ignore
     builder.Services.AddSingleton<ETagCache>(cache) |> ignore
-
-    builder.Services.AddSingleton<IETagProviderFactory>(factory :> IETagProviderFactory)
-    |> ignore
-
     builder.Services.AddLogging() |> ignore
     let app = builder.Build()
 
@@ -76,7 +64,7 @@ let createIntegrationTestServer () =
     |> ignore
 
     let etagMetadata =
-        ETagMetadata("items", fun ctx -> ctx.Request.RouteValues.["id"] :?> string)
+        ETagMetadata((fun ctx -> ctx.Request.RouteValues.["id"] :?> string), source.Compute)
 
     // ETag-enabled GET/HEAD endpoint
     app
@@ -116,7 +104,7 @@ let createIntegrationTestServer () =
     |> ignore
 
     app.Start()
-    new TestServer<_>(app, app.GetTestClient(), provider, cache)
+    new TestServer<_>(app, app.GetTestClient(), source, cache)
 
 [<Tests>]
 let conditionalRequestIntegrationTests =
