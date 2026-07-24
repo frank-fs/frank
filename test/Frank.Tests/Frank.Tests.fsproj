@@ -19,6 +19,7 @@
     <Compile Include="HeadRegistrationIntegrationTests.fs" />
     <Compile Include="NameInferenceTests.fs" />
     <Compile Include="PlumbingHiddenTests.fs" />
+    <Compile Include="AllocationHarnessTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -36,6 +37,7 @@
     <ProjectReference Include="../../src/Frank.Validation/Frank.Validation.fsproj" />
     <ProjectReference Include="../../src/Frank.LinkedData/Frank.LinkedData.fsproj" />
     <ProjectReference Include="../../src/Frank.Provenance/Frank.Provenance.fsproj" />
+    <ProjectReference Include="../Frank.TestSupport/Frank.TestSupport.fsproj" />
   </ItemGroup>
 
 </Project>
