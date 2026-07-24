@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="TempDir.fs" />
     <Compile Include="RunCli.fs" />
+    <Compile Include="AllocationHarness.fs" />
   </ItemGroup>
 
 </Project>
