@@ -20,10 +20,11 @@ type ExtractOptions =
 type ExtractSummary = LockFile.StatusCounts
 
 /// Result of the extract pipeline: the status-count summary plus any
-/// EquivalentClassNotices raised while scoring types against the registry.
+/// ConventionDiagnostics raised while extracting vocab terms and scoring types
+/// against the registry.
 type ExtractResult =
     { Summary: ExtractSummary
-      EquivalentClassNotices: EquivalentClassNotice list }
+      Diagnostics: ConventionDiagnostic list }
 
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
@@ -117,12 +118,14 @@ let private mergeWithPreservation (existing: Mapping list) (fresh: Mapping list)
 
 let private summarize (mappings: Mapping list) : ExtractSummary = LockFile.countByStatus mappings
 
-let private accumulateTerms (acc: VocabTerms) g : VocabTerms =
-    let t = ConventionEngine.extractVocabTerms g
+let private accumulateTerms (acc: VocabTerms * ConventionDiagnostic list) g : VocabTerms * ConventionDiagnostic list =
+    let accTerms, accDiagnostics = acc
+    let t, diagnostics = ConventionEngine.extractVocabTermsDetailed g
 
-    { Classes = Map.fold (fun m k v -> Map.add k v m) acc.Classes t.Classes
-      Properties = Map.fold (fun m k v -> Map.add k v m) acc.Properties t.Properties
-      Individuals = Map.fold (fun m k v -> Map.add k v m) acc.Individuals t.Individuals }
+    { Classes = Map.fold (fun m k v -> Map.add k v m) accTerms.Classes t.Classes
+      Properties = Map.fold (fun m k v -> Map.add k v m) accTerms.Properties t.Properties
+      Individuals = Map.fold (fun m k v -> Map.add k v m) accTerms.Individuals t.Individuals },
+    accDiagnostics @ diagnostics
 
 // ── Effectful steps ───────────────────────────────────────────────────────────
 
@@ -167,7 +170,7 @@ let private fetchVocabTerms
     (clock: unit -> DateTimeOffset)
     (projectDir: string)
     (registry: VocabularyRegistry)
-    : Async<Result<VocabTerms * Map<string, VocabularyEntry>, string>> =
+    : Async<Result<VocabTerms * Map<string, VocabularyEntry> * ConventionDiagnostic list, string>> =
     async {
         let cacheDir = Path.Combine(projectDir, ".frank", "vocab")
         Directory.CreateDirectory cacheDir |> ignore
@@ -196,13 +199,13 @@ let private fetchVocabTerms
                   Properties = Map.empty
                   Individuals = Map.empty }
 
-            let terms =
+            let terms, termDiagnostics =
                 results
                 |> Array.choose (fun r ->
                     match r with
                     | Ok cv -> Some cv.Graph
                     | Error _ -> None)
-                |> Array.fold accumulateTerms emptyTerms
+                |> Array.fold accumulateTerms (emptyTerms, [])
 
             let fetchedAt = clock ()
 
@@ -221,7 +224,7 @@ let private fetchVocabTerms
                     | Error _ -> None)
                 |> Map.ofList
 
-            return Ok(terms, vocabEntries)
+            return Ok(terms, vocabEntries, termDiagnostics)
     }
 
 /// Evaluate the registry binding. The VocabularyEvaluator handles fallback resolution.
@@ -280,7 +283,7 @@ let private buildMappings
     (projectFile: string)
     (curated: string list)
     (domain: string list)
-    : Result<Map<string, VocabularyEntry> * Mapping list * VocabularyRegistry * EquivalentClassNotice list, string> =
+    : Result<Map<string, VocabularyEntry> * Mapping list * VocabularyRegistry * ConventionDiagnostic list, string> =
     tryEvalRegistry opts.AssemblyRefs curated
     |> Result.mapError (fun e -> $"registry eval failed: {e}")
     |> Result.bind (fun registry ->
@@ -292,11 +295,11 @@ let private buildMappings
             fetchVocabTerms fetch clock projectDir registry
             |> Async.RunSynchronously
             |> Result.mapError (fun e -> $"vocab fetch failed: {e}")
-            |> Result.map (fun (terms, vocabEntries) ->
+            |> Result.map (fun (terms, vocabEntries, termDiagnostics) ->
                 let scored = typeInfos |> List.map (ConventionEngine.scoreDetailed terms registry)
-                let fresh, noticeOpts = List.unzip scored
-                let notices = noticeOpts |> List.choose id
-                vocabEntries, fresh, registry, notices)))
+                let fresh, diagnosticLists = List.unzip scored
+                let diagnostics = termDiagnostics @ List.concat diagnosticLists
+                vocabEntries, fresh, registry, diagnostics)))
 
 /// Pipeline core with the vocabulary fetcher and clock injected.
 /// `run` wraps this with the production HttpClient-backed fetcher and real clock.
@@ -313,7 +316,7 @@ let internal runWithFetch
         resolveSources opts projectFile
         |> Result.bind (fun (_vocabFile, curated, domain) ->
             buildMappings fetch clock opts projectFile curated domain
-            |> Result.map (fun (vocabEntries, fresh, registry, notices) ->
+            |> Result.map (fun (vocabEntries, fresh, registry, diagnostics) ->
                 let lockPath = lockFilePath projectFile
                 let existingLock = readOrEmptyLock lockPath
 
@@ -324,7 +327,7 @@ let internal runWithFetch
                     writeLock lockPath clock existingLock fresh vocabEntries declaredPrefixes
 
                 { Summary = summary
-                  EquivalentClassNotices = notices }))
+                  Diagnostics = diagnostics }))
 
 /// Run the extract pipeline.
 /// No child processes; all FCS evaluation is in-process.

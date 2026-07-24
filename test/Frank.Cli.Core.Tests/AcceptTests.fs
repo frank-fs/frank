@@ -333,18 +333,19 @@ let acceptTests =
                   "round-trip preserves quotes and backslash"
           }
 
-          test "json output: equivalentClassNoticeToJson round-trips a type name containing quote and backtick" {
-              let notice: EquivalentClassNotice =
-                  { FSharpType = "MyApp.Tricky<`a>+\"Weird\""
-                    ExplicitIri = "https://schema.org/Foo\"bar" }
+          test "json output: conventionDiagnosticToJson round-trips a type name containing quote and backtick" {
+              let fsharpType = "MyApp.Tricky<`a>+\"Weird\""
+              let explicitIri = "https://schema.org/Foo\"bar"
+              let diagnostic = EquivalentClassCollapse(fsharpType, explicitIri)
 
-              let json = Accept.equivalentClassNoticeToJson notice
+              let json = Accept.conventionDiagnosticToJson diagnostic
 
-              let doc = System.Text.Json.Nodes.JsonNode.Parse json
+              let doc: System.Text.Json.Nodes.JsonNode =
+                  System.Text.Json.Nodes.JsonNode.Parse json
 
               Expect.equal (doc.["notice"].GetValue<string>()) "equivalentClassCollapse" "notice"
-              Expect.equal (doc.["fsharpType"].GetValue<string>()) notice.FSharpType "fsharpType round-trips"
-              Expect.equal (doc.["explicitIri"].GetValue<string>()) notice.ExplicitIri "explicitIri round-trips"
+              Expect.equal (doc.["fsharpType"].GetValue<string>()) fsharpType "fsharpType round-trips"
+              Expect.equal (doc.["explicitIri"].GetValue<string>()) explicitIri "explicitIri round-trips"
           }
 
           test "accept a union investment produces a Union mapping with confirmed cases" {

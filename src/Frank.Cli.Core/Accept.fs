@@ -653,22 +653,36 @@ let vocabWarningsToJson (warnings: VocabWarning list) : string =
     let opts = JsonSerializerOptions(WriteIndented = false)
     arr.ToJsonString(opts)
 
-let private equivalentClassNoticeToJsonObject (n: EquivalentClassNotice) : JsonObject =
+let private conventionDiagnosticToJsonObject (d: ConventionDiagnostic) : JsonObject =
     let entry = JsonObject()
-    entry.Add("notice", JsonValue.Create "equivalentClassCollapse")
-    entry.Add("fsharpType", JsonValue.Create n.FSharpType)
-    entry.Add("explicitIri", JsonValue.Create n.ExplicitIri)
+
+    match d with
+    | EquivalentClassCollapse(fsharpType, explicitIri) ->
+        entry.Add("notice", JsonValue.Create "equivalentClassCollapse")
+        entry.Add("fsharpType", JsonValue.Create fsharpType)
+        entry.Add("explicitIri", JsonValue.Create explicitIri)
+    | AmbiguousLocalNameDropped(category, localName, iris) ->
+        entry.Add("notice", JsonValue.Create "ambiguousLocalNameDropped")
+        entry.Add("category", JsonValue.Create category)
+        entry.Add("localName", JsonValue.Create localName)
+        let irisArr = JsonArray()
+
+        for iri in iris do
+            irisArr.Add(JsonValue.Create iri)
+
+        entry.Add("iris", irisArr)
+
     entry
 
-/// Serialize one EquivalentClassNotice as a single-line JSON object string. Mirrors
-/// vocabWarningToJsonObject's JsonObject-based construction — FSharpType/ExplicitIri
-/// aren't guaranteed quote/backslash-free (F# generic type FullNames can contain
+/// Serialize one ConventionDiagnostic as a single-line JSON object string. Mirrors
+/// vocabWarningToJsonObject's JsonObject-based construction — string fields aren't
+/// guaranteed quote/backslash-free (F# generic type FullNames can contain
 /// backticks/angle brackets), so this serializes properly instead of hand-built
-/// printfn string interpolation. Callers print one of these per notice, one per line
-/// (see Frank.Cli's printEquivalentClassNotices) — never wrapped in a JSON array.
-let equivalentClassNoticeToJson (n: EquivalentClassNotice) : string =
+/// printfn string interpolation. Callers print one of these per diagnostic, one per line
+/// (see Frank.Cli's printConventionDiagnostics) — never wrapped in a JSON array.
+let conventionDiagnosticToJson (d: ConventionDiagnostic) : string =
     let opts = JsonSerializerOptions(WriteIndented = false)
-    (equivalentClassNoticeToJsonObject n).ToJsonString(opts)
+    (conventionDiagnosticToJsonObject d).ToJsonString(opts)
 
 // ── Public: summaryToJson ─────────────────────────────────────────────────────
 

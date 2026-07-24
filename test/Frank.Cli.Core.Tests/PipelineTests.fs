@@ -213,8 +213,8 @@ let at1PipelineTests =
                   Directory.Delete(tmpDir, true)
           }
 
-          test "extract pipeline surfaces an EquivalentClassNotice through ExtractResult" {
-              // End-to-end proof that ConventionEngine.scoreDetailed's notice channel flows
+          test "extract pipeline surfaces an EquivalentClassCollapse diagnostic through ExtractResult" {
+              // End-to-end proof that ConventionEngine.scoreDetailed's diagnostic channel flows
               // through Pipeline.run/runWithFetch (Pipeline.ExtractResult), not just the
               // pure ConventionEngine unit-level API.
               let tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
@@ -233,13 +233,15 @@ let at1PipelineTests =
                   let extractResult = Expect.wantOk result "pipeline should succeed"
 
                   Expect.equal
-                      extractResult.EquivalentClassNotices.Length
+                      extractResult.Diagnostics.Length
                       1
-                      $"expected exactly one notice, got {extractResult.EquivalentClassNotices}"
+                      $"expected exactly one diagnostic, got {extractResult.Diagnostics}"
 
-                  let notice = extractResult.EquivalentClassNotices.[0]
-                  Expect.equal notice.FSharpType "FixtureApp.Order" "notice names the collapsed type"
-                  Expect.equal notice.ExplicitIri "schema:Bar" "notice carries the explicit CURIE"
+                  match extractResult.Diagnostics.[0] with
+                  | EquivalentClassCollapse(fsharpType, explicitIri) ->
+                      Expect.equal fsharpType "FixtureApp.Order" "diagnostic names the collapsed type"
+                      Expect.equal explicitIri "schema:Bar" "diagnostic carries the explicit CURIE"
+                  | other -> failwith $"expected an EquivalentClassCollapse diagnostic, got {other}"
               finally
                   Directory.Delete(tmpDir, true)
           } ]

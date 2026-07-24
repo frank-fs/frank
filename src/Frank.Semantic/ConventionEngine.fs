@@ -21,18 +21,26 @@ type VocabTermIris =
       PropertyIris: Set<string>
       IndividualIris: Set<string> }
 
-/// Diagnostic emitted when ConventionEngine.applyExplicitClass collapses a type's own
-/// ClassIri onto a declared equivalentClass target because the type had no independently
-/// CONFIRMED convention match of its own (Unresolved, or only a fuzzy/Proposed candidate —
-/// a Proposed guess was never asserted as the type's identity, so it doesn't count as one).
-/// Without this notice the collapse is silent: an author who declared
-/// `equivalentClass typeof<Foo> "schema:Bar"` expecting Foo to keep its own class identity
-/// AND gain a genuine owl:equivalentClass link to Bar instead gets neither — Foo's ClassIri
-/// becomes Bar's IRI outright, and the resulting equivalentClass field then collapses to a
-/// no-op (see #425, ResolvedModel.buildResolvedResource).
-type EquivalentClassNotice =
-    { FSharpType: string
-      ExplicitIri: string }
+/// A convention-matching outcome a vocabulary author would not expect from reading
+/// their own declarations, surfaced explicitly instead of only implicitly via
+/// Status/Confidence.
+type ConventionDiagnostic =
+    /// ConventionEngine.applyExplicitClass collapsed a type's own ClassIri onto a
+    /// declared equivalentClass target because the type had no independently CONFIRMED
+    /// convention match of its own (Unresolved, or only a fuzzy/Proposed candidate —
+    /// a Proposed guess was never asserted as the type's identity, so it doesn't count as
+    /// one). Without this, the collapse is silent: an author who declared
+    /// `equivalentClass typeof<Foo> "schema:Bar"` expecting Foo to keep its own class
+    /// identity AND gain a genuine owl:equivalentClass link to Bar instead gets neither —
+    /// Foo's ClassIri becomes Bar's IRI outright, and the resulting equivalentClass field
+    /// then collapses to a no-op (see #425, ResolvedModel.buildResolvedResource).
+    | EquivalentClassCollapse of FSharpType: string * ExplicitIri: string
+    /// ConventionEngine.buildTermMap excluded a local name from VocabTerms because it maps
+    /// to more than one distinct absolute IRI (e.g. schema:identifier and dct:identifier
+    /// both normalize to "identifier"). Without this, the drop is silent: every type that
+    /// would have convention-matched against that name instead degrades to Unresolved with
+    /// no record of why (see buildTermMap).
+    | AmbiguousLocalNameDropped of Category: string * LocalName: string * Iris: string list
 
 module ConventionEngine =
 
@@ -317,17 +325,37 @@ module ConventionEngine =
         Map.fold (fun acc k v -> Map.add k v acc) a b
 
     /// Build a local-name to IRI map, excluding ambiguous local names (a name that
-    /// maps to more than one distinct IRI). Ambiguous names are dropped so they cannot
-    /// produce a Confirmed mapping to an arbitrary namespace; the affected type degrades
-    /// to Unresolved (surfaced in the lock), never a silent wrong-namespace confirm.
-    let private buildTermMap (pairs: (string * string) seq) : Map<string, string> =
-        pairs
-        |> Seq.groupBy fst
-        |> Seq.choose (fun (key, group) ->
-            match group |> Seq.map snd |> Seq.distinct |> Seq.toList with
-            | [ single ] -> Some(key, single)
-            | _ -> None)
-        |> Map.ofSeq
+    /// maps to more than one distinct IRI), plus an AmbiguousLocalNameDropped diagnostic
+    /// for each excluded name. Ambiguous names are dropped so they cannot produce a
+    /// Confirmed mapping to an arbitrary namespace; the affected type degrades to
+    /// Unresolved (surfaced in the lock AND via the returned diagnostic), never a silent
+    /// wrong-namespace confirm.
+    let private buildTermMap
+        (category: string)
+        (pairs: (string * string) seq)
+        : Map<string, string> * ConventionDiagnostic list =
+        let groups =
+            pairs
+            |> Seq.groupBy fst
+            |> Seq.map (fun (key, group) -> key, group |> Seq.map snd |> Seq.distinct |> Seq.sort |> Seq.toList)
+            |> Seq.toList
+
+        let termMap =
+            groups
+            |> List.choose (fun (key, iris) ->
+                match iris with
+                | [ single ] -> Some(key, single)
+                | _ -> None)
+            |> Map.ofList
+
+        let diagnostics =
+            groups
+            |> List.choose (fun (key, iris) ->
+                match iris with
+                | [ _ ] -> None
+                | many -> Some(AmbiguousLocalNameDropped(category, key, many)))
+
+        termMap, diagnostics
 
     /// Collect enumeration members: subjects S where S rdf:type C and C is a known
     /// class IRI, excluding any S that is itself already a class or property IRI.
@@ -354,7 +382,9 @@ module ConventionEngine =
                 | _ -> None
             | _ -> None)
 
-    /// Extract class, property, and individual local names from a vocabulary IGraph.
+    /// Extract class, property, and individual local names from a vocabulary IGraph,
+    /// plus an AmbiguousLocalNameDropped diagnostic for each local name excluded because
+    /// it maps to more than one distinct IRI (see buildTermMap).
     /// Recognized typings:
     ///   Classes    — rdfs:Class, schema:Class, owl:Class, rdfs:Datatype
     ///   Properties — rdf:Property, schema:Property, owl:ObjectProperty, owl:DatatypeProperty
@@ -362,8 +392,7 @@ module ConventionEngine =
     ///                 S rdf:type C and C is a known class (enumeration member pattern).
     ///                 A subject already in Classes or Properties is never re-bucketed here.
     /// Keys are lowercase local names; values are absolute IRI strings.
-    /// A local name that maps to more than one distinct IRI is excluded (ambiguous).
-    let extractVocabTerms (graph: IGraph) : VocabTerms =
+    let extractVocabTermsDetailed (graph: IGraph) : VocabTerms * ConventionDiagnostic list =
         if isNull graph then
             invalidArg (nameof graph) "graph must not be null"
 
@@ -376,14 +405,26 @@ module ConventionEngine =
         let propertyIris = propertyPairs |> Seq.map snd |> Set.ofSeq
         let excludeIris = Set.union classIris propertyIris
 
-        { Classes = buildTermMap classPairs
-          Properties = buildTermMap propertyPairs
-          Individuals =
-            buildTermMap (
-                Seq.append
+        let classMap, classDiagnostics = buildTermMap "class" classPairs
+        let propertyMap, propertyDiagnostics = buildTermMap "property" propertyPairs
+
+        let individualMap, individualDiagnostics =
+            buildTermMap
+                "individual"
+                (Seq.append
                     (individualTypeIris |> Seq.collect (fun t -> collectByTypeIri t graph))
-                    (collectEnumMembers classIris excludeIris graph)
-            ) }
+                    (collectEnumMembers classIris excludeIris graph))
+
+        { Classes = classMap
+          Properties = propertyMap
+          Individuals = individualMap },
+        classDiagnostics @ propertyDiagnostics @ individualDiagnostics
+
+    /// Extract class, property, and individual local names from a vocabulary IGraph.
+    /// Thin wrapper over extractVocabTermsDetailed for callers that don't need the
+    /// ambiguous-local-name diagnostic channel.
+    /// A local name that maps to more than one distinct IRI is excluded (ambiguous).
+    let extractVocabTerms (graph: IGraph) : VocabTerms = extractVocabTermsDetailed graph |> fst
 
     /// Extract absolute IRI sets per term category from a vocabulary IGraph.
     /// Unlike extractVocabTerms, there is NO local-name deduplication: both
@@ -526,20 +567,21 @@ module ConventionEngine =
 
     /// If registry.EquivalentClasses contains an entry for typeInfo.FullName,
     /// override the class IRI to the explicit one, keeping convention-scored fields.
-    /// Also returns an EquivalentClassNotice when the override collapses a type that had
-    /// no independent CONFIRMED convention match of its own — the case where the author's
-    /// "distinct-but-equivalent" intent silently degrades into identity collapse. Guarding on
-    /// Status <> Confirmed (not just Iri.IsNone) matters against real vocabularies: a large
-    /// term graph routinely produces a spurious Proposed (Iri = Some _, fuzzy-matched) candidate
-    /// that was never asserted as the type's own identity, so it must still trigger the notice.
+    /// Also returns an EquivalentClassCollapse diagnostic when the override collapses a
+    /// type that had no independent CONFIRMED convention match of its own — the case where
+    /// the author's "distinct-but-equivalent" intent silently degrades into identity
+    /// collapse. Guarding on Status <> Confirmed (not just Iri.IsNone) matters against real
+    /// vocabularies: a large term graph routinely produces a spurious Proposed
+    /// (Iri = Some _, fuzzy-matched) candidate that was never asserted as the type's own
+    /// identity, so it must still trigger the diagnostic.
     let private applyExplicitClass
         (registry: VocabularyRegistry)
         (typeInfo: TypeInfo)
         (terms: VocabTerms)
         (convention: Mapping)
-        : Mapping * EquivalentClassNotice option =
+        : Mapping * ConventionDiagnostic list =
         match Map.tryFind typeInfo.FullName registry.EquivalentClasses with
-        | None -> convention, None
+        | None -> convention, []
         | Some explicitUri ->
             let curie = toCurie registry.Prefixes explicitUri
 
@@ -551,13 +593,11 @@ module ConventionEngine =
                 else
                     MappingShape.payloadFields convention.Shape
 
-            let notice =
+            let diagnostics =
                 if convention.Status <> Confirmed then
-                    Some
-                        { FSharpType = typeInfo.FullName
-                          ExplicitIri = curie }
+                    [ EquivalentClassCollapse(typeInfo.FullName, curie) ]
                 else
-                    None
+                    []
 
             { convention with
                 Iri = Some curie
@@ -565,7 +605,7 @@ module ConventionEngine =
                 Source = Manual
                 Status = Confirmed
                 Shape = MappingShape.Record fieldMappings },
-            notice
+            diagnostics
 
     // ── Union fallback ────────────────────────────────────────────────────────
 
@@ -594,14 +634,15 @@ module ConventionEngine =
           Shape = MappingShape.Record [] }
 
     /// Score a TypeInfo against in-scope vocabulary terms and emit a candidate Mapping,
-    /// plus an EquivalentClassNotice when applyExplicitClass silently collapsed the type's
-    /// ClassIri onto a declared equivalentClass target (see EquivalentClassNotice).
+    /// plus any ConventionDiagnostics raised while scoring — currently only
+    /// EquivalentClassCollapse, when applyExplicitClass silently collapsed the type's
+    /// ClassIri onto a declared equivalentClass target (see ConventionDiagnostic).
     /// Pure: takes pre-extracted VocabTerms and VocabularyRegistry as data — no I/O.
     let scoreDetailed
         (terms: VocabTerms)
         (registry: VocabularyRegistry)
         (typeInfo: TypeInfo)
-        : Mapping * EquivalentClassNotice option =
+        : Mapping * ConventionDiagnostic list =
         let inScopeClasses =
             terms.Classes |> Map.filter (fun _ iri -> isInScope registry iri)
 
