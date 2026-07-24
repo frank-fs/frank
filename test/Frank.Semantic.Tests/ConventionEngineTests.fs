@@ -644,7 +644,7 @@ let explicitEquivalentClassTests =
               Expect.equal fields.[0].Name "Position" "field name preserved"
           }
 
-          test "collapse without independent convention match surfaces an EquivalentClassNotice" {
+          test "collapse without independent convention match surfaces an EquivalentClassCollapse diagnostic" {
               // MoveLog<_> doesn't convention-match "itemlist" (no independent candidate),
               // so applyExplicitClass fully collapses its ClassIri onto schema:ItemList.
               // That collapse must be traceable, not silent.
@@ -667,18 +667,20 @@ let explicitEquivalentClassTests =
                       Using = Set.ofList [ "schema" ]
                       EquivalentClasses = Map.ofList [ "TicTacToe.Model.MoveLog`1", Uri("https://schema.org/ItemList") ] }
 
-              let mapping, notice = ConventionEngine.scoreDetailed terms registry typeInfo
+              let mapping, diagnostics = ConventionEngine.scoreDetailed terms registry typeInfo
 
               Expect.equal mapping.Iri (Some "schema:ItemList") "class IRI still overridden"
 
-              match notice with
-              | None -> failwith "expected an EquivalentClassNotice for a collapse without an independent match"
-              | Some n ->
-                  Expect.equal n.FSharpType "TicTacToe.Model.MoveLog`1" "notice names the collapsed type"
-                  Expect.equal n.ExplicitIri "schema:ItemList" "notice carries the explicit CURIE"
+              match diagnostics with
+              | [ EquivalentClassCollapse(fsharpType, explicitIri) ] ->
+                  Expect.equal fsharpType "TicTacToe.Model.MoveLog`1" "diagnostic names the collapsed type"
+                  Expect.equal explicitIri "schema:ItemList" "diagnostic carries the explicit CURIE"
+              | other ->
+                  failwith
+                      $"expected exactly one EquivalentClassCollapse diagnostic for a collapse without an independent match, got {other}"
           }
 
-          test "collapse WITH an independent convention match produces no notice" {
+          test "collapse WITH an independent convention match produces no diagnostic" {
               // Order convention-matches "order" on its own; the explicit override to a
               // *different* class still replaces ClassIri (existing behavior, unchanged),
               // but since Order had its own match, this is not the silent-collapse case.
@@ -701,10 +703,10 @@ let explicitEquivalentClassTests =
                       Using = Set.ofList [ "schema" ]
                       EquivalentClasses = Map.ofList [ "MyApp.Order", Uri("https://schema.org/Product") ] }
 
-              let mapping, notice = ConventionEngine.scoreDetailed terms registry typeInfo
+              let mapping, diagnostics = ConventionEngine.scoreDetailed terms registry typeInfo
 
               Expect.equal mapping.Iri (Some "schema:Product") "class IRI still overridden by explicit target"
-              Expect.isNone notice "no notice: type had its own independent convention match"
+              Expect.isEmpty diagnostics "no diagnostic: type had its own independent convention match"
           }
 
           test "real schema.org-scale noise match still surfaces a notice (TicTacToe-v732 fixture)" {
@@ -745,17 +747,17 @@ let explicitEquivalentClassTests =
                           EquivalentClasses =
                               Map.ofList [ "TicTacToe.Model.MoveLog`1", Uri("https://schema.org/ItemList") ] }
 
-                  let mapping, notice = ConventionEngine.scoreDetailed terms registry typeInfo
+                  let mapping, diagnostics = ConventionEngine.scoreDetailed terms registry typeInfo
 
                   Expect.equal mapping.Iri (Some "schema:ItemList") "class IRI overridden to the explicit target"
 
-                  match notice with
-                  | None ->
+                  match diagnostics with
+                  | [ EquivalentClassCollapse(fsharpType, explicitIri) ] ->
+                      Expect.equal fsharpType "TicTacToe.Model.MoveLog`1" "diagnostic names the collapsed type"
+                      Expect.equal explicitIri "schema:ItemList" "diagnostic carries the explicit CURIE"
+                  | other ->
                       failwith
-                          "expected an EquivalentClassNotice: MoveLog had no Confirmed independent identity before the override, even against the real schema.org term graph"
-                  | Some n ->
-                      Expect.equal n.FSharpType "TicTacToe.Model.MoveLog`1" "notice names the collapsed type"
-                      Expect.equal n.ExplicitIri "schema:ItemList" "notice carries the explicit CURIE"
+                          $"expected exactly one EquivalentClassCollapse diagnostic: MoveLog had no Confirmed independent identity before the override, even against the real schema.org term graph; got {other}"
           } ]
 
 // ── Exact-identity confirm rule ───────────────────────────────────────────────
@@ -1577,4 +1579,68 @@ let extractTermIrisTests =
                   Expect.isFalse
                       (terms.Properties.ContainsKey "identifier")
                       "extractVocabTerms must drop ambiguous 'identifier' (schema:identifier vs dct:identifier)"
+          } ]
+
+// ── extractVocabTermsDetailed: ambiguous local-name drop is an explicit diagnostic ──
+
+[<Tests>]
+let extractVocabTermsDetailedTests =
+    testList
+        "extractVocabTermsDetailed: ambiguous local-name drop surfaces AmbiguousLocalNameDropped"
+        [ test "two rdf:Properties with same local name in different namespaces surface a diagnostic" {
+              // Same ambiguous-'identifier' scenario as extractTermIris's contrast test above, but
+              // this time asserting the drop is no longer silent (see #427): a developer running
+              // `frank semantic extract` must be able to see why "identifier" never convention-matches.
+              let jsonld =
+                  """
+                  { "@context": {
+                      "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+                      "a_ns": "http://a/",
+                      "b_ns": "http://b/" },
+                    "@graph": [
+                      { "@id": "http://a/identifier", "@type": "rdf:Property" },
+                      { "@id": "http://b/identifier", "@type": "rdf:Property" } ] }
+                  """
+
+              let graph =
+                  VocabFetcher.parseGraph VocabFetcher.JsonLd (System.Text.Encoding.UTF8.GetBytes jsonld)
+                  |> function
+                      | Ok g -> g
+                      | Error e -> failwith e
+
+              let terms, diagnostics = ConventionEngine.extractVocabTermsDetailed graph
+
+              Expect.isFalse
+                  (terms.Properties.ContainsKey "identifier")
+                  $"extractVocabTermsDetailed must still drop ambiguous 'identifier'; got {terms.Properties}"
+
+              match diagnostics with
+              | [ AmbiguousLocalNameDropped(category, localName, iris) ] ->
+                  Expect.equal category "property" "diagnostic names the term category"
+                  Expect.equal localName "identifier" "diagnostic names the dropped local name"
+
+                  Expect.equal
+                      iris
+                      [ "http://a/identifier"; "http://b/identifier" ]
+                      "diagnostic carries both colliding absolute IRIs, sorted"
+              | other -> failwith $"expected exactly one AmbiguousLocalNameDropped diagnostic, got {other}"
+          }
+
+          test "no ambiguity → no diagnostic" {
+              let jsonld =
+                  """
+                  { "@context": { "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#" },
+                    "@graph": [ { "@id": "http://a/identifier", "@type": "rdf:Property" } ] }
+                  """
+
+              let graph =
+                  VocabFetcher.parseGraph VocabFetcher.JsonLd (System.Text.Encoding.UTF8.GetBytes jsonld)
+                  |> function
+                      | Ok g -> g
+                      | Error e -> failwith e
+
+              let terms, diagnostics = ConventionEngine.extractVocabTermsDetailed graph
+
+              Expect.isTrue (terms.Properties.ContainsKey "identifier") "unambiguous term is kept"
+              Expect.isEmpty diagnostics "no ambiguity, no diagnostic"
           } ]

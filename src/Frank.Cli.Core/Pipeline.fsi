@@ -18,10 +18,11 @@ type ExtractOptions =
 type ExtractSummary = LockFile.StatusCounts
 
 /// Result of the extract pipeline: the status-count summary plus any
-/// EquivalentClassNotices raised while scoring types against the registry.
+/// ConventionDiagnostics raised while extracting vocab terms and scoring types
+/// against the registry.
 type ExtractResult =
     { Summary: ExtractSummary
-      EquivalentClassNotices: EquivalentClassNotice list }
+      Diagnostics: ConventionDiagnostic list }
 
 /// Exclude files that FCS cannot typecheck in the pipeline's reduced assembly context.
 /// Mirrors the MSBuild _FrankVocabSource item exclusion in Frank.Cli.MSBuild.targets:

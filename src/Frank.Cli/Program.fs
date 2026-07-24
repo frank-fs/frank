@@ -189,20 +189,27 @@ let private printSummary (fmt: Pipeline.OutputFormat) (s: Pipeline.ExtractSummar
     | Pipeline.Text -> printfn "Confirmed: %d, Proposed: %d, Unresolved: %d" s.Confirmed s.Proposed s.Unresolved
     | Pipeline.Json -> printfn """{"confirmed":%d,"proposed":%d,"unresolved":%d}""" s.Confirmed s.Proposed s.Unresolved
 
-/// Print a notice for each type whose ClassIri was collapsed onto a declared
-/// equivalentClass target because the type had no independent convention match of
-/// its own (see EquivalentClassNotice / ConventionEngine.applyExplicitClass).
-let private printEquivalentClassNotices (fmt: Pipeline.OutputFormat) (notices: EquivalentClassNotice list) : unit =
+/// Print each ConventionDiagnostic surfaced while extracting vocab terms and scoring
+/// types against the registry (see ConventionDiagnostic).
+let private printConventionDiagnostics (fmt: Pipeline.OutputFormat) (diagnostics: ConventionDiagnostic list) : unit =
     match fmt with
     | Pipeline.Text ->
-        for n in notices do
-            printfn
-                "notice: %s has no independent convention match; ClassIri collapsed to explicit equivalentClass target %s"
-                n.FSharpType
-                n.ExplicitIri
+        for d in diagnostics do
+            match d with
+            | EquivalentClassCollapse(fsharpType, explicitIri) ->
+                printfn
+                    "notice: %s has no independent convention match; ClassIri collapsed to explicit equivalentClass target %s"
+                    fsharpType
+                    explicitIri
+            | AmbiguousLocalNameDropped(category, localName, iris) ->
+                printfn
+                    "notice: ambiguous %s local name '%s' dropped (%s); affected types degrade to Unresolved"
+                    category
+                    localName
+                    (String.concat ", " iris)
     | Pipeline.Json ->
-        for n in notices do
-            printfn "%s" (Accept.equivalentClassNoticeToJson n)
+        for d in diagnostics do
+            printfn "%s" (Accept.conventionDiagnosticToJson d)
 
 // ── Command handlers ──────────────────────────────────────────────────────────
 
@@ -241,7 +248,7 @@ let private handleExtract (args: ParseResults<ExtractArgs>) : int =
             1
         | Ok result ->
             printSummary fmt result.Summary
-            printEquivalentClassNotices fmt result.EquivalentClassNotices
+            printConventionDiagnostics fmt result.Diagnostics
             0
 
 let private lockPathFrom (lockFile: string option) (project: string option) : Result<string, string> =
