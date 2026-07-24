@@ -33,8 +33,17 @@ type MutableEtagSource(initialEtags: Map<string, string>) =
     member _.Compute(etagContext: ETagContext) : Task<string option> =
         task { return Map.tryFind etagContext.InstanceId currentEtags }
 
-/// Creates a test server with the conditional request middleware and ETag-enabled endpoints.
-let createTestServer (compute: ETagContext -> Task<string option>) =
+/// Shared bootstrap: DI, TestServer, routing, ConditionalRequestMiddleware wiring, and both
+/// ETag-enabled GET/HEAD + POST/PUT/DELETE routes plus a "/no-etag" pass-through route, at a
+/// caller-supplied route pattern. `configureOuter`, when given, runs BEFORE
+/// ConditionalRequestMiddleware is registered -- e.g. to insert a Link-emitting middleware
+/// ahead of it, for the R10 ordering-contract tests in ConditionalRequestContextComputeTests
+/// (#426 follow-up: extracted so that module no longer hand-rolls this bootstrap itself).
+let private createTestServerCore
+    (routePattern: string)
+    (configureOuter: (IApplicationBuilder -> IApplicationBuilder) option)
+    (compute: ETagContext -> Task<string option>)
+    =
     let cache = new ETagCache(100, NullLogger<ETagCache>.Instance)
     let builder = WebApplication.CreateBuilder([||])
     builder.WebHost.UseTestServer() |> ignore
@@ -45,8 +54,12 @@ let createTestServer (compute: ETagContext -> Task<string option>) =
 
     (app :> IApplicationBuilder).UseRouting() |> ignore
 
-    (app :> IApplicationBuilder).UseMiddleware<ConditionalRequestMiddleware>()
-    |> ignore
+    let outer =
+        match configureOuter with
+        | Some f -> f (app :> IApplicationBuilder)
+        | None -> app :> IApplicationBuilder
+
+    outer.UseMiddleware<ConditionalRequestMiddleware>() |> ignore
 
     let etagMetadata =
         ETagMetadata((fun ctx -> ctx.Request.RouteValues.["id"] :?> string), compute)
@@ -54,7 +67,7 @@ let createTestServer (compute: ETagContext -> Task<string option>) =
     // ETag-enabled GET/HEAD endpoint
     app
         .MapMethods(
-            "/resource/{id}",
+            routePattern,
             [| "GET"; "HEAD" |],
             Func<HttpContext, Task>(fun ctx -> task { do! ctx.Response.WriteAsync("OK") } :> Task)
         )
@@ -64,7 +77,7 @@ let createTestServer (compute: ETagContext -> Task<string option>) =
     // ETag-enabled POST/PUT/DELETE endpoint
     app
         .MapMethods(
-            "/resource/{id}",
+            routePattern,
             [| "POST"; "PUT"; "DELETE" |],
             Func<HttpContext, Task>(fun ctx -> task { do! ctx.Response.WriteAsync("MUTATED") } :> Task)
         )
@@ -77,6 +90,21 @@ let createTestServer (compute: ETagContext -> Task<string option>) =
 
     app.Start()
     (app.GetTestClient(), cache)
+
+/// Creates a test server with the conditional request middleware and ETag-enabled endpoints
+/// at "/resource/{id}".
+let createTestServer (compute: ETagContext -> Task<string option>) =
+    createTestServerCore "/resource/{id}" None compute
+
+/// Same bootstrap as createTestServer, but at a caller-supplied route pattern and with the
+/// ability to register extra middleware BEFORE ConditionalRequestMiddleware -- used by
+/// ConditionalRequestContextComputeTests (#426) instead of duplicating this bootstrap.
+let createTestServerAt
+    (routePattern: string)
+    (configureOuter: (IApplicationBuilder -> IApplicationBuilder) option)
+    (compute: ETagContext -> Task<string option>)
+    =
+    createTestServerCore routePattern configureOuter compute
 
 [<Tests>]
 let conditionalRequestTests =

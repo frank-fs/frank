@@ -49,7 +49,10 @@ type ConditionalRequestMiddleware
                     // resource (e.g. /provenance?resource=<uri>) would otherwise collide with
                     // every other query string on the same path, caching one resource's ETag
                     // under a key a completely different resource then reads back (#426).
-                    let resourceKey = ctx.Request.Path.Value + ctx.Request.QueryString.Value
+                    // Derived from instanceId (the endpoint's own declared identity), not the
+                    // raw query string, so an unrelated query param can never bust the cache
+                    // for a resource whose instanceId is unchanged.
+                    let resourceKey = ctx.Request.Path.Value + "|" + instanceId
 
                     let etagContext =
                         { InstanceId = instanceId

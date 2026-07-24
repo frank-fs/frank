@@ -77,9 +77,14 @@ module ProvenanceExtensions =
             [ box etagMetadata ]
 
     // Adds the provenance middleware, conditional-request middleware and both endpoints to
-    // the spec; caller sets Services separately. Kept as a named function (not inlined) to
-    // avoid duplicating the addMiddleware body in two CE members.
-    let private addProvenanceMiddlewareAndEndpoint (spec: WebHostSpec) : WebHostSpec =
+    // the spec, and centralizes the DI concerns every caller needs: the caller-supplied
+    // `configureServices` (config/store registration, which differs between useProvenanceWith
+    // and useProvenance) plus the ETagCache registration ConditionalRequestMiddleware needs --
+    // shared here instead of repeated at both call sites (#426 follow-up).
+    let private addProvenanceMiddlewareAndEndpoint
+        (configureServices: IServiceCollection -> unit)
+        (spec: WebHostSpec)
+        : WebHostSpec =
         let addMiddleware (app: IApplicationBuilder) =
             let configured = spec.Middleware app
             // R10 (#426): useConditionalRequests is registered INNER to (after)
@@ -88,15 +93,23 @@ module ProvenanceExtensions =
             // Frank.useConditionalRequests's doc comment for the ordering contract.
             configured.UseMiddleware<ProvenanceMiddleware>() |> useConditionalRequests
 
+        let addServices (services: IServiceCollection) =
+            configureServices services
+            // ConditionalRequestMiddleware (wired via useConditionalRequests above) needs
+            // ETagCache resolvable from DI.
+            services.AddETagCache() |> ignore
+            spec.Services services
+
         { spec with
             Endpoints = Array.append spec.Endpoints [| buildProvenanceEndpoint (); buildPerNodeEndpoint () |]
-            Middleware = addMiddleware }
+            Middleware = addMiddleware
+            Services = addServices }
 
     type WebHostBuilder with
 
         [<CustomOperation("useProvenanceWith")>]
         member _.UseProvenanceWith(spec: WebHostSpec, config: ProvenanceConfig) : WebHostSpec =
-            let addServices (services: IServiceCollection) =
+            let configureServices (services: IServiceCollection) =
                 // AddSingleton (last-wins) is intentional: explicit caller config must override auto-loaded defaults.
                 services.AddSingleton<ProvenanceConfig>(config) |> ignore
 
@@ -105,19 +118,13 @@ module ProvenanceExtensions =
                         sp.GetRequiredService<ILoggerFactory>().CreateLogger("Frank.Provenance")
 
                     new MailboxProcessorProvenanceStore(config.StoreConfig, logger) :> IProvenanceStore)
+                |> ignore
 
-                // ConditionalRequestMiddleware (wired via useConditionalRequests above) needs
-                // ETagCache resolvable from DI.
-                services.AddETagCache() |> ignore
-
-                spec.Services services
-
-            { addProvenanceMiddlewareAndEndpoint spec with
-                Services = addServices }
+            spec |> addProvenanceMiddlewareAndEndpoint configureServices
 
         [<CustomOperation("useProvenance")>]
         member _.UseProvenance(spec: WebHostSpec) : WebHostSpec =
-            let addServices (services: IServiceCollection) =
+            let configureServices (services: IServiceCollection) =
                 services.TryAddSingleton<ProvenanceConfig>(fun _ ->
                     match
                         GeneratedProvenanceResolver.resolveGeneratedConfig (
@@ -126,6 +133,7 @@ module ProvenanceExtensions =
                     with
                     | Ok c -> c
                     | Error m -> invalidOp m)
+                |> ignore
 
                 services.TryAddSingleton<IProvenanceStore>(fun sp ->
                     let cfg = sp.GetRequiredService<ProvenanceConfig>()
@@ -134,12 +142,6 @@ module ProvenanceExtensions =
                         sp.GetRequiredService<ILoggerFactory>().CreateLogger("Frank.Provenance")
 
                     new MailboxProcessorProvenanceStore(cfg.StoreConfig, logger) :> IProvenanceStore)
+                |> ignore
 
-                // ConditionalRequestMiddleware (wired via useConditionalRequests above) needs
-                // ETagCache resolvable from DI.
-                services.AddETagCache() |> ignore
-
-                spec.Services services
-
-            { addProvenanceMiddlewareAndEndpoint spec with
-                Services = addServices }
+            spec |> addProvenanceMiddlewareAndEndpoint configureServices

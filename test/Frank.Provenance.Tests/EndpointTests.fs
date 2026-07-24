@@ -45,6 +45,24 @@ let private ctxKeys (body: string) : Set<string> =
         | JsonValueKind.Array -> ctxEl.EnumerateArray() |> Seq.map keysOf |> Seq.fold Set.union Set.empty
         | _ -> Set.empty
 
+/// #426 Fix 1: wraps a real store, counting QueryByResource calls -- lets a test assert only
+/// ONE store query happens for a cache-miss GET, proving computeLineageETag/computeNodeETag's
+/// resolved graph (stashed on ctx.Items) is reused by handle/handleNode's 200 path instead of
+/// re-running the identical store query + graph build a second time.
+type private CountingProvenanceStore(inner: IProvenanceStore) =
+    let mutable queryByResourceCalls = 0
+    member _.QueryByResourceCalls = queryByResourceCalls
+
+    interface IProvenanceStore with
+        member _.Append r = inner.Append r
+
+        member _.QueryByResource resourceUri =
+            queryByResourceCalls <- queryByResourceCalls + 1
+            inner.QueryByResource resourceUri
+
+        member _.QueryByAgent agentId = inner.QueryByAgent agentId
+        member _.QueryByActivityId activityId = inner.QueryByActivityId activityId
+
 let private countOccurrences (sub: string) (s: string) =
     let mutable count = 0
     let mutable idx = 0
@@ -160,116 +178,93 @@ let private startNodeServer (records: ProvenanceRecord list) =
     app.StartAsync().GetAwaiter().GetResult()
     app
 
-/// #426: server exposing /provenance and /provenance/{nodeId} wired the SAME way
+/// #426: shared bootstrap for /provenance[/{nodeId}] servers wired the SAME way
 /// Frank.Provenance.fs wires them for real apps -- ETagMetadata attached at route
 /// registration, computed via ProvenanceEndpoint.computeLineageETag/computeNodeETag, with
-/// Frank.ConditionalRequestMiddleware owning ETag headers and 304 short-circuiting. Proves
-/// ETag/Cache-Control/304 behavior end-to-end through the real middleware, not the
-/// hand-rolled inline logic serveJsonLd used to have.
+/// Frank.ConditionalRequestMiddleware owning ETag headers and 304 short-circuiting.
+/// `includeProvenanceMiddleware` inserts ProvenanceMiddleware OUTER to (before)
+/// ConditionalRequestMiddleware per the R10 ordering contract (its OnStarting-registered
+/// has_provenance Link header then survives a 304 short-circuit). `mapLineageRoute` controls
+/// whether the /provenance batch route is registered in addition to /provenance/{nodeId} --
+/// the two callers below differed only in these two flags (#426 follow-up: replaces the
+/// ~35-line duplicated bootstrap each used to hand-roll).
+let private startConditionalServerCore
+    (includeProvenanceMiddleware: bool)
+    (mapLineageRoute: bool)
+    (records: ProvenanceRecord list)
+    =
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+
+    let store =
+        new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance) :> IProvenanceStore
+
+    let cache = new ETagCache(100, NullLogger<ETagCache>.Instance)
+    builder.Services.AddSingleton<IProvenanceStore>(store) |> ignore
+    builder.Services.AddSingleton<ProvenanceConfig>(defaultConfig) |> ignore
+    builder.Services.AddSingleton<ETagCache>(cache) |> ignore
+    builder.Services.AddRouting() |> ignore
+    let app = builder.Build()
+    let resolvedStore = app.Services.GetRequiredService<IProvenanceStore>()
+
+    for r in records do
+        resolvedStore.Append r
+
+    (app :> IApplicationBuilder).UseRouting() |> ignore
+
+    if includeProvenanceMiddleware then
+        // R10 (#426): ProvenanceMiddleware OUTER to (before) ConditionalRequestMiddleware so
+        // its OnStarting-registered has_provenance Link header survives a 304 short-circuit.
+        (app :> IApplicationBuilder).UseMiddleware<ProvenanceMiddleware>() |> ignore
+
+    (app :> IApplicationBuilder).UseMiddleware<ConditionalRequestMiddleware>()
+    |> ignore
+
+    if mapLineageRoute then
+        let lineageEtagMetadata =
+            ETagMetadata(
+                (fun (ctx: HttpContext) -> ctx.Request.Query.["resource"].ToString()),
+                (fun (etagContext: ETagContext) -> ProvenanceEndpoint.computeLineageETag resolvedStore etagContext)
+            )
+
+        app
+            .MapGet(
+                "/provenance",
+                Func<HttpContext, System.Threading.Tasks.Task>(ProvenanceEndpoint.handle resolvedStore defaultConfig)
+            )
+            .WithMetadata(lineageEtagMetadata)
+        |> ignore
+
+    let nodeEtagMetadata =
+        ETagMetadata(
+            ProvenanceEndpoint.resolveNodeId,
+            (fun (etagContext: ETagContext) -> ProvenanceEndpoint.computeNodeETag resolvedStore etagContext)
+        )
+
+    app
+        .MapGet(
+            "/provenance/{nodeId}",
+            Func<HttpContext, System.Threading.Tasks.Task>(ProvenanceEndpoint.handleNode resolvedStore defaultConfig)
+        )
+        .WithMetadata(nodeEtagMetadata)
+    |> ignore
+
+    app.StartAsync().GetAwaiter().GetResult()
+    app
+
+/// #426: server exposing /provenance and /provenance/{nodeId}. Proves ETag/Cache-Control/304
+/// behavior end-to-end through the real middleware, not the hand-rolled inline logic
+/// serveJsonLd used to have.
 let private startConditionalServer (records: ProvenanceRecord list) =
-    let builder = WebApplication.CreateBuilder()
-    builder.WebHost.UseTestServer() |> ignore
+    startConditionalServerCore false true records
 
-    let store =
-        new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance) :> IProvenanceStore
-
-    let cache = new ETagCache(100, NullLogger<ETagCache>.Instance)
-    builder.Services.AddSingleton<IProvenanceStore>(store) |> ignore
-    builder.Services.AddSingleton<ProvenanceConfig>(defaultConfig) |> ignore
-    builder.Services.AddSingleton<ETagCache>(cache) |> ignore
-    builder.Services.AddRouting() |> ignore
-    let app = builder.Build()
-    let resolvedStore = app.Services.GetRequiredService<IProvenanceStore>()
-
-    for r in records do
-        resolvedStore.Append r
-
-    (app :> IApplicationBuilder).UseRouting() |> ignore
-
-    (app :> IApplicationBuilder).UseMiddleware<ConditionalRequestMiddleware>()
-    |> ignore
-
-    let lineageEtagMetadata =
-        ETagMetadata(
-            (fun (ctx: HttpContext) -> ctx.Request.Query.["resource"].ToString()),
-            (fun (etagContext: ETagContext) -> ProvenanceEndpoint.computeLineageETag resolvedStore etagContext)
-        )
-
-    app
-        .MapGet(
-            "/provenance",
-            Func<HttpContext, System.Threading.Tasks.Task>(ProvenanceEndpoint.handle resolvedStore defaultConfig)
-        )
-        .WithMetadata(lineageEtagMetadata)
-    |> ignore
-
-    let nodeEtagMetadata =
-        ETagMetadata(
-            ProvenanceEndpoint.resolveNodeId,
-            (fun (etagContext: ETagContext) -> ProvenanceEndpoint.computeNodeETag resolvedStore etagContext)
-        )
-
-    app
-        .MapGet(
-            "/provenance/{nodeId}",
-            Func<HttpContext, System.Threading.Tasks.Task>(ProvenanceEndpoint.handleNode resolvedStore defaultConfig)
-        )
-        .WithMetadata(nodeEtagMetadata)
-    |> ignore
-
-    app.StartAsync().GetAwaiter().GetResult()
-    app
-
-/// #426: server exposing /provenance/{nodeId} wired with BOTH ProvenanceMiddleware (which
-/// emits the has_provenance Link header via ctx.Response.OnStarting) OUTER to
-/// ConditionalRequestMiddleware, per the R10 ordering contract (see
-/// Frank.useConditionalRequests's doc comment) -- the same composition
-/// Frank.Provenance.fs's addProvenanceMiddlewareAndEndpoint wires for real apps, so this
-/// proves the per-node 304 short-circuit preserves the Link header at TestServer speed
-/// rather than only via the slow E2E subprocess test (AT-P7).
+/// #426: server exposing /provenance/{nodeId} with ProvenanceMiddleware wired ahead of
+/// ConditionalRequestMiddleware -- the same composition Frank.Provenance.fs's
+/// addProvenanceMiddlewareAndEndpoint wires for real apps, so this proves the per-node 304
+/// short-circuit preserves the Link header at TestServer speed rather than only via the slow
+/// E2E subprocess test (AT-P7).
 let private startConditionalServerWithProvenanceMiddleware (records: ProvenanceRecord list) =
-    let builder = WebApplication.CreateBuilder()
-    builder.WebHost.UseTestServer() |> ignore
-
-    let store =
-        new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance) :> IProvenanceStore
-
-    let cache = new ETagCache(100, NullLogger<ETagCache>.Instance)
-    builder.Services.AddSingleton<IProvenanceStore>(store) |> ignore
-    builder.Services.AddSingleton<ProvenanceConfig>(defaultConfig) |> ignore
-    builder.Services.AddSingleton<ETagCache>(cache) |> ignore
-    builder.Services.AddRouting() |> ignore
-    let app = builder.Build()
-    let resolvedStore = app.Services.GetRequiredService<IProvenanceStore>()
-
-    for r in records do
-        resolvedStore.Append r
-
-    (app :> IApplicationBuilder).UseRouting() |> ignore
-
-    // R10 (#426): ProvenanceMiddleware OUTER to (before) ConditionalRequestMiddleware so its
-    // OnStarting-registered has_provenance Link header survives a 304 short-circuit.
-    (app :> IApplicationBuilder).UseMiddleware<ProvenanceMiddleware>() |> ignore
-
-    (app :> IApplicationBuilder).UseMiddleware<ConditionalRequestMiddleware>()
-    |> ignore
-
-    let nodeEtagMetadata =
-        ETagMetadata(
-            ProvenanceEndpoint.resolveNodeId,
-            (fun (etagContext: ETagContext) -> ProvenanceEndpoint.computeNodeETag resolvedStore etagContext)
-        )
-
-    app
-        .MapGet(
-            "/provenance/{nodeId}",
-            Func<HttpContext, System.Threading.Tasks.Task>(ProvenanceEndpoint.handleNode resolvedStore defaultConfig)
-        )
-        .WithMetadata(nodeEtagMetadata)
-    |> ignore
-
-    app.StartAsync().GetAwaiter().GetResult()
-    app
+    startConditionalServerCore true false records
 
 [<Tests>]
 let tests =
@@ -1182,6 +1177,85 @@ let tests =
                       "compute-only path (%.2fms) must be materially cheaper than the fully-compacted 200 (%.2fms)"
                       swCompute.Elapsed.TotalMilliseconds
                       sw200.Elapsed.TotalMilliseconds)
+          }
+
+          testCaseAsync
+              "Fix1 (#426 follow-up): handle() reuses computeLineageETag's resolved graph via ctx.Items -- one QueryByResource call, not two, for a cache-miss GET"
+          <| async {
+              // Reproduces exactly what ConditionalRequestMiddleware does on a cache-miss GET:
+              // call the ETagMetadata compute closure on a ctx, THEN call the handler on the
+              // SAME ctx. Before Fix 1, handle() re-ran resolveLineageGraph independently,
+              // doubling the store query + graph build on every cache-miss GET.
+              let inner =
+                  new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance)
+                  :> IProvenanceStore
+
+              let countingStore = CountingProvenanceStore(inner)
+              let store = countingStore :> IProvenanceStore
+              store.Append(mkRecord "urn:uuid:act-1" "http://localhost/r")
+
+              let ctx = DefaultHttpContext() :> HttpContext
+              ctx.Request.Scheme <- "http"
+              ctx.Request.Host <- HostString "localhost"
+              ctx.Request.Path <- PathString "/provenance"
+              ctx.Request.QueryString <- QueryString "?resource=http://localhost/r"
+              use responseBody = new MemoryStream()
+              ctx.Response.Body <- responseBody
+
+              let etagContext: ETagContext = { InstanceId = ""; HttpContext = ctx }
+
+              let! _ = ProvenanceEndpoint.computeLineageETag store etagContext |> Async.AwaitTask
+
+              Expect.equal
+                  countingStore.QueryByResourceCalls
+                  1
+                  "computeLineageETag issues exactly one QueryByResource call"
+
+              do! ProvenanceEndpoint.handle store defaultConfig ctx |> Async.AwaitTask
+              Expect.equal ctx.Response.StatusCode 200 "handle() must still return 200"
+
+              Expect.equal
+                  countingStore.QueryByResourceCalls
+                  1
+                  "handle() must reuse the graph computeLineageETag stashed on ctx.Items -- NOT issue a second QueryByResource call"
+          }
+
+          testCaseAsync
+              "Fix1 (#426 follow-up): handleNode() reuses computeNodeETag's resolved graph via ctx.Items -- no extra store query for a cache-miss GET"
+          <| async {
+              let inner =
+                  new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance)
+                  :> IProvenanceStore
+
+              let countingStore = CountingProvenanceStore(inner)
+              let store = countingStore :> IProvenanceStore
+              let record = mkRecord "http://localhost/provenance/act-1" "http://localhost/r"
+              store.Append record
+
+              let ctx = DefaultHttpContext() :> HttpContext
+              ctx.Request.Scheme <- "http"
+              ctx.Request.Host <- HostString "localhost"
+              ctx.Request.Path <- PathString "/provenance/act-1"
+              ctx.Request.RouteValues.["nodeId"] <- "act-1"
+              use responseBody = new MemoryStream()
+              ctx.Response.Body <- responseBody
+
+              let etagContext: ETagContext =
+                  { InstanceId = "act-1"
+                    HttpContext = ctx }
+
+              let! _ = ProvenanceEndpoint.computeNodeETag store etagContext |> Async.AwaitTask
+              let callsAfterCompute = countingStore.QueryByResourceCalls
+
+              Expect.equal callsAfterCompute 1 "computeNodeETag issues exactly one QueryByResource call"
+
+              do! ProvenanceEndpoint.handleNode store defaultConfig ctx |> Async.AwaitTask
+              Expect.equal ctx.Response.StatusCode 200 "handleNode() must still return 200"
+
+              Expect.equal
+                  countingStore.QueryByResourceCalls
+                  callsAfterCompute
+                  "handleNode() must reuse the graph computeNodeETag stashed on ctx.Items -- NOT issue an extra QueryByResource call"
           }
 
           testCaseAsync "#412 AC1: bare state-entity @context has prov only, http and rdfs absent"

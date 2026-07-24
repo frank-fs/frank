@@ -18,14 +18,10 @@ open System.Net
 open System.Net.Http
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
-open Microsoft.AspNetCore.TestHost
-open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.Hosting
-open Microsoft.Extensions.Logging.Abstractions
 open Expecto
 open Frank
+open Frank.Tests.ConditionalRequestTests
 
 let private linkEmittingMiddleware (next: RequestDelegate) (ctx: HttpContext) =
     task {
@@ -44,39 +40,13 @@ let conditionalRequestContextComputeTests =
               // instanceIdResolver only resolves the route value; the compute closure below
               // additionally reads the query string directly off ETagContext.HttpContext --
               // proving the closure is not limited to the opaque instanceId string.
-              let etagMetadata =
-                  ETagMetadata(
-                      (fun ctx -> ctx.Request.RouteValues.["id"] :?> string),
-                      (fun (etagContext: ETagContext) ->
-                          task {
-                              let version = etagContext.HttpContext.Request.Query.["version"].ToString()
-                              return Some(sprintf "%s-v%s" etagContext.InstanceId version)
-                          })
-                  )
+              let compute (etagContext: ETagContext) =
+                  task {
+                      let version = etagContext.HttpContext.Request.Query.["version"].ToString()
+                      return Some(sprintf "%s-v%s" etagContext.InstanceId version)
+                  }
 
-              let cache = new ETagCache(100, NullLogger<ETagCache>.Instance)
-              let builder = WebApplication.CreateBuilder([||])
-              builder.WebHost.UseTestServer() |> ignore
-              builder.Services.AddRouting() |> ignore
-              builder.Services.AddSingleton<ETagCache>(cache) |> ignore
-              builder.Services.AddLogging() |> ignore
-              let app = builder.Build()
-
-              (app :> IApplicationBuilder).UseRouting() |> ignore
-
-              (app :> IApplicationBuilder).UseMiddleware<ConditionalRequestMiddleware>()
-              |> ignore
-
-              app
-                  .MapGet(
-                      "/versioned/{id}",
-                      Func<HttpContext, Task>(fun ctx -> task { do! ctx.Response.WriteAsync("OK") } :> Task)
-                  )
-                  .WithMetadata(etagMetadata)
-              |> ignore
-
-              app.Start()
-              let client = app.GetTestClient()
+              let (client, _cache) = createTestServerAt "/versioned/{id}" None compute
               let! (response: HttpResponseMessage) = client.GetAsync("/versioned/42?version=7")
               Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
               let etag = response.Headers.ETag.ToString()
@@ -89,41 +59,18 @@ let conditionalRequestContextComputeTests =
 
           // -- R10: Link header from an outer middleware survives a 304 short-circuit --
           testTask "Link header appended by a middleware registered outer to useConditionalRequests survives a 304" {
-              let etagMetadata =
-                  ETagMetadata(
-                      (fun ctx -> ctx.Request.RouteValues.["id"] :?> string),
-                      (fun (_: ETagContext) -> task { return Some "abc123" })
-                  )
-
-              let cache = new ETagCache(100, NullLogger<ETagCache>.Instance)
-              let builder = WebApplication.CreateBuilder([||])
-              builder.WebHost.UseTestServer() |> ignore
-              builder.Services.AddRouting() |> ignore
-              builder.Services.AddSingleton<ETagCache>(cache) |> ignore
-              builder.Services.AddLogging() |> ignore
-              let app = builder.Build()
-
-              (app :> IApplicationBuilder).UseRouting() |> ignore
+              let compute (_: ETagContext) = task { return Some "abc123" }
 
               // Registered OUTER to (before) ConditionalRequestMiddleware -- the ordering
               // contract useConditionalRequests documents.
-              (app :> IApplicationBuilder)
-                  .Use(Func<HttpContext, RequestDelegate, Task>(fun ctx next -> linkEmittingMiddleware next ctx))
-              |> ignore
-
-              (app :> IApplicationBuilder).UseMiddleware<ConditionalRequestMiddleware>()
-              |> ignore
-
-              app
-                  .MapGet(
-                      "/linked/{id}",
-                      Func<HttpContext, Task>(fun ctx -> task { do! ctx.Response.WriteAsync("OK") } :> Task)
+              let configureOuter (appBuilder: IApplicationBuilder) =
+                  appBuilder.Use(
+                      Func<HttpContext, RequestDelegate, Task>(fun ctx next -> linkEmittingMiddleware next ctx)
                   )
-                  .WithMetadata(etagMetadata)
-              |> ignore
 
-              app.Start()
-              let client = app.GetTestClient()
+              let (client, _cache) =
+                  createTestServerAt "/linked/{id}" (Some configureOuter) compute
+
               let request = new HttpRequestMessage(HttpMethod.Get, "/linked/42")
               request.Headers.TryAddWithoutValidation("If-None-Match", "\"abc123\"") |> ignore
               let! (response: HttpResponseMessage) = client.SendAsync(request)

@@ -23,6 +23,18 @@ let private graphFingerprint (tripleReprs: string list) : string =
     |> System.Text.Encoding.UTF8.GetBytes
     |> Frank.ETagFormat.computeFromBytes
 
+/// Private ctx.Items marker keys (#426 follow-up, Fix 1): computeNodeETag/computeLineageETag
+/// run BEFORE handleNode/handle on the SAME HttpContext (ConditionalRequestMiddleware calls
+/// the compute closure, then next.Invoke on a cache miss) -- stashing the already-resolved
+/// graph here lets handleNode/handle reuse it instead of re-running the identical store query
+/// + graph build a second time. Object identity, not strings, so this can never collide with
+/// ctx.Items keys set by other middleware. Only the success (graph-found) case is stashed --
+/// a not-found node outcome is cheap to re-derive, so handleNode's 404 path always falls
+/// through to a fresh resolveNodeGraph rather than threading NodeOutcome through ctx.Items too.
+module private CtxItemKeys =
+    let nodeGraph = obj ()
+    let lineageGraph = obj ()
+
 /// Single function backing every provenance JSON-LD 200 response (#424). Adds Vary: Accept
 /// (gap 2) and immutable Cache-Control (gap 3) — provenance nodes represent a historical
 /// fact and never change once recorded, so the representation can be cached indefinitely.
@@ -112,6 +124,20 @@ let private resolveNodeGraph (store: IProvenanceStore) (origin: string) (nodeId:
     else
         resolveActivityNodeGraph store origin (sprintf "%s/provenance/%s" origin nodeId)
 
+/// Resolves the node outcome handleNode's 200/404 path serves -- reusing the graph
+/// computeNodeETag already stashed on ctx.Items for THIS request (Fix 1, #426 follow-up)
+/// when present, falling back to a fresh resolveNodeGraph otherwise (e.g. a direct handleNode
+/// call that never went through ConditionalRequestMiddleware, or a 404 that was never stashed).
+let private resolveNodeGraphForRequest
+    (store: IProvenanceStore)
+    (ctx: HttpContext)
+    (origin: string)
+    (nodeId: string)
+    : Task<NodeOutcome> =
+    match ctx.Items.TryGetValue CtxItemKeys.nodeGraph with
+    | true, (:? IGraph as g) -> Task.FromResult(NodeGraph g)
+    | _ -> resolveNodeGraph store origin nodeId
+
 /// Extracts the nodeId route value the same way handleNode does — used by the ETagMetadata
 /// attached to the per-node route (Frank.Provenance.fs) so the instance id it resolves can
 /// never diverge from what handleNode itself resolves (#426).
@@ -140,6 +166,7 @@ let computeNodeETag (store: IProvenanceStore) (etagContext: Frank.ETagContext) :
                 match outcome with
                 | NodeNotFound _ -> return None
                 | NodeGraph g ->
+                    etagContext.HttpContext.Items.[CtxItemKeys.nodeGraph] <- box g
                     let _, tripleReprs = ProvenanceGraph.scanTriples g
                     return Some(graphFingerprint tripleReprs)
             }
@@ -173,6 +200,24 @@ let private resolveLineageGraph (store: IProvenanceStore) (origin: string) (reso
         return ProvenanceGraph.buildLineageGraph origin resolvedResource records
     }
 
+/// Resolves the lineage graph `handle`'s 200 path serves -- reusing the graph
+/// computeLineageETag already stashed on ctx.Items for THIS request (Fix 1, #426 follow-up)
+/// when present, falling back to a fresh resolveLineageQuery/resolveLineageGraph otherwise
+/// (e.g. a direct `handle` call that never went through ConditionalRequestMiddleware). Returns
+/// None only when resolveLineageQuery itself fails (malformed Host) -- `handle` has already
+/// confirmed the 'resource' parameter is present before calling this.
+let private resolveLineageGraphForRequest (store: IProvenanceStore) (ctx: HttpContext) : Task<IGraph option> =
+    match ctx.Items.TryGetValue CtxItemKeys.lineageGraph with
+    | true, (:? IGraph as g) -> Task.FromResult(Some g)
+    | _ ->
+        match resolveLineageQuery ctx with
+        | None -> Task.FromResult None
+        | Some(origin, resolvedResource) ->
+            task {
+                let! g = resolveLineageGraph store origin resolvedResource
+                return Some g
+            }
+
 /// Computes an ETag for the lineage batch document by re-running the SAME resolution
 /// (resolveLineageQuery/resolveLineageGraph) that `handle`'s 200 path uses — attached as
 /// ETagMetadata.Compute on the batch route (Frank.Provenance.fs) (#426). Returns the raw
@@ -183,6 +228,7 @@ let computeLineageETag (store: IProvenanceStore) (etagContext: Frank.ETagContext
     | Some(origin, resolvedResource) ->
         task {
             let! g = resolveLineageGraph store origin resolvedResource
+            etagContext.HttpContext.Items.[CtxItemKeys.lineageGraph] <- box g
             let _, tripleReprs = ProvenanceGraph.scanTriples g
             return Some(graphFingerprint tripleReprs)
         }
@@ -205,23 +251,13 @@ let handle (store: IProvenanceStore) (config: ProvenanceConfig) (ctx: HttpContex
             "Missing required query parameter"
             "provenance query requires a 'resource' parameter"
     else
-        match Frank.OriginValidation.tryValidateOrigin ctx.Request with
-        | None ->
-            ctx.Response.StatusCode <- 400
-            Task.CompletedTask
-        | Some origin ->
-            task {
-                let rawResource = resource.ToString()
+        task {
+            let! graphOpt = resolveLineageGraphForRequest store ctx
 
-                let resolvedResource =
-                    if rawResource.StartsWith("/") then
-                        origin + rawResource
-                    else
-                        rawResource
-
-                let! g = resolveLineageGraph store origin resolvedResource
-                do! serveJsonLd config g ctx
-            }
+            match graphOpt with
+            | None -> ctx.Response.StatusCode <- 400
+            | Some g -> do! serveJsonLd config g ctx
+        }
 
 /// GET /provenance/{nodeId} — return a focused graph for a single activity or state entity.
 /// nodeId starting with "entity-" is a state entity (base64url-encoded resourceUri|k).
@@ -248,7 +284,7 @@ let handleNode (store: IProvenanceStore) (config: ProvenanceConfig) (ctx: HttpCo
             Task.CompletedTask
         | Some origin ->
             task {
-                let! outcome = resolveNodeGraph store origin nodeId
+                let! outcome = resolveNodeGraphForRequest store ctx origin nodeId
 
                 match outcome with
                 | NodeNotFound(typeUri, title, detail) -> do! notFound ctx typeUri title detail
