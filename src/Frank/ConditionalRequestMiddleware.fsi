@@ -24,6 +24,14 @@ module ConditionalRequestMiddlewareExtensions =
         /// Register the ETag cache as a singleton service.
         member AddETagCache: ?maxEntries: int -> IServiceCollection
 
+    /// Structural enforcement of the R10 ordering contract (#426/#467): call this BEFORE
+    /// registering a Link-header-emitting middleware (e.g. LinkedDataMiddleware,
+    /// ProvenanceMiddleware). If useConditionalRequests has already been registered on this
+    /// same IApplicationBuilder, the caller is being registered too late -- inner to it, the
+    /// wrong order -- and this throws immediately at app-startup/configuration time instead of
+    /// silently dropping the caller's Link header on a future 304/412 short-circuit.
+    val guardAgainstInnerLinkMiddleware: app: IApplicationBuilder -> middlewareName: string -> unit
+
     /// Register the conditional request middleware in the ASP.NET Core pipeline.
     /// Must be called after UseRouting() -- use via `plug useConditionalRequests`.
     ///
@@ -42,4 +50,8 @@ module ConditionalRequestMiddlewareExtensions =
     /// next.Invoke (src/Frank.Provenance/ProvenanceMiddleware.fs ~line 259-266). Both
     /// patterns survive being wrapped by this middleware, as long as they are registered
     /// outer to it.
+    ///
+    /// Sets a marker on app.Properties so a Link-emitting middleware registered afterwards can
+    /// call guardAgainstInnerLinkMiddleware and be caught structurally (#467) instead of
+    /// relying solely on this doc comment.
     val useConditionalRequests: app: IApplicationBuilder -> IApplicationBuilder

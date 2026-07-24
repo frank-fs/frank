@@ -93,6 +93,10 @@ module ProvenanceExtensions =
             // ProvenanceCacheHeadersMiddleware's OnStarting-registered Vary/Cache-Control
             // headers both survive a 304 short-circuit -- see Frank.useConditionalRequests's
             // doc comment for the ordering contract.
+            // #467: structurally enforced -- this must never fire here, since
+            // useConditionalRequests below is what sets the marker in the first place.
+            guardAgainstInnerLinkMiddleware configured "ProvenanceMiddleware/ProvenanceCacheHeadersMiddleware"
+
             configured.UseMiddleware<ProvenanceMiddleware>().UseMiddleware<ProvenanceCacheHeadersMiddleware>()
             |> useConditionalRequests
 

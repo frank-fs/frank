@@ -159,6 +159,24 @@ module ConditionalRequestMiddlewareExtensions =
                 let logger = sp.GetRequiredService<ILogger<ETagCache>>()
                 new ETagCache(max, logger))
 
+    /// Well-known IApplicationBuilder.Properties key set by useConditionalRequests -- lets
+    /// guardAgainstInnerLinkMiddleware detect the R10 wrong-order case structurally (#467)
+    /// instead of relying solely on the doc comment below.
+    [<Literal>]
+    let private ConditionalRequestRegisteredKey =
+        "Frank.ConditionalRequestMiddleware.Registered"
+
+    /// Structural enforcement of the R10 ordering contract (#426/#467): call this BEFORE
+    /// registering a Link-header-emitting middleware (e.g. LinkedDataMiddleware,
+    /// ProvenanceMiddleware). If useConditionalRequests has already been registered on this
+    /// same IApplicationBuilder, the caller is being registered too late -- inner to it, the
+    /// wrong order -- and this throws immediately at app-startup/configuration time instead of
+    /// silently dropping the caller's Link header on a future 304/412 short-circuit.
+    let guardAgainstInnerLinkMiddleware (app: IApplicationBuilder) (middlewareName: string) : unit =
+        if app.Properties.ContainsKey(ConditionalRequestRegisteredKey) then
+            invalidOp
+                $"useConditionalRequests was already registered before {middlewareName} -- Link headers from {middlewareName} will not survive a 304 short-circuit. Register {middlewareName} BEFORE useConditionalRequests in the pipeline."
+
     /// Register the conditional request middleware in the ASP.NET Core pipeline.
     /// Must be called after UseRouting() -- use via `plug useConditionalRequests`.
     ///
@@ -177,5 +195,10 @@ module ConditionalRequestMiddlewareExtensions =
     /// next.Invoke (src/Frank.Provenance/ProvenanceMiddleware.fs ~line 259-266). Both
     /// patterns survive being wrapped by this middleware, as long as they are registered
     /// outer to it.
+    ///
+    /// Sets a marker on app.Properties so a Link-emitting middleware registered afterwards can
+    /// call guardAgainstInnerLinkMiddleware and be caught structurally (#467) instead of
+    /// relying solely on this doc comment.
     let useConditionalRequests (app: IApplicationBuilder) =
+        app.Properties.[ConditionalRequestRegisteredKey] <- true
         app.UseMiddleware<ConditionalRequestMiddleware>()
