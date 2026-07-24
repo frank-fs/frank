@@ -7,18 +7,41 @@ open Microsoft.AspNetCore.Routing.Patterns
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.DependencyInjection.Extensions
 open Microsoft.Extensions.Logging
+open Frank
 open Frank.Builder
 
 [<AutoOpen>]
 module ProvenanceExtensions =
 
-    let private buildGetEndpoint (pattern: string) (name: string) (handler: RequestDelegate) : Endpoint =
+    let private buildGetEndpoint
+        (pattern: string)
+        (name: string)
+        (handler: RequestDelegate)
+        (extraMetadata: obj list)
+        : Endpoint =
         let builder = RouteEndpointBuilder(handler, RoutePatternFactory.Parse pattern, 0)
         builder.DisplayName <- name
         builder.Metadata.Add(HttpMethodMetadata [| "GET" |])
+
+        for m in extraMetadata do
+            builder.Metadata.Add m
+
         builder.Build()
 
+    /// #426: the ETagMetadata compute closure re-invokes ProvenanceEndpoint's SAME
+    /// resolution functions (resolveLineageGraph, via computeLineageETag) the handler uses
+    /// on its 200 path — no re-derivation of resource/origin resolution in a second copy.
     let private buildProvenanceEndpoint () : Endpoint =
+        let etagMetadata =
+            ETagMetadata(
+                (fun (ctx: HttpContext) -> ctx.Request.Query.["resource"].ToString()),
+                (fun (etagContext: ETagContext) ->
+                    let store =
+                        etagContext.HttpContext.RequestServices.GetRequiredService<IProvenanceStore>()
+
+                    ProvenanceEndpoint.computeLineageETag store etagContext)
+            )
+
         buildGetEndpoint
             "/provenance"
             "GET Provenance"
@@ -26,8 +49,24 @@ module ProvenanceExtensions =
                 let store = ctx.RequestServices.GetRequiredService<IProvenanceStore>()
                 let config = ctx.RequestServices.GetRequiredService<ProvenanceConfig>()
                 ProvenanceEndpoint.handle store config ctx))
+            [ box etagMetadata ]
 
+    /// #426: the ETagMetadata compute closure re-invokes ProvenanceEndpoint's SAME
+    /// per-node dispatch (resolveNodeGraph, via computeNodeETag) that handleNode's 200
+    /// path uses — the entity-/activity dispatch and index/lineage checks live in exactly
+    /// one place, so the middleware's 304 decision can never drift from what the handler
+    /// would actually serve.
     let private buildPerNodeEndpoint () : Endpoint =
+        let etagMetadata =
+            ETagMetadata(
+                ProvenanceEndpoint.resolveNodeId,
+                (fun (etagContext: ETagContext) ->
+                    let store =
+                        etagContext.HttpContext.RequestServices.GetRequiredService<IProvenanceStore>()
+
+                    ProvenanceEndpoint.computeNodeETag store etagContext)
+            )
+
         buildGetEndpoint
             "/provenance/{nodeId}"
             "GET Provenance Node"
@@ -35,14 +74,19 @@ module ProvenanceExtensions =
                 let store = ctx.RequestServices.GetRequiredService<IProvenanceStore>()
                 let config = ctx.RequestServices.GetRequiredService<ProvenanceConfig>()
                 ProvenanceEndpoint.handleNode store config ctx))
+            [ box etagMetadata ]
 
-    // Adds the provenance middleware and both endpoints to the spec; caller sets Services separately.
-    // Kept as a named function (not inlined) to avoid duplicating the addMiddleware body in two CE members.
+    // Adds the provenance middleware, conditional-request middleware and both endpoints to
+    // the spec; caller sets Services separately. Kept as a named function (not inlined) to
+    // avoid duplicating the addMiddleware body in two CE members.
     let private addProvenanceMiddlewareAndEndpoint (spec: WebHostSpec) : WebHostSpec =
         let addMiddleware (app: IApplicationBuilder) =
             let configured = spec.Middleware app
-            configured.UseMiddleware<ProvenanceMiddleware>() |> ignore
-            configured
+            // R10 (#426): useConditionalRequests is registered INNER to (after)
+            // ProvenanceMiddleware, so ProvenanceMiddleware's OnStarting-registered
+            // has_provenance Link header survives a 304 short-circuit -- see
+            // Frank.useConditionalRequests's doc comment for the ordering contract.
+            configured.UseMiddleware<ProvenanceMiddleware>() |> useConditionalRequests
 
         { spec with
             Endpoints = Array.append spec.Endpoints [| buildProvenanceEndpoint (); buildPerNodeEndpoint () |]
@@ -61,6 +105,10 @@ module ProvenanceExtensions =
                         sp.GetRequiredService<ILoggerFactory>().CreateLogger("Frank.Provenance")
 
                     new MailboxProcessorProvenanceStore(config.StoreConfig, logger) :> IProvenanceStore)
+
+                // ConditionalRequestMiddleware (wired via useConditionalRequests above) needs
+                // ETagCache resolvable from DI.
+                services.AddETagCache() |> ignore
 
                 spec.Services services
 
@@ -86,6 +134,10 @@ module ProvenanceExtensions =
                         sp.GetRequiredService<ILoggerFactory>().CreateLogger("Frank.Provenance")
 
                     new MailboxProcessorProvenanceStore(cfg.StoreConfig, logger) :> IProvenanceStore)
+
+                // ConditionalRequestMiddleware (wired via useConditionalRequests above) needs
+                // ETagCache resolvable from DI.
+                services.AddETagCache() |> ignore
 
                 spec.Services services
 

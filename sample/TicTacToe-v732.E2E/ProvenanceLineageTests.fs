@@ -574,3 +574,46 @@ SELECT ?s WHERE { ?s prov:specializationOf <%s> . }"""
                 sprintf "SPARQL resource join: expected %d entities, got %d" (N + 1) rjRows.Length
             )
         }
+
+    // ── AT-P7: conditional GET on a provenance node — 304 STILL carries has_provenance Link ──
+    // #426: 304 short-circuiting for /provenance/{nodeId} is owned by
+    // ConditionalRequestMiddleware, wired INNER to ProvenanceMiddleware (the R10 ordering
+    // contract on useConditionalRequests). This proves that ordering holds in the real,
+    // fully-wired sample app: a matching If-None-Match short-circuits to 304 with no body,
+    // and the has_provenance Link header ProvenanceMiddleware appends before calling
+    // next.Invoke survives that short-circuit.
+    [<Test>]
+    member _.``AT-P7 GET provenance node with matching If-None-Match returns 304 with no body and has_provenance Link intact``
+        ()
+        =
+        task {
+            let g = parseJsonLd batchBody
+            let activities = subjectsByType g (provNs + "Activity")
+            Assert.That(activities, Is.Not.Empty, "No prov:Activity nodes in batch")
+            let nodeIri = activities.Head
+
+            let! (first: HttpResponseMessage) = httpClient.GetAsync(nodeIri)
+            Assert.That(int first.StatusCode, Is.EqualTo 200, "first per-node GET must be 200")
+            Assert.That(first.Headers.ETag, Is.Not.Null, "per-node GET must carry an ETag header")
+            let etagValue = first.Headers.ETag.ToString()
+
+            use req = new HttpRequestMessage(HttpMethod.Get, nodeIri)
+            req.Headers.TryAddWithoutValidation("If-None-Match", etagValue) |> ignore
+            let! (second: HttpResponseMessage) = httpClient.SendAsync(req)
+
+            Assert.That(int second.StatusCode, Is.EqualTo 304, "matching If-None-Match must return 304")
+            let! secondBody = second.Content.ReadAsStringAsync()
+            Assert.That(secondBody, Is.EqualTo "", "304 response must have an empty body")
+
+            let linkHeader =
+                second.Headers
+                |> Seq.tryFind (fun kv -> kv.Key.ToLowerInvariant() = "link")
+                |> Option.map (fun kv -> String.concat ", " kv.Value)
+                |> Option.defaultValue ""
+
+            Assert.That(
+                linkHeader.Contains "has_provenance",
+                Is.True,
+                "has_provenance Link header must survive the 304 short-circuit"
+            )
+        }

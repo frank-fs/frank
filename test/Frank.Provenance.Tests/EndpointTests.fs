@@ -11,6 +11,7 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging.Abstractions
 open Microsoft.Extensions.Primitives
 open Expecto
+open Frank
 open Frank.Provenance
 
 let private mkRecord id resource =
@@ -154,6 +155,117 @@ let private startNodeServer (records: ProvenanceRecord list) =
         "/provenance/{nodeId}",
         Func<HttpContext, System.Threading.Tasks.Task>(ProvenanceEndpoint.handleNode resolvedStore defaultConfig)
     )
+    |> ignore
+
+    app.StartAsync().GetAwaiter().GetResult()
+    app
+
+/// #426: server exposing /provenance and /provenance/{nodeId} wired the SAME way
+/// Frank.Provenance.fs wires them for real apps -- ETagMetadata attached at route
+/// registration, computed via ProvenanceEndpoint.computeLineageETag/computeNodeETag, with
+/// Frank.ConditionalRequestMiddleware owning ETag headers and 304 short-circuiting. Proves
+/// ETag/Cache-Control/304 behavior end-to-end through the real middleware, not the
+/// hand-rolled inline logic serveJsonLd used to have.
+let private startConditionalServer (records: ProvenanceRecord list) =
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+
+    let store =
+        new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance) :> IProvenanceStore
+
+    let cache = new ETagCache(100, NullLogger<ETagCache>.Instance)
+    builder.Services.AddSingleton<IProvenanceStore>(store) |> ignore
+    builder.Services.AddSingleton<ProvenanceConfig>(defaultConfig) |> ignore
+    builder.Services.AddSingleton<ETagCache>(cache) |> ignore
+    builder.Services.AddRouting() |> ignore
+    let app = builder.Build()
+    let resolvedStore = app.Services.GetRequiredService<IProvenanceStore>()
+
+    for r in records do
+        resolvedStore.Append r
+
+    (app :> IApplicationBuilder).UseRouting() |> ignore
+
+    (app :> IApplicationBuilder).UseMiddleware<ConditionalRequestMiddleware>()
+    |> ignore
+
+    let lineageEtagMetadata =
+        ETagMetadata(
+            (fun (ctx: HttpContext) -> ctx.Request.Query.["resource"].ToString()),
+            (fun (etagContext: ETagContext) -> ProvenanceEndpoint.computeLineageETag resolvedStore etagContext)
+        )
+
+    app
+        .MapGet(
+            "/provenance",
+            Func<HttpContext, System.Threading.Tasks.Task>(ProvenanceEndpoint.handle resolvedStore defaultConfig)
+        )
+        .WithMetadata(lineageEtagMetadata)
+    |> ignore
+
+    let nodeEtagMetadata =
+        ETagMetadata(
+            ProvenanceEndpoint.resolveNodeId,
+            (fun (etagContext: ETagContext) -> ProvenanceEndpoint.computeNodeETag resolvedStore etagContext)
+        )
+
+    app
+        .MapGet(
+            "/provenance/{nodeId}",
+            Func<HttpContext, System.Threading.Tasks.Task>(ProvenanceEndpoint.handleNode resolvedStore defaultConfig)
+        )
+        .WithMetadata(nodeEtagMetadata)
+    |> ignore
+
+    app.StartAsync().GetAwaiter().GetResult()
+    app
+
+/// #426: server exposing /provenance/{nodeId} wired with BOTH ProvenanceMiddleware (which
+/// emits the has_provenance Link header via ctx.Response.OnStarting) OUTER to
+/// ConditionalRequestMiddleware, per the R10 ordering contract (see
+/// Frank.useConditionalRequests's doc comment) -- the same composition
+/// Frank.Provenance.fs's addProvenanceMiddlewareAndEndpoint wires for real apps, so this
+/// proves the per-node 304 short-circuit preserves the Link header at TestServer speed
+/// rather than only via the slow E2E subprocess test (AT-P7).
+let private startConditionalServerWithProvenanceMiddleware (records: ProvenanceRecord list) =
+    let builder = WebApplication.CreateBuilder()
+    builder.WebHost.UseTestServer() |> ignore
+
+    let store =
+        new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance) :> IProvenanceStore
+
+    let cache = new ETagCache(100, NullLogger<ETagCache>.Instance)
+    builder.Services.AddSingleton<IProvenanceStore>(store) |> ignore
+    builder.Services.AddSingleton<ProvenanceConfig>(defaultConfig) |> ignore
+    builder.Services.AddSingleton<ETagCache>(cache) |> ignore
+    builder.Services.AddRouting() |> ignore
+    let app = builder.Build()
+    let resolvedStore = app.Services.GetRequiredService<IProvenanceStore>()
+
+    for r in records do
+        resolvedStore.Append r
+
+    (app :> IApplicationBuilder).UseRouting() |> ignore
+
+    // R10 (#426): ProvenanceMiddleware OUTER to (before) ConditionalRequestMiddleware so its
+    // OnStarting-registered has_provenance Link header survives a 304 short-circuit.
+    (app :> IApplicationBuilder).UseMiddleware<ProvenanceMiddleware>() |> ignore
+
+    (app :> IApplicationBuilder).UseMiddleware<ConditionalRequestMiddleware>()
+    |> ignore
+
+    let nodeEtagMetadata =
+        ETagMetadata(
+            ProvenanceEndpoint.resolveNodeId,
+            (fun (etagContext: ETagContext) -> ProvenanceEndpoint.computeNodeETag resolvedStore etagContext)
+        )
+
+    app
+        .MapGet(
+            "/provenance/{nodeId}",
+            Func<HttpContext, System.Threading.Tasks.Task>(ProvenanceEndpoint.handleNode resolvedStore defaultConfig)
+        )
+        .WithMetadata(nodeEtagMetadata)
     |> ignore
 
     app.StartAsync().GetAwaiter().GetResult()
@@ -884,8 +996,10 @@ let tests =
 
           testCaseAsync "GET /provenance carries a strong ETag and immutable Cache-Control"
           <| async {
+              // #426: ETag is now owned by ConditionalRequestMiddleware via ETagMetadata,
+              // not hand-rolled inside serveJsonLd -- go through the real middleware.
               let record = mkRecord "http://localhost/provenance/act-1" "http://localhost/r"
-              use app = startNodeServer [ record ]
+              use app = startConditionalServer [ record ]
               use client = app.GetTestClient()
 
               let! (resp: HttpResponseMessage) =
@@ -902,8 +1016,9 @@ let tests =
 
           testCaseAsync "GET /provenance with matching If-None-Match returns 304 with no body"
           <| async {
+              // #426: 304 short-circuiting is owned by ConditionalRequestMiddleware.
               let record = mkRecord "http://localhost/provenance/act-1" "http://localhost/r"
-              use app = startNodeServer [ record ]
+              use app = startConditionalServer [ record ]
               use client = app.GetTestClient()
 
               let! (first: HttpResponseMessage) =
@@ -923,11 +1038,54 @@ let tests =
               Expect.equal secondBody "" "304 response must have an empty body"
           }
 
+          testCaseAsync
+              "GET /provenance/{nodeId} with matching If-None-Match returns 304 with no body and preserves the has_provenance Link header"
+          <| async {
+              // #426 follow-up: the only proof of this per-node case was the slow E2E subprocess
+              // test (sample/TicTacToe-v732.E2E/ProvenanceLineageTests.fs AT-P7). This drives the
+              // SAME R10-ordered pipeline (ProvenanceMiddleware OUTER to
+              // ConditionalRequestMiddleware) at TestServer speed to prove the per-node 304
+              // short-circuit preserves the OnStarting-registered has_provenance Link header.
+              let record = mkRecord "http://localhost/provenance/act-1" "http://localhost/r"
+              use app = startConditionalServerWithProvenanceMiddleware [ record ]
+              use client = app.GetTestClient()
+
+              let! (first: HttpResponseMessage) = client.GetAsync("/provenance/act-1") |> Async.AwaitTask
+              Expect.equal (int first.StatusCode) 200 "first request status 200"
+              let etagValue = first.Headers.ETag.ToString()
+
+              use req = new HttpRequestMessage(HttpMethod.Get, "/provenance/act-1")
+              req.Headers.TryAddWithoutValidation("If-None-Match", etagValue) |> ignore
+              let! (second: HttpResponseMessage) = client.SendAsync(req) |> Async.AwaitTask
+
+              Expect.equal (int second.StatusCode) 304 "matching If-None-Match must return 304"
+              let! secondBody = second.Content.ReadAsStringAsync() |> Async.AwaitTask
+              Expect.equal secondBody "" "304 response must have an empty body"
+
+              Expect.isTrue (second.Headers.Contains "Link") "304 response must still carry the Link header"
+              let linkValue = second.Headers.GetValues("Link") |> Seq.exactlyOne
+
+              // Exact parse of the rel= parameter, not a loose Contains on the whole header --
+              // "http://www.w3.org/ns/prov#has_provenance" must be the FULL rel value.
+              let relSegment =
+                  linkValue.Split(';')
+                  |> Array.map (fun s -> s.Trim())
+                  |> Array.tryFind (fun s -> s.StartsWith("rel="))
+
+              Expect.isSome relSegment "Link header must carry a rel= parameter"
+
+              Expect.equal
+                  relSegment.Value
+                  "rel=\"http://www.w3.org/ns/prov#has_provenance\""
+                  "rel must be exactly has_provenance"
+          }
+
           testCaseAsync "different resources produce different ETags; the same resource is stable across requests"
           <| async {
+              // #426: ETag now comes from ETagCache/ETagMetadata.Compute via the middleware.
               let recordA = mkRecord "http://localhost/provenance/act-a" "http://localhost/a"
               let recordB = mkRecord "http://localhost/provenance/act-b" "http://localhost/b"
-              use app = startNodeServer [ recordA; recordB ]
+              use app = startConditionalServer [ recordA; recordB ]
               use client = app.GetTestClient()
 
               let! (respA1: HttpResponseMessage) =
@@ -948,15 +1106,18 @@ let tests =
           }
 
           testCaseAsync
-              "matching If-None-Match short-circuits BEFORE JSON-LD compaction (timing proof over a large graph)"
+              "computeLineageETag (what ConditionalRequestMiddleware pays on a cache-miss to decide 304 vs 200) is materially cheaper than the fully-compacted handle() 200 path"
           <| async {
-              // #431 gap 3 follow-up: the original fix computed the ETag from the compacted
-              // JSON-LD body, so a 304 still paid the full compaction cost — only bandwidth was
-              // saved, not compute. This drives ProvenanceEndpoint.handle directly (no
+              // #431 gap 3 / #426 follow-up: the original fix computed the ETag from the
+              // compacted JSON-LD body, so a 304 still paid the full compaction cost — only
+              // bandwidth was saved, not compute. Since #426, 304 short-circuiting is owned by
+              // ConditionalRequestMiddleware, which decides via ProvenanceEndpoint's
+              // computeLineageETag (graph build + fingerprint only, no compaction) instead of
+              // ever calling handle()'s full 200 path. This drives both functions directly (no
               // TestServer/HttpClient) against a large record set so compaction cost is
-              // measurable, and proves the 304 path is materially cheaper than the 200 path.
-              // (compactGraph's call site sits structurally inside serveJsonLd's else-branch —
-              // unreachable when If-None-Match matches — this test corroborates that empirically.)
+              // measurable, and proves computeLineageETag is materially cheaper than handle() —
+              // i.e. a middleware-level 304 genuinely avoids JSON-LD compaction, not just
+              // bandwidth.
               let store =
                   new MailboxProcessorProvenanceStore(
                       { ProvenanceStoreConfig.defaults with
@@ -970,46 +1131,56 @@ let tests =
               for i in 1..2000 do
                   store.Append(mkRecord (sprintf "http://localhost/provenance/act-%d" i) resourceUri)
 
-              let makeCtx (ifNoneMatch: string option) : HttpContext =
+              let makeCtx () : HttpContext =
                   let ctx = DefaultHttpContext() :> HttpContext
                   ctx.Request.Scheme <- "http"
                   ctx.Request.Host <- HostString "localhost"
                   ctx.Request.Path <- PathString "/provenance"
                   ctx.Request.QueryString <- QueryString("?resource=" + resourceUri)
-
-                  match ifNoneMatch with
-                  | Some etag -> ctx.Request.Headers.IfNoneMatch <- StringValues etag
-                  | None -> ()
-
                   ctx.Response.Body <- new MemoryStream()
                   ctx
 
-              // Warm-up (JIT, first-graph-build) + capture the real ETag.
-              let warmCtx = makeCtx None
-              do! ProvenanceEndpoint.handle store defaultConfig warmCtx |> Async.AwaitTask
-              Expect.equal warmCtx.Response.StatusCode 200 "warm-up request status 200"
-              let etagValue = warmCtx.Response.Headers.ETag.ToString()
+              // Warm-up (JIT, first-graph-build) for both paths.
+              let warmHandleCtx = makeCtx ()
+              do! ProvenanceEndpoint.handle store defaultConfig warmHandleCtx |> Async.AwaitTask
+              Expect.equal warmHandleCtx.Response.StatusCode 200 "warm-up handle() status 200"
 
-              // Timed 200: mismatched If-None-Match still pays full compaction.
-              let mismatchCtx = makeCtx (Some "\"does-not-match\"")
+              let warmEtagContext: ETagContext =
+                  { InstanceId = ""
+                    HttpContext = makeCtx () }
+
+              let! warmComputed = ProvenanceEndpoint.computeLineageETag store warmEtagContext |> Async.AwaitTask
+
+              Expect.isSome warmComputed "warm-up computeLineageETag must produce an ETag"
+
+              // Timed 200: full handle(), including compaction.
+              let handleCtx = makeCtx ()
               let sw200 = System.Diagnostics.Stopwatch.StartNew()
-              do! ProvenanceEndpoint.handle store defaultConfig mismatchCtx |> Async.AwaitTask
+              do! ProvenanceEndpoint.handle store defaultConfig handleCtx |> Async.AwaitTask
               sw200.Stop()
-              Expect.equal mismatchCtx.Response.StatusCode 200 "mismatched If-None-Match must still return 200"
+              Expect.equal handleCtx.Response.StatusCode 200 "handle() must return 200"
 
-              // Timed 304: matching If-None-Match must short-circuit before compaction.
-              let matchCtx = makeCtx (Some etagValue)
-              let sw304 = System.Diagnostics.Stopwatch.StartNew()
-              do! ProvenanceEndpoint.handle store defaultConfig matchCtx |> Async.AwaitTask
-              sw304.Stop()
-              Expect.equal matchCtx.Response.StatusCode 304 "matching If-None-Match must return 304"
+              // Timed compute-only: what ConditionalRequestMiddleware actually pays on a
+              // cache-miss to decide 304 vs 200.
+              let computeEtagContext: ETagContext =
+                  { InstanceId = ""
+                    HttpContext = makeCtx () }
+
+              let swCompute = System.Diagnostics.Stopwatch.StartNew()
+
+              let! computed =
+                  ProvenanceEndpoint.computeLineageETag store computeEtagContext
+                  |> Async.AwaitTask
+
+              swCompute.Stop()
+              Expect.isSome computed "computeLineageETag must produce an ETag for an existing resource"
 
               Expect.isLessThan
-                  sw304.Elapsed.TotalMilliseconds
+                  swCompute.Elapsed.TotalMilliseconds
                   (sw200.Elapsed.TotalMilliseconds * 0.5)
                   (sprintf
-                      "304 (%.2fms) must be materially cheaper than paying full JSON-LD compaction on 200 (%.2fms)"
-                      sw304.Elapsed.TotalMilliseconds
+                      "compute-only path (%.2fms) must be materially cheaper than the fully-compacted 200 (%.2fms)"
+                      swCompute.Elapsed.TotalMilliseconds
                       sw200.Elapsed.TotalMilliseconds)
           }
 
