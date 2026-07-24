@@ -65,7 +65,7 @@ let registry =
 
 /// Writes a fixture where `type Order` has a declared `equivalentClass` but no
 /// in-scope vocabulary terms (no 'using' — no network fetch needed), so it collapses
-/// with no independent match. Used to prove EquivalentClassNotices flows end-to-end
+/// with no independent match. Used to prove ConventionDiagnostics flows end-to-end
 /// through Pipeline.run/runWithFetch.
 let private writeFixtureProjectWithEquivalentClass (tmpDir: string) : string * string =
     let domainSource =

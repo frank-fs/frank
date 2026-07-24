@@ -121,7 +121,7 @@ dct:identifier a rdf:Property .
 [<Tests>]
 let extractCliNoticeTests =
     testList
-        "frank semantic extract CLI: EquivalentClassNotice printed for real collapse case"
+        "frank semantic extract CLI: ConventionDiagnostic printed for real collapse case"
         [ test "extract --format text prints a notice line for a type collapsed onto an explicit equivalentClass" {
               withTempDir (fun dir ->
                   let projectFile = writeFixtureProjectWithEquivalentClass dir

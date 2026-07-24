@@ -25,9 +25,11 @@ let tests =
                   callCount <- callCount + 1
                   Array.zeroCreate<byte> (callCount * 64) |> ignore
 
-              Expect.throwsT<System.Exception>
-                  (fun () -> assertNoAllocationGrowth ignore request 50 256L)
-                  "per-call allocation growing linearly with call count must be flagged"
+              Expect.throwsC (fun () -> assertNoAllocationGrowth ignore request 50 256L) (fun ex ->
+                  Expect.stringContains
+                      ex.Message
+                      "growth"
+                      "per-call allocation growing linearly with call count must be flagged with a growth-detection message")
 
           testCase "measureAllocationDeltas rejects fewer than 3 iterations"
           <| fun _ ->
