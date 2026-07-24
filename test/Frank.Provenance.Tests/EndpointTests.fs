@@ -163,6 +163,12 @@ let private startNodeServer (records: ProvenanceRecord list) =
     for r in records do
         resolvedStore.Append r
 
+    (app :> IApplicationBuilder).UseRouting() |> ignore
+    // #426: Vary/Cache-Control are owned by ProvenanceCacheHeadersMiddleware, not
+    // handle/handleNode -- wire it here so this server matches production header behavior.
+    (app :> IApplicationBuilder).UseMiddleware<ProvenanceCacheHeadersMiddleware>()
+    |> ignore
+
     app.MapGet(
         "/provenance",
         Func<HttpContext, System.Threading.Tasks.Task>(ProvenanceEndpoint.handle resolvedStore defaultConfig)
@@ -216,6 +222,12 @@ let private startConditionalServerCore
         // R10 (#426): ProvenanceMiddleware OUTER to (before) ConditionalRequestMiddleware so
         // its OnStarting-registered has_provenance Link header survives a 304 short-circuit.
         (app :> IApplicationBuilder).UseMiddleware<ProvenanceMiddleware>() |> ignore
+
+    // R10 (#426): ProvenanceCacheHeadersMiddleware OUTER to (before)
+    // ConditionalRequestMiddleware, same ordering contract as ProvenanceMiddleware above --
+    // its OnStarting-registered Vary/Cache-Control headers must survive a 304 short-circuit.
+    (app :> IApplicationBuilder).UseMiddleware<ProvenanceCacheHeadersMiddleware>()
+    |> ignore
 
     (app :> IApplicationBuilder).UseMiddleware<ConditionalRequestMiddleware>()
     |> ignore
@@ -1033,6 +1045,41 @@ let tests =
               Expect.equal secondBody "" "304 response must have an empty body"
           }
 
+          testCaseAsync "GET /provenance 304 response still carries Cache-Control and Vary: Accept"
+          <| async {
+              // RED before fix (#426 regression, Fielding review): Vary/Cache-Control were
+              // set inside serveJsonLd, which never runs on ConditionalRequestMiddleware's
+              // 304 short-circuit path -- a 304 to /provenance was missing both headers.
+              // Both headers are STATIC per-endpoint values, so they must be present
+              // regardless of whether the handler runs.
+              let record = mkRecord "http://localhost/provenance/act-1" "http://localhost/r"
+              use app = startConditionalServer [ record ]
+              use client = app.GetTestClient()
+
+              let! (first: HttpResponseMessage) =
+                  client.GetAsync("/provenance?resource=http://localhost/r") |> Async.AwaitTask
+
+              Expect.equal (int first.StatusCode) 200 "first request status 200"
+              let etagValue = first.Headers.ETag.ToString()
+
+              use req =
+                  new HttpRequestMessage(HttpMethod.Get, "/provenance?resource=http://localhost/r")
+
+              req.Headers.TryAddWithoutValidation("If-None-Match", etagValue) |> ignore
+              let! (second: HttpResponseMessage) = client.SendAsync(req) |> Async.AwaitTask
+
+              Expect.equal (int second.StatusCode) 304 "matching If-None-Match must return 304"
+
+              Expect.isTrue
+                  (second.Headers.Vary |> Seq.exists (fun v -> v = "Accept"))
+                  "304 response must carry Vary: Accept"
+
+              Expect.isTrue (second.Headers.CacheControl <> null) "304 response must carry Cache-Control"
+              let cacheControl = second.Headers.CacheControl.ToString()
+              Expect.stringContains cacheControl "immutable" "304 Cache-Control must mark the representation immutable"
+              Expect.stringContains cacheControl "max-age" "304 Cache-Control must include a max-age directive"
+          }
+
           testCaseAsync
               "GET /provenance/{nodeId} with matching If-None-Match returns 304 with no body and preserves the has_provenance Link header"
           <| async {
@@ -1073,6 +1120,35 @@ let tests =
                   relSegment.Value
                   "rel=\"http://www.w3.org/ns/prov#has_provenance\""
                   "rel must be exactly has_provenance"
+          }
+
+          testCaseAsync "GET /provenance/{nodeId} 304 response still carries Cache-Control and Vary: Accept"
+          <| async {
+              // RED before fix (#426 regression, Fielding review): same gap as the batch
+              // route above -- Vary/Cache-Control were set inside serveJsonLd, which never
+              // runs on a 304 short-circuit.
+              let record = mkRecord "http://localhost/provenance/act-1" "http://localhost/r"
+              use app = startConditionalServer [ record ]
+              use client = app.GetTestClient()
+
+              let! (first: HttpResponseMessage) = client.GetAsync("/provenance/act-1") |> Async.AwaitTask
+              Expect.equal (int first.StatusCode) 200 "first request status 200"
+              let etagValue = first.Headers.ETag.ToString()
+
+              use req = new HttpRequestMessage(HttpMethod.Get, "/provenance/act-1")
+              req.Headers.TryAddWithoutValidation("If-None-Match", etagValue) |> ignore
+              let! (second: HttpResponseMessage) = client.SendAsync(req) |> Async.AwaitTask
+
+              Expect.equal (int second.StatusCode) 304 "matching If-None-Match must return 304"
+
+              Expect.isTrue
+                  (second.Headers.Vary |> Seq.exists (fun v -> v = "Accept"))
+                  "304 response must carry Vary: Accept"
+
+              Expect.isTrue (second.Headers.CacheControl <> null) "304 response must carry Cache-Control"
+              let cacheControl = second.Headers.CacheControl.ToString()
+              Expect.stringContains cacheControl "immutable" "304 Cache-Control must mark the representation immutable"
+              Expect.stringContains cacheControl "max-age" "304 Cache-Control must include a max-age directive"
           }
 
           testCaseAsync "different resources produce different ETags; the same resource is stable across requests"

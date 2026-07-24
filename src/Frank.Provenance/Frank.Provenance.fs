@@ -88,10 +88,13 @@ module ProvenanceExtensions =
         let addMiddleware (app: IApplicationBuilder) =
             let configured = spec.Middleware app
             // R10 (#426): useConditionalRequests is registered INNER to (after)
-            // ProvenanceMiddleware, so ProvenanceMiddleware's OnStarting-registered
-            // has_provenance Link header survives a 304 short-circuit -- see
-            // Frank.useConditionalRequests's doc comment for the ordering contract.
-            configured.UseMiddleware<ProvenanceMiddleware>() |> useConditionalRequests
+            // ProvenanceMiddleware and ProvenanceCacheHeadersMiddleware, so
+            // ProvenanceMiddleware's OnStarting-registered has_provenance Link header and
+            // ProvenanceCacheHeadersMiddleware's OnStarting-registered Vary/Cache-Control
+            // headers both survive a 304 short-circuit -- see Frank.useConditionalRequests's
+            // doc comment for the ordering contract.
+            configured.UseMiddleware<ProvenanceMiddleware>().UseMiddleware<ProvenanceCacheHeadersMiddleware>()
+            |> useConditionalRequests
 
         let addServices (services: IServiceCollection) =
             configureServices services

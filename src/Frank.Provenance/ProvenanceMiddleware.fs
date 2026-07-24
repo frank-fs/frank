@@ -6,6 +6,7 @@ open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Metadata
+open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.Primitives
 
@@ -313,3 +314,45 @@ type ProvenanceMiddleware
             ctx.Response.StatusCode <- 400
             Task.CompletedTask
         | Some origin -> this.InvokeCore(ctx, origin)
+
+/// Sets Vary: Accept and immutable Cache-Control on /provenance and /provenance/{nodeId}
+/// responses. Both headers are STATIC per-endpoint values -- not computed per request --
+/// so this middleware sets them unconditionally, without needing to know whether the
+/// request will be served fresh (200) or short-circuited to 304 by
+/// Frank.ConditionalRequestMiddleware. Registered OUTER to (before)
+/// Frank.useConditionalRequests, the same R10 ordering contract ProvenanceMiddleware's
+/// has_provenance Link header relies on (see Frank.useConditionalRequests's doc comment):
+/// the OnStarting callback registered here survives a 304 short-circuit even though
+/// next.Invoke never reaches the terminal handler on that path.
+///
+/// #426 regression fix: these headers used to be set inside ProvenanceEndpoint.serveJsonLd,
+/// which only runs on a cache miss -- a 304 response was missing both headers.
+type ProvenanceCacheHeadersMiddleware(next: RequestDelegate) =
+
+    do
+        if isNull (box next) then
+            invalidArg (nameof next) "RequestDelegate must not be null"
+
+    static member private IsStaticHeaderRoute(endpoint: Endpoint) : bool =
+        match endpoint with
+        | :? RouteEndpoint as re ->
+            re.RoutePattern.RawText = "/provenance"
+            || re.RoutePattern.RawText = "/provenance/{nodeId}"
+        | _ -> false
+
+    static member private RegisterHeaders(ctx: HttpContext) : unit =
+        ctx.Response.OnStarting(fun () ->
+            let status = ctx.Response.StatusCode
+
+            if status >= 200 && status < 400 then
+                Frank.AcceptNegotiation.appendVaryAccept ctx.Response
+                ctx.Response.Headers.CacheControl <- "max-age=31536000, immutable"
+
+            Task.CompletedTask)
+        |> ignore
+
+    member this.InvokeAsync(ctx: HttpContext) : Task =
+        if ProvenanceCacheHeadersMiddleware.IsStaticHeaderRoute(ctx.GetEndpoint()) then
+            ProvenanceCacheHeadersMiddleware.RegisterHeaders ctx
+
+        next.Invoke ctx

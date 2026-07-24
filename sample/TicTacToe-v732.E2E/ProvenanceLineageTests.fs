@@ -616,4 +616,20 @@ SELECT ?s WHERE { ?s prov:specializationOf <%s> . }"""
                 Is.True,
                 "has_provenance Link header must survive the 304 short-circuit"
             )
+
+            // #426 regression fix (Fielding review, RFC 9110 §15.4.5): Cache-Control and
+            // Vary are STATIC per-endpoint values set by ProvenanceCacheHeadersMiddleware,
+            // registered OUTER to ConditionalRequestMiddleware -- they must survive the 304
+            // short-circuit too, not just the has_provenance Link header.
+            Assert.That(second.Headers.Vary, Does.Contain "Accept", "304 response must carry Vary: Accept")
+            Assert.That(second.Headers.CacheControl, Is.Not.Null, "304 response must carry Cache-Control")
+            let cacheControl = second.Headers.CacheControl.ToString()
+
+            Assert.That(
+                cacheControl.Contains "immutable",
+                Is.True,
+                "304 Cache-Control must mark the representation immutable"
+            )
+
+            Assert.That(cacheControl.Contains "max-age", Is.True, "304 Cache-Control must include a max-age directive")
         }

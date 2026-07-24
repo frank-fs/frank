@@ -35,15 +35,16 @@ module private CtxItemKeys =
     let nodeGraph = obj ()
     let lineageGraph = obj ()
 
-/// Single function backing every provenance JSON-LD 200 response (#424). Adds Vary: Accept
-/// (gap 2) and immutable Cache-Control (gap 3) — provenance nodes represent a historical
-/// fact and never change once recorded, so the representation can be cached indefinitely.
-/// ETag computation and If-None-Match/304 short-circuiting are owned entirely by
-/// Frank.ConditionalRequestMiddleware via the ETagMetadata attached to these routes (see
-/// Frank.Provenance.fs) — this function is now a plain 200-body writer (#426).
+/// Single function backing every provenance JSON-LD 200 response (#424). Vary: Accept and
+/// immutable Cache-Control (provenance nodes represent a historical fact and never change
+/// once recorded, so the representation can be cached indefinitely) are set by
+/// ProvenanceCacheHeadersMiddleware, registered OUTER to ConditionalRequestMiddleware
+/// (Frank.Provenance.fs) so they are present on a 304 short-circuit too, which never
+/// reaches this function (#426 fix) — this function only sets headers that DO depend on
+/// the handler running. ETag computation and If-None-Match/304 short-circuiting are owned
+/// entirely by Frank.ConditionalRequestMiddleware via the ETagMetadata attached to these
+/// routes (see Frank.Provenance.fs) — this function is now a plain 200-body writer (#426).
 let private serveJsonLd (config: ProvenanceConfig) (g: IGraph) (ctx: HttpContext) : Task =
-    Frank.AcceptNegotiation.appendVaryAccept ctx.Response
-    ctx.Response.Headers.CacheControl <- "max-age=31536000, immutable"
     let body = ProvenanceGraph.compactGraph config.DeclaredPrefixes g
     ctx.Response.StatusCode <- 200
     ctx.Response.ContentType <- "application/ld+json"
