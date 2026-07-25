@@ -557,15 +557,12 @@ let describedByScopingTests =
 // OPTIONS rel="type", and a single-relation resource is byte-identical to before #433 ──
 
 let private multiRelationScopedConfig =
-    { ProfileUri = "/alps/test"
-      HomeRoute = "/"
-      AlpsDescriptors = []
-      DescribedByLinks =
-        [ { ClassIri = "https://schema.org/Game"
-            Link = "<https://schema.org/Game>; rel=\"type\"" }
-          { ClassIri = "https://schema.org/MoveAction"
-            Link = "<https://schema.org/MoveAction>; rel=\"type\"" } ]
-      ResourceHrefVars = Map.empty }
+    { scopedRelationConfig with
+        DescribedByLinks =
+            [ { ClassIri = "https://schema.org/Game"
+                Link = "<https://schema.org/Game>; rel=\"type\"" }
+              { ClassIri = "https://schema.org/MoveAction"
+                Link = "<https://schema.org/MoveAction>; rel=\"type\"" } ] }
 
 [<Tests>]
 let multiValuedRelationTests =
@@ -585,8 +582,10 @@ let multiValuedRelationTests =
                       [ "<https://schema.org/Game>; rel=\"type\""
                         "<https://schema.org/MoveAction>; rel=\"type\"" ]
 
-              Expect.equal links expected "rel=\"type\" Link set is exactly {Game, MoveAction}"
-              Expect.equal links.Length 2 "exactly two rel=\"type\" links — never collapsed to a single value"
+              Expect.equal
+                  links
+                  expected
+                  "rel=\"type\" Link set is exactly {Game, MoveAction} — never collapsed to a single value"
 
           testCase
               "AC2: a single-relation resource's OPTIONS response is byte-identical to the pre-#433 single-value form (regression guard)"

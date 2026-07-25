@@ -30,13 +30,11 @@ let private tryGetRelationMeta (ep: Microsoft.AspNetCore.Http.Endpoint) =
     else
         Some(boxed |> unbox<ResourceRelationMetadata>)
 
-/// ALL declared relation IRIs on an endpoint, in declaration order — #433: a resource may
-/// compose more than one semantic type by stamping `relation` more than once (or via the
-/// list overload); GetOrderedMetadata returns every instance, not just the last.
+/// ALL declared relation IRIs on an endpoint, in declaration order — delegates to
+/// DiscoveryMiddleware's own `relationsOf` (internal, via InternalsVisibleTo) rather than
+/// re-deriving the GetOrderedMetadata idiom here (#433 /simplify: reuse finding).
 let private allRelationIris (ep: Microsoft.AspNetCore.Http.Endpoint) : string list =
-    ep.Metadata.GetOrderedMetadata<ResourceRelationMetadata>()
-    |> Seq.map (fun m -> m.Relation)
-    |> Seq.toList
+    DiscoveryMiddleware.relationsOf (ep :?> RouteEndpoint)
 
 /// Spin a minimal TestServer seeded with two Frank resources, each carrying `relation`.
 /// Reuses TestHelpers.buildDiscoveryApp's ResourceEndpointDataSource wiring (#411 — the

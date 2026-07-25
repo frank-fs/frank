@@ -33,10 +33,8 @@ let private httpMethodsOf (re: RouteEndpoint) : string list option =
 /// instance to the endpoint's metadata collection. GetOrderedMetadata returns EVERY
 /// instance (unlike GetMetadata, which returns only the last-added one) — the idiom every
 /// endpoint-metadata scan in this file uses instead of collapsing to a single value (#433).
-let private relationsOf (re: RouteEndpoint) : string list =
-    re.Metadata.GetOrderedMetadata<ResourceRelationMetadata>()
-    |> Seq.map (fun m -> m.Relation)
-    |> Seq.toList
+let internal relationsOf (re: RouteEndpoint) : string list =
+    [ for m in re.Metadata.GetOrderedMetadata<ResourceRelationMetadata>() -> m.Relation ]
 
 /// Accepted request CLR type full name declared on an endpoint via IAcceptsMetadata,
 /// normalized via Frank.ClrTypeName so a module-nested/generic request type correlates

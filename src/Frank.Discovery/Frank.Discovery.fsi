@@ -33,8 +33,11 @@ module DiscoveryExtensions =
         member UseDiscovery: spec: WebHostSpec -> WebHostSpec
 
 /// Extends ResourceBuilder with a `relation` operation that stamps
-/// ResourceRelationMetadata onto every endpoint built by the resource CE block.
-/// Frank.Discovery adds this operation; Frank core is unchanged.
+/// ResourceRelationMetadata onto every endpoint built by the resource CE block. A resource
+/// may declare more than one relation (e.g. its GET embodies schema:Game while its POST
+/// embodies schema:MoveAction) — each declaration adds its OWN ResourceRelationMetadata
+/// instance rather than overwriting a prior one (#433). Frank.Discovery adds this
+/// operation; Frank core is unchanged.
 [<AutoOpen>]
 module ResourceRelationExtensions =
 
@@ -43,5 +46,14 @@ module ResourceRelationExtensions =
         /// Stamp the vocabulary IRI as ResourceRelationMetadata on every endpoint
         /// produced by this resource block. The discovery middleware reads this at
         /// runtime to build the JSON Home directory — no static HomeResources needed.
+        /// Composes with any other `relation` call in the same resource block (#433):
+        /// calling this more than once accumulates one metadata instance per call.
         [<CustomOperation("relation")>]
         member Relation: spec: ResourceSpec * iri: string -> ResourceSpec
+
+        /// Stamp MULTIPLE vocabulary IRIs in one call — one ResourceRelationMetadata
+        /// instance per IRI, in list order (#433). Equivalent to calling the single-IRI
+        /// `relation` overload once per list entry; reuses it directly rather than
+        /// duplicating the validation/stamping logic (Constitution rule 8).
+        [<CustomOperation("relation")>]
+        member Relation: spec: ResourceSpec * iris: string list -> ResourceSpec
