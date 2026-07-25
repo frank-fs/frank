@@ -297,9 +297,10 @@ let buildFConfApp (config: DiscoveryConfig) : WebApplication =
     runWebHostSpecOnTestServer spec
 
 /// Spin a TestServer with ONE route ("/games/{id}") carrying TWO ResourceRelationMetadata
-/// entries — a resource composing more than one declared vocabulary class (#433, e.g. GET
-/// embodies schema:Game while POST embodies schema:MoveAction). Used by the #433 AC1
-/// multi-valued rel="type" scoping acceptance test.
+/// entries on its single GET endpoint — a resource-level typing of ONE vocabulary class
+/// PLUS another (#433), not per-verb differentiation (that's #470 — relation is scoped to
+/// the whole resource block, applied uniformly regardless of HTTP verb). Used by the #433
+/// AC1 multi-valued rel="type" scoping acceptance test.
 let startMultiRelationScopedServer (config: DiscoveryConfig) =
     let endpoints: Endpoint[] =
         [| routeEndpoint

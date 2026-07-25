@@ -56,12 +56,16 @@ module DiscoveryExtensions =
             | Error msg -> invalidOp msg
 
 /// Extends ResourceBuilder with a `relation` operation that stamps
-/// ResourceRelationMetadata onto every endpoint built by the resource CE block. A resource
-/// may declare more than one relation (e.g. its GET embodies schema:Game while its POST
-/// embodies schema:MoveAction) — each declaration adds its OWN ResourceRelationMetadata
-/// instance to the endpoint's metadata collection rather than overwriting a prior one, so
+/// ResourceRelationMetadata onto EVERY endpoint built by the resource CE block, regardless
+/// of HTTP verb — the same resource-block-level scope as `name`/`entryPoint`, not per-verb.
+/// A resource may declare more than one relation to type the resource itself with more than
+/// one vocabulary class (e.g. it is both a Game and a Collection) — each declaration adds
+/// its OWN ResourceRelationMetadata instance rather than overwriting a prior one, so
 /// DiscoveryMiddleware's readers (which walk GetOrderedMetadata, not GetMetadata) see every
-/// declared relation (#433). Frank.Discovery adds this operation; Frank core is unchanged.
+/// declared relation (#433). This does NOT give different verbs different relations (GET
+/// embodying one class, POST another) — that needs per-verb scoping, tracked separately
+/// (#470), since today's core CE applies every resource-block convention to every verb
+/// uniformly. Frank.Discovery adds this operation; Frank core is unchanged.
 [<AutoOpen>]
 module ResourceRelationExtensions =
 

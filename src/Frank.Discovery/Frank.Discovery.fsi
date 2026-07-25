@@ -33,10 +33,12 @@ module DiscoveryExtensions =
         member UseDiscovery: spec: WebHostSpec -> WebHostSpec
 
 /// Extends ResourceBuilder with a `relation` operation that stamps
-/// ResourceRelationMetadata onto every endpoint built by the resource CE block. A resource
-/// may declare more than one relation (e.g. its GET embodies schema:Game while its POST
-/// embodies schema:MoveAction) — each declaration adds its OWN ResourceRelationMetadata
-/// instance rather than overwriting a prior one (#433). Frank.Discovery adds this
+/// ResourceRelationMetadata onto EVERY endpoint built by the resource CE block, regardless
+/// of HTTP verb — the same resource-block-level scope as `name`/`entryPoint`, not per-verb.
+/// A resource may declare more than one relation to type the resource itself with more than
+/// one vocabulary class — each declaration adds its OWN ResourceRelationMetadata instance
+/// rather than overwriting a prior one (#433). Per-verb relation scoping (different verbs
+/// embodying different classes) is tracked separately (#470). Frank.Discovery adds this
 /// operation; Frank core is unchanged.
 [<AutoOpen>]
 module ResourceRelationExtensions =
