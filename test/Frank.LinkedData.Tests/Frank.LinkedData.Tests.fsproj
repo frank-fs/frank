@@ -12,6 +12,8 @@
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="MemoizationTests.fs" />
     <Compile Include="CacheBoundTests.fs" />
+    <Compile Include="AllocationTests.fs" />
+    <Compile Include="SharedCacheBudgetTests.fs" />
     <Compile Include="EndpointMetadataTests.fs" />
     <Compile Include="PropertyTests.fs" />
     <Compile Include="ResolverTests.fs" />
@@ -34,6 +36,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Frank.LinkedData/Frank.LinkedData.fsproj" />
+    <ProjectReference Include="../Frank.TestSupport/Frank.TestSupport.fsproj" />
   </ItemGroup>
 
 </Project>

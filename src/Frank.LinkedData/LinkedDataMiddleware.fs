@@ -254,6 +254,24 @@ module private Serializers =
 /// equality on Origin/MediaType. NoComparison is required alongside CustomEquality: without
 /// it F# would try to auto-derive IComparable too, which fails to compile for the same
 /// function-field reason.
+///
+/// ACCEPTED TRADE-OFF (#468 expert-review Fowler-minor): staticBodyCache is now ONE keyed
+/// IMemoryCache region (SizeLimit = Frank.Builder.CacheCapacity) SHARED by every distinct
+/// LinkedDataConfig a LinkedDataMiddleware instance serves — before #468, ConditionalWeakTable
+/// gave EACH LinkedDataConfig its OWN inner BoundedCache, an independent per-config budget.
+/// Folding Config identity into the key (above) instead of keeping per-config partitioning
+/// was deliberate: dynamic per-config keyed-DI registration isn't feasible — LinkedDataConfig
+/// instances aren't known until each `resource {}` CE block registers an endpoint, which
+/// happens AFTER Builder.fs's static AddKeyedSingleton registrations already ran. The
+/// consequence, stated plainly: a flood against ONE config's origin-space CAN evict entries
+/// belonging to a DIFFERENT config once the app's combined distinct-key count (summed across
+/// every LinkedDataConfig) exceeds the one shared capacity — apps with many distinct
+/// LinkedDataConfigs (many `resource {}` blocks each with their own graph) share a single
+/// 1000-entry budget, not 1000 per config. What is NOT compromised: VALUE isolation — the
+/// ReferenceEquals-on-Config check above means config A's cached body for origin X can never
+/// be returned for config B's request to the same origin X, regardless of budget sharing.
+/// Proven by test/Frank.LinkedData.Tests/SharedCacheBudgetTests.fs (both halves: shared-budget
+/// eviction across configs, and per-config value correctness under that shared budget).
 [<Struct; CustomEquality; NoComparison>]
 type private StaticBodyCacheKey =
     { Config: LinkedDataConfig
@@ -331,6 +349,18 @@ type LinkedDataMiddleware
     /// existing call site only ever exercises a single config, where the two numbers
     /// coincide.
     member internal _.StaticBodyCacheSize = (staticBodyCache :?> MemoryCache).Count
+
+    /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): drives the
+    /// GraphFactory=None static-body hot path directly (bypassing HTTP request/response
+    /// plumbing — ctx is never touched on this branch) so an allocation-delta test can
+    /// isolate exactly what cachedStaticBody's cache-HIT path itself allocates, without the
+    /// unrelated noise of DefaultHttpContext/response-writing (#468 Fowler-important
+    /// finding: CacheStriping.getOrBuild's `cache.TryGetValue(box key)` boxes the
+    /// [<Struct>] StaticBodyCacheKey on every call, hit or miss — inherent to
+    /// IMemoryCache's `object`-keyed API, not eliminable without diverging from
+    /// constructor-injected IMemoryCache).
+    member internal _.ComputeStaticBodyForTest(mediaType: string, origin: string, config: LinkedDataConfig) : string =
+        computeBody mediaType origin config Unchecked.defaultof<HttpContext>
 
     member private this.ServeRdf(ctx: HttpContext, mediaType: string, effective: LinkedDataConfig) : Task =
         match Frank.OriginValidation.tryValidateOrigin ctx.Request with
