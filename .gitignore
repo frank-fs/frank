@@ -8,6 +8,7 @@
 *.so
 bin/
 obj/
+nupkg/
 
 # Packages #
 ############
@@ -48,3 +49,30 @@ Thumbs.db
 .vscode/
 *.user
 launchSettings.json
+.entire/
+.worktrees/
+.claude/worktrees/
+nupkg/*
+!nupkg/.gitkeep
+
+# AI tool config directories
+.claude/*
+!.claude/settings.json
+!.claude/agents/
+!.claude/skills/
+.codex/
+.opencode/
+.windsurf/
+.gemini/
+.cursor/
+.qwen/
+.kilocode/
+.augment/
+.roo/
+.amazonq/
+.github/copilot/
+sample/Frank.TicTacToe.Sample/frank/
+.remember/
+PROMPT.md
+BenchmarkDotNet.Artifacts/
+sample/**/TestResults/
