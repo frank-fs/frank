@@ -46,7 +46,9 @@ let private newMiddleware (endpoints: Endpoint[]) =
         DiscoveryConfig.Empty,
         dataSource :> Microsoft.AspNetCore.Routing.EndpointDataSource,
         dataSource,
-        NullLogger<DiscoveryMiddleware.DiscoveryMiddleware>.Instance
+        NullLogger<DiscoveryMiddleware.DiscoveryMiddleware>.Instance,
+        newBoundedMemoryCache (),
+        newBoundedMemoryCache ()
     )
 
 let private invoke (middleware: DiscoveryMiddleware.DiscoveryMiddleware) (ctx: HttpContext) : unit =

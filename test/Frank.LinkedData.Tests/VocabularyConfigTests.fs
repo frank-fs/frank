@@ -42,6 +42,7 @@ let private describedByTarget (resp: HttpResponseMessage) : string option =
 let private startServerWithSpec (spec: WebHostSpec) (ldConfig: LinkedDataConfig) : WebApplication =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
+    registerBoundedMemoryCaches builder.Services |> ignore
     spec.Services builder.Services |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
@@ -65,7 +66,9 @@ let tests =
               // Mirrors the MSBuild codegen path exactly (GeneratedLinkedDataResolver.resolveFromType) —
               // no per-resource vocabulary field anywhere on this config.
               let codegenConfig =
-                  match GeneratedLinkedDataResolver.resolveFromType typeof<Frank.LinkedData.Tests.GeneratedLinkedData> with
+                  match
+                      GeneratedLinkedDataResolver.resolveFromType typeof<Frank.LinkedData.Tests.GeneratedLinkedData>
+                  with
                   | Ok c -> c
                   | Error e -> failtest $"fixture resolution failed: {e}"
 

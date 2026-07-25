@@ -6,6 +6,7 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Metadata
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.Routing.Template
+open Microsoft.Extensions.Caching.Memory
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.Primitives
 
@@ -295,27 +296,26 @@ let resolveHref (origin: string) (href: string) : string = resolveHrefAgainst (U
 /// Origin-keyed build-once-per-distinct-origin memoization, shared by
 /// resolvedAlpsCache/cachedResolvedAlps and resolvedHomeResourcesCache/
 /// cachedResolvedHomeResources below (#398 /simplify item 6 was duplicated verbatim
-/// between the two; this is the single extraction). `cache`/`onBuild` are owned by the
-/// calling DiscoveryMiddleware instance so this function stays free of module-level
-/// mutable state (Rule 13) — the caller supplies its own cache and build-count callback.
-/// `cache` is a Frank.BoundedCache (#405: bounds retained memory to a hard ceiling
-/// independent of how many distinct Host header values a client sends — an unauthenticated
-/// client varying Host could otherwise mint unbounded permanent entries) — build still
-/// runs at most once per origin even if two requests race on a brand-new one. Mirrors
+/// between the two; this is the single extraction). `locks`/`cache`/`onBuild` are owned by
+/// the calling DiscoveryMiddleware instance so this function stays free of module-level
+/// mutable state (Rule 13) — the caller supplies its own striping locks, cache, and
+/// build-count callback. `cache` is a keyed IMemoryCache (#468: bounds retained memory to a
+/// hard ceiling independent of how many distinct Host header values a client sends — an
+/// unauthenticated client varying Host could otherwise mint unbounded permanent entries) —
+/// build still runs at most once per origin even if two requests race on a brand-new one
+/// (Frank.CacheStriping.getOrBuild's double-checked-locking guarantee). Mirrors
 /// ValidationMiddleware's getOrBuildShapesGraph shape (src/Frank.Validation/
 /// ValidationMiddleware.fs).
 let private getOrBuildByOrigin
-    (cache: Frank.BoundedCache<string, 'T>)
+    (locks: Frank.StripedLocks)
+    (cache: IMemoryCache)
     (onBuild: unit -> unit)
     (origin: string)
     (build: unit -> 'T)
     : 'T =
-    cache.GetOrAdd(
-        origin,
-        (fun () ->
-            onBuild ()
-            build ())
-    )
+    Frank.CacheStriping.getOrBuild locks cache origin (fun () ->
+        onBuild ()
+        build ())
 
 /// Resolve every Href/Rt in a descriptor tree (top-level and nested children) against a
 /// pre-parsed live request origin Uri (#398) — parsed ONCE by the caller and threaded
@@ -519,7 +519,10 @@ type DiscoveryMiddleware
         config: DiscoveryConfig,
         endpointDataSource: EndpointDataSource,
         resourceEndpointDataSource: Frank.Builder.ResourceEndpointDataSource,
-        logger: ILogger<DiscoveryMiddleware>
+        logger: ILogger<DiscoveryMiddleware>,
+        [<Microsoft.Extensions.DependencyInjection.FromKeyedServices("discovery:alps")>] resolvedAlpsCache: IMemoryCache,
+        [<Microsoft.Extensions.DependencyInjection.FromKeyedServices("discovery:home")>] resolvedHomeResourcesCache:
+            IMemoryCache
     ) =
 
     // #432 review fix 3/6: the ALPS profile is an Application-Level Profile, not the
@@ -626,21 +629,22 @@ type DiscoveryMiddleware
     // DiscoveryConfig (unlike LinkedDataConfig) is a single constructor-injected value —
     // one per middleware instance, never looked up per-endpoint per-request — so a plain
     // instance-level cache keyed by origin alone is the right-sized mirror of the same idea
-    // (LinkedDataMiddleware additionally keys by config via ConditionalWeakTable because ONE
-    // of its middleware instances serves MANY distinct LinkedDataConfig values, one per
-    // endpoint; DiscoveryMiddleware never does). #405: Frank.BoundedCache bounds retained
-    // memory to a hard ceiling regardless of how many distinct Host header values a client
-    // sends — the origin string is only ever validated for SYNTACTIC well-formedness
+    // (LinkedDataMiddleware additionally folds config identity into its cache key because
+    // ONE of its middleware instances serves MANY distinct LinkedDataConfig values, one per
+    // endpoint; DiscoveryMiddleware never does). #468: resolvedAlpsCache (constructor-
+    // injected, keyed IMemoryCache "discovery:alps") bounds retained memory to a hard
+    // ceiling regardless of how many distinct Host header values a client sends — the
+    // origin string is only ever validated for SYNTACTIC well-formedness
     // (Frank.OriginValidation.tryValidateOrigin), never checked against a configured
     // allowlist, so an unbounded cache here would let an unauthenticated client mint
     // unlimited permanent entries.
-    let resolvedAlpsCache =
-        Frank.BoundedCache<string, AlpsDescriptor list>(Frank.BoundedCache.DefaultCapacity)
+    let resolvedAlpsLocks = Frank.StripedLocks(Frank.CacheStriping.DefaultStripeCount)
 
     let mutable resolvedAlpsBuildCount = 0
 
     let cachedResolvedAlps (origin: string) : AlpsDescriptor list =
         getOrBuildByOrigin
+            resolvedAlpsLocks
             resolvedAlpsCache
             (fun () -> System.Threading.Interlocked.Increment(&resolvedAlpsBuildCount) |> ignore)
             origin
@@ -651,14 +655,16 @@ type DiscoveryMiddleware
     // Mirrors resolvedAlpsCache/cachedResolvedAlps exactly, applied to JSON Home's
     // resources instead of the ALPS descriptor tree — same instance-level-cache rationale
     // (one DiscoveryConfig per middleware instance, never per-endpoint), same
-    // build-once-per-distinct-origin discipline, and the SAME bounded-cache fix (#405).
-    let resolvedHomeResourcesCache =
-        Frank.BoundedCache<string, JsonHomeResource list>(Frank.BoundedCache.DefaultCapacity)
+    // build-once-per-distinct-origin discipline, and its OWN independently-budgeted keyed
+    // IMemoryCache region ("discovery:home", #468) — a flood against this cache never
+    // evicts resolvedAlpsCache's entries or vice versa.
+    let resolvedHomeLocks = Frank.StripedLocks(Frank.CacheStriping.DefaultStripeCount)
 
     let mutable resolvedHomeBuildCount = 0
 
     let cachedResolvedHomeResources (origin: string) : JsonHomeResource list =
         getOrBuildByOrigin
+            resolvedHomeLocks
             resolvedHomeResourcesCache
             (fun () -> System.Threading.Interlocked.Increment(&resolvedHomeBuildCount) |> ignore)
             origin
@@ -757,13 +763,16 @@ type DiscoveryMiddleware
 
     /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of
     /// distinct origins currently retained in the resolved-ALPS cache — proves the
-    /// Host-header-flood cache-DoS fix (#405): bounded at Frank.BoundedCache.DefaultCapacity
-    /// regardless of how many distinct Host header values a client sends.
-    member internal _.ResolvedAlpsCacheSize = resolvedAlpsCache.Count
+    /// Host-header-flood cache-DoS fix (#468, originally #405): bounded at
+    /// Frank.Builder.CacheCapacity regardless of how many distinct Host header values a
+    /// client sends. Reads the concrete MemoryCache's real Count (#468's solution: keyed
+    /// registrations resolve to the concrete type), never a hand-rolled counter.
+    member internal _.ResolvedAlpsCacheSize = (resolvedAlpsCache :?> MemoryCache).Count
 
     /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): mirrors
-    /// ResolvedAlpsCacheSize above, for the resolved-JSON-Home cache (#405).
-    member internal _.ResolvedHomeCacheSize = resolvedHomeResourcesCache.Count
+    /// ResolvedAlpsCacheSize above, for the resolved-JSON-Home cache (#468, originally #405).
+    member internal _.ResolvedHomeCacheSize =
+        (resolvedHomeResourcesCache :?> MemoryCache).Count
 
     /// #432: emit the ALPS `rel="profile"` link (RFC 6906, #432 review fix 3) on a GET or
     /// HEAD whose path matches a registered resource route (RFC 7231 §4.3.2 — HEAD MUST

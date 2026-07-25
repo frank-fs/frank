@@ -10,6 +10,7 @@ module Builder =
     open Microsoft.AspNetCore.Hosting
     open Microsoft.AspNetCore.Http
     open Microsoft.AspNetCore.Routing
+    open Microsoft.Extensions.Caching.Memory
     open Microsoft.Extensions.DependencyInjection
     open Microsoft.Extensions.FileProviders
     open Microsoft.Extensions.Hosting
@@ -478,6 +479,42 @@ module Builder =
         override __.Endpoints = endpoints :> _
         override __.GetChangeToken() = NullChangeToken.Singleton :> _
 
+    /// #468: shared SizeLimit for every keyed IMemoryCache region registered by
+    /// registerBoundedMemoryCaches below — mirrors the prior hand-rolled cache's
+    /// DefaultCapacity value (1000) exactly, same worst-case-retained-memory ceiling per
+    /// cache, new mechanism. Asserted against by Discovery/Validation/LinkedData/Frank's own
+    /// test suites (the capacity-constant name/location AT7 requires tests to reference).
+    [<Literal>]
+    let CacheCapacity = 1000
+
+    let private newBoundedMemoryCache () : IMemoryCache =
+        new MemoryCache(MemoryCacheOptions(SizeLimit = System.Nullable(int64 CacheCapacity))) :> IMemoryCache
+
+    /// #468: registers the four independently-budgeted IMemoryCache regions consumed by
+    /// DiscoveryMiddleware's resolvedAlpsCache/resolvedHomeResourcesCache,
+    /// ValidationMiddleware's hostRelativeShapesCache, and LinkedDataMiddleware's
+    /// staticBodyCache via keyed DI. Each key gets its OWN MemoryCache instance (own
+    /// SizeLimit accounting) — a flood against one must never evict another's entries, a
+    /// stronger guarantee than grouping by middleware (Discovery's two caches don't share a
+    /// budget either). Called from BOTH WebHostBuilder.Run TFM branches below AND from test
+    /// helpers that mirror Run's own wiring sequence on a TestServer (e.g.
+    /// Frank.Discovery.Tests.runWebHostSpecOnTestServer) so the two can never drift
+    /// (Constitution #8: no duplicated logic).
+    let registerBoundedMemoryCaches (services: IServiceCollection) : IServiceCollection =
+        services.AddKeyedSingleton<IMemoryCache>("discovery:alps", (fun _ _ -> newBoundedMemoryCache ()))
+        |> ignore
+
+        services.AddKeyedSingleton<IMemoryCache>("discovery:home", (fun _ _ -> newBoundedMemoryCache ()))
+        |> ignore
+
+        services.AddKeyedSingleton<IMemoryCache>("validation:shapes", (fun _ _ -> newBoundedMemoryCache ()))
+        |> ignore
+
+        services.AddKeyedSingleton<IMemoryCache>("linkeddata:staticbody", (fun _ _ -> newBoundedMemoryCache ()))
+        |> ignore
+
+        services
+
     type WebHostSpec =
         { Host: (IWebHostBuilder -> IWebHostBuilder)
           BeforeRoutingMiddleware: (IApplicationBuilder -> IApplicationBuilder)
@@ -549,6 +586,7 @@ module Builder =
             // ApiExplorer/reflection walk involved (#411).
             let dataSource = ResourceEndpointDataSource(spec.Endpoints)
             builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
+            registerBoundedMemoryCaches builder.Services |> ignore
 
             spec.Host(builder.WebHost) |> ignore
             spec.Services(builder.Services) |> ignore
@@ -581,7 +619,8 @@ module Builder =
                         .Host(webBuilder)
                         .ConfigureServices(fun services ->
                             spec.Services services |> ignore
-                            services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore)
+                            services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
+                            registerBoundedMemoryCaches services |> ignore)
                         .Configure(fun app ->
                             app
                             |> spec.BeforeRoutingMiddleware

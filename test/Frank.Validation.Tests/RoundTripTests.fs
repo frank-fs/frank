@@ -9,6 +9,7 @@ open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open VDS.RDF
 open Expecto
+open Frank.Builder
 open Frank.LinkedData
 open Frank.Validation
 
@@ -54,6 +55,7 @@ let private startRoundTripServer () =
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(emptyValidationConfig ()) |> ignore
     builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
+    registerBoundedMemoryCaches builder.Services |> ignore
     let app = builder.Build()
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore
     app.UseMiddleware<ValidationMiddleware>() |> ignore

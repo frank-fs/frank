@@ -9,7 +9,6 @@
 
   <ItemGroup>
     <Compile Include="ETagTests.fs" />
-    <Compile Include="BoundedCacheTests.fs" />
     <Compile Include="MiddlewareOrderingTests.fs" />
     <Compile Include="MetadataTests.fs" />
     <Compile Include="ETagCacheTests.fs" />
@@ -22,6 +21,8 @@
     <Compile Include="NameInferenceTests.fs" />
     <Compile Include="PlumbingHiddenTests.fs" />
     <Compile Include="AllocationHarnessTests.fs" />
+    <Compile Include="CrossCacheIsolationTests.fs" />
+    <Compile Include="CacheDIWiringTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

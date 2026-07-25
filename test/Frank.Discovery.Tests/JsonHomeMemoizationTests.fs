@@ -68,7 +68,9 @@ let private newMiddleware () =
         declaredOnlyHomeConfig,
         (declaredOnlyHomeEndpoints :> Microsoft.AspNetCore.Routing.EndpointDataSource),
         declaredOnlyHomeEndpoints,
-        NullLogger<DiscoveryMiddleware.DiscoveryMiddleware>.Instance
+        NullLogger<DiscoveryMiddleware.DiscoveryMiddleware>.Instance,
+        newBoundedMemoryCache (),
+        newBoundedMemoryCache ()
     )
 
 let private readBody (ctx: HttpContext) =

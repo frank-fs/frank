@@ -8,6 +8,7 @@ open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.Logging.Abstractions
 open Expecto
 open Frank.Validation
+open Frank.Validation.Tests.MiddlewareTestHelpers
 
 /// #382: ValidationMiddleware.HostRelative used to rebuild the SHACL ShapesGraph
 /// (Shapes.toShapesGraph) on every ld+json request — deterministic per origin, so this is
@@ -74,17 +75,24 @@ let private normalizeBlankNodes (body: string) : string =
     Text.RegularExpressions.Regex.Replace(body, "_:-?[0-9]+", "_:BNODE")
 
 let private newMiddleware () =
-    let next = RequestDelegate(fun ctx ->
-        ctx.Response.StatusCode <- 200
-        Task.CompletedTask)
+    let next =
+        RequestDelegate(fun ctx ->
+            ctx.Response.StatusCode <- 200
+            Task.CompletedTask)
 
-    ValidationMiddleware(next, hostRelativeConfig (), NullLogger<ValidationMiddleware>.Instance)
+    ValidationMiddleware(
+        next,
+        hostRelativeConfig (),
+        NullLogger<ValidationMiddleware>.Instance,
+        newBoundedMemoryCache ()
+    )
 
 [<Tests>]
 let tests =
     testList
         "ValidationMiddleware host-relative ShapesGraph memoization (#382)"
-        [ testCase "5 requests to the same origin build the ShapesGraph exactly once" <| fun _ ->
+        [ testCase "5 requests to the same origin build the ShapesGraph exactly once"
+          <| fun _ ->
               let middleware = newMiddleware ()
 
               for _ in 1..5 do
@@ -96,7 +104,8 @@ let tests =
                   1
                   "same origin repeated 5x ⇒ ShapesGraph built exactly once, not once per request"
 
-          testCase "a second, distinct origin triggers exactly one additional build" <| fun _ ->
+          testCase "a second, distinct origin triggers exactly one additional build"
+          <| fun _ ->
               let middleware = newMiddleware ()
 
               invoke middleware (makeContext "https" "example.com" (conformingBody "https://example.com"))
@@ -113,7 +122,8 @@ let tests =
                   2
                   "two distinct origins ⇒ two builds total, regardless of repeat requests to each"
 
-          testCase "repeat requests to the same origin serve identical 422 reports modulo blank-node IDs (no behavioral change)"
+          testCase
+              "repeat requests to the same origin serve identical 422 reports modulo blank-node IDs (no behavioral change)"
           <| fun _ ->
               let middleware = newMiddleware ()
 
@@ -133,7 +143,8 @@ let tests =
                   (normalizeBlankNodes body1)
                   "cached ShapesGraph must serve identical 422 report content (blank-node IDs vary per Validate call, not per cache state)"
 
-          testCase "a different origin gets its own report, not the first origin's cached one" <| fun _ ->
+          testCase "a different origin gets its own report, not the first origin's cached one"
+          <| fun _ ->
               let middleware = newMiddleware ()
 
               let ctxA = makeContext "https" "example.com" missingSquareBody
@@ -146,7 +157,10 @@ let tests =
 
               Expect.equal scB 422 "second origin: same violation shape ⇒ 422"
               Expect.stringContains bodyB "other.example" "second origin's report cites its own host-relative IRI"
-              Expect.isFalse (bodyB.Contains "example.com") "second origin's report must not leak the first origin's IRI"
+
+              Expect.isFalse
+                  (bodyB.Contains "example.com")
+                  "second origin's report must not leak the first origin's IRI"
 
               Expect.notEqual
                   (normalizeBlankNodes bodyB)

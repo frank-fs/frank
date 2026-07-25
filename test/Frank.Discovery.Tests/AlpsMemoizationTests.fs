@@ -66,7 +66,9 @@ let private newMiddleware (config: DiscoveryConfig) =
         config,
         emptyEndpoints,
         emptyResourceEndpoints,
-        NullLogger<DiscoveryMiddleware.DiscoveryMiddleware>.Instance
+        NullLogger<DiscoveryMiddleware.DiscoveryMiddleware>.Instance,
+        newBoundedMemoryCache (),
+        newBoundedMemoryCache ()
     )
 
 [<Tests>]

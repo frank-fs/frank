@@ -8,12 +8,20 @@ open Microsoft.AspNetCore.Http.Metadata
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.Routing.Patterns
 open Microsoft.AspNetCore.TestHost
+open Microsoft.Extensions.Caching.Memory
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.Primitives
 open Frank.Builder
 open Frank.Discovery
+
+/// #468: a fresh, independently-budgeted IMemoryCache mirroring one of the keyed
+/// registrations WebHostBuilder.Run wires in production — used by tests that construct
+/// DiscoveryMiddleware directly (bypassing DI) and so must supply its two keyed
+/// IMemoryCache constructor parameters by hand.
+let newBoundedMemoryCache () : IMemoryCache =
+    new MemoryCache(MemoryCacheOptions(SizeLimit = Nullable(int64 Frank.Builder.CacheCapacity))) :> IMemoryCache
 
 /// Captures all log messages emitted through the logging pipeline.
 /// Add via builder.Logging.AddProvider to intercept middleware log output.
@@ -74,6 +82,7 @@ let buildDiscoveryApp
     builder.Services.AddRouting() |> ignore
     let dataSource = ResourceEndpointDataSource(endpoints)
     builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
+    registerBoundedMemoryCaches builder.Services |> ignore
     configureBuilder |> Option.iter (fun f -> f builder)
     let app = builder.Build()
     app.UseRouting() |> ignore
@@ -243,6 +252,7 @@ let runWebHostSpecOnTestServer (spec: WebHostSpec) : WebApplication =
     builder.WebHost.UseTestServer() |> ignore
     let dataSource = ResourceEndpointDataSource(spec.Endpoints)
     builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
+    registerBoundedMemoryCaches builder.Services |> ignore
     spec.Services builder.Services |> ignore
     let app = builder.Build()
 

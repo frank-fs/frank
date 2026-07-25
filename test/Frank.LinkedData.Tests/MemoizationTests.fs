@@ -28,7 +28,10 @@ let private makeContext (scheme: string) (host: string) (accept: string) (config
     ctx.Request.Headers.Add("Accept", StringValues accept)
     ctx.Response.Body <- new MemoryStream()
     let metadata = EndpointMetadataCollection([ box config ])
-    let endpoint = Endpoint(RequestDelegate(fun _ -> Task.CompletedTask), metadata, "test")
+
+    let endpoint =
+        Endpoint(RequestDelegate(fun _ -> Task.CompletedTask), metadata, "test")
+
     ctx.SetEndpoint(endpoint)
     ctx :> HttpContext
 
@@ -42,17 +45,24 @@ let private readResponseBody (ctx: HttpContext) : string =
     reader.ReadToEnd()
 
 let private newMiddleware () =
-    let next = RequestDelegate(fun ctx ->
-        ctx.Response.StatusCode <- 200
-        Task.CompletedTask)
+    let next =
+        RequestDelegate(fun ctx ->
+            ctx.Response.StatusCode <- 200
+            Task.CompletedTask)
 
-    LinkedDataMiddleware(next, NullLogger<LinkedDataMiddleware>.Instance, LinkedDataVocabularyConfig.None)
+    LinkedDataMiddleware(
+        next,
+        NullLogger<LinkedDataMiddleware>.Instance,
+        LinkedDataVocabularyConfig.None,
+        newBoundedMemoryCache ()
+    )
 
 [<Tests>]
 let tests =
     testList
         "LinkedDataMiddleware static-graph body memoization (#382)"
-        [ testCase "5 ld+json requests to the same origin build the body exactly once" <| fun _ ->
+        [ testCase "5 ld+json requests to the same origin build the body exactly once"
+          <| fun _ ->
               let middleware = newMiddleware ()
 
               for _ in 1..5 do
@@ -64,7 +74,8 @@ let tests =
                   1
                   "same origin+mediaType repeated 5x ⇒ body built exactly once, not once per request"
 
-          testCase "a second, distinct origin triggers exactly one additional build" <| fun _ ->
+          testCase "a second, distinct origin triggers exactly one additional build"
+          <| fun _ ->
               let middleware = newMiddleware ()
 
               invoke middleware (makeContext "http" "example.com" "application/ld+json" sampleConfig)
@@ -131,7 +142,11 @@ let tests =
               let bodyB = readResponseBody ctxB
 
               Expect.stringContains bodyB "other.example" "second origin's @base cites its own host"
-              Expect.isFalse (bodyB.Contains "example.com") "second origin's body must not leak the first origin's @base"
+
+              Expect.isFalse
+                  (bodyB.Contains "example.com")
+                  "second origin's body must not leak the first origin's @base"
+
               Expect.notEqual bodyB bodyA "distinct origins ⇒ distinct bodies, not a stale cache hit"
 
           testCase "GraphFactory (dynamic) branch is NEVER cached: factory runs once per request"

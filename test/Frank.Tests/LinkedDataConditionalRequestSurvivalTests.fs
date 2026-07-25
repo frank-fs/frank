@@ -17,6 +17,7 @@ open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Expecto
 open Frank
+open Frank.Builder
 open Frank.LinkedData
 
 let private buildFixtureGraph () =
@@ -55,6 +56,7 @@ let private startServer () =
     |> ignore
 
     builder.Services.AddETagCache() |> ignore
+    registerBoundedMemoryCaches builder.Services |> ignore
     let app = builder.Build()
     (app :> IApplicationBuilder).UseRouting() |> ignore
     // R10 (#426/#467): LinkedDataMiddleware registered OUTER to (before) useConditionalRequests.

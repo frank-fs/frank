@@ -3,9 +3,10 @@ module Frank.Tests.AllocationHarnessTests
 open Expecto
 open Frank.TestSupport.AllocationHarness
 
-/// #437: this harness is infrastructure the memoization/BoundedCache perf-fix issues (#438/#439)
-/// attach their assertions to. Proven here against a deliberately growing (known-bad) handler
-/// and a constant-allocation (known-good) handler before any consumer relies on it.
+/// #437: this harness is infrastructure the memoization/bounded-cache perf-fix issues
+/// (#438/#439) attach their assertions to. Proven here against a deliberately growing
+/// (known-bad) handler and a constant-allocation (known-good) handler before any consumer
+/// relies on it.
 
 [<Tests>]
 let tests =

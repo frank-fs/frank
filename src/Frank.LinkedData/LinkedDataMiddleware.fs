@@ -7,6 +7,7 @@ open System.Text
 open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
+open Microsoft.Extensions.Caching.Memory
 open Microsoft.Extensions.Logging
 open Microsoft.Net.Http.Headers
 open VDS.RDF
@@ -238,27 +239,52 @@ module private Serializers =
         ctx.Response.ContentType <- mediaType
         ctx.Response.WriteAsync(body)
 
+/// #468: staticBodyCache's key. Serialized static-graph bodies for the GraphFactory=None
+/// branch are keyed by the OWNING LinkedDataConfig's REFERENCE identity (endpoints are
+/// configured once at startup and live for the app's lifetime — the prior
+/// ConditionalWeakTable partitioned by this same identity) crossed with (origin, mediaType)
+/// — `origin` is derived from the request's own `Host` header
+/// (Frank.OriginValidation.tryValidateOrigin validates only SYNTACTIC well-formedness,
+/// never an allowlist), so an unauthenticated client varying Host must not be able to mint
+/// unbounded permanent entries. LinkedDataConfig is an F# record carrying a function-typed
+/// field (GraphFactory), so it does NOT support F#'s structural equality at all (verified:
+/// `config1 = config2` fails to compile with FS0001) — this key type never invokes
+/// LinkedDataConfig's own equality, only Config's REFERENCE identity (mirroring
+/// ConditionalWeakTable's own reference-equality partitioning) combined with structural
+/// equality on Origin/MediaType. NoComparison is required alongside CustomEquality: without
+/// it F# would try to auto-derive IComparable too, which fails to compile for the same
+/// function-field reason.
+[<CustomEquality; NoComparison>]
+type private StaticBodyCacheKey =
+    { Config: LinkedDataConfig
+      Origin: string
+      MediaType: string }
+
+    override this.Equals(other) =
+        match other with
+        | :? StaticBodyCacheKey as o ->
+            obj.ReferenceEquals(this.Config, o.Config)
+            && this.Origin = o.Origin
+            && this.MediaType = o.MediaType
+        | _ -> false
+
+    override this.GetHashCode() =
+        hash (RuntimeHelpers.GetHashCode this.Config, this.Origin, this.MediaType)
+
 /// Content-negotiation middleware serving per-endpoint RDF graphs in multiple
 /// representations: application/ld+json, text/turtle, application/rdf+xml.
 /// Only fires for GET/HEAD (safe-method guard) on endpoints that carry a
 /// LinkedDataConfig in their metadata. All other requests pass through.
 type LinkedDataMiddleware
-    (next: RequestDelegate, logger: ILogger<LinkedDataMiddleware>, vocabularyConfig: LinkedDataVocabularyConfig) =
+    (
+        next: RequestDelegate,
+        logger: ILogger<LinkedDataMiddleware>,
+        vocabularyConfig: LinkedDataVocabularyConfig,
+        [<Microsoft.Extensions.DependencyInjection.FromKeyedServices("linkeddata:staticbody")>] staticBodyCache:
+            IMemoryCache
+    ) =
 
-    /// Serialized static-graph bodies for the GraphFactory=None branch, keyed by the owning
-    /// LinkedDataConfig instance (endpoints are configured once at startup and live for the
-    /// app's lifetime) then by (origin, mediaType). ConditionalWeakTable ties the OUTER
-    /// cache's lifetime to the config's own lifetime — the mediaType set is indeed tiny (a
-    /// handful of supported content types), but `origin` is derived from the request's own
-    /// `Host` header (Frank.OriginValidation.tryValidateOrigin validates only SYNTACTIC
-    /// well-formedness, never an allowlist) — an unauthenticated client varying Host can
-    /// mint unbounded permanent entries here (#405). Frank.BoundedCache bounds the INNER
-    /// per-config cache to a hard ceiling, independent of how many distinct origins a
-    /// client sends. The GraphFactory=Some branch is genuinely per-request and is NEVER
-    /// routed through this cache.
-    let staticBodyCache =
-        ConditionalWeakTable<LinkedDataConfig, Frank.BoundedCache<struct (string * string), string>>()
-
+    let staticBodyLocks = Frank.StripedLocks(Frank.CacheStriping.DefaultStripeCount)
     let mutable staticBodyBuildCount = 0
 
     let cachedStaticBody
@@ -267,20 +293,14 @@ type LinkedDataMiddleware
         (mediaType: string)
         (build: unit -> string)
         : string =
-        let perConfig =
-            staticBodyCache.GetValue(
-                config,
-                ConditionalWeakTable<LinkedDataConfig, Frank.BoundedCache<struct (string * string), string>>
-                    .CreateValueCallback
-                    (fun _ -> Frank.BoundedCache<struct (string * string), string>(Frank.BoundedCache.DefaultCapacity))
-            )
+        let key =
+            { Config = config
+              Origin = origin
+              MediaType = mediaType }
 
-        perConfig.GetOrAdd(
-            struct (origin, mediaType),
-            (fun () ->
-                System.Threading.Interlocked.Increment(&staticBodyBuildCount) |> ignore
-                build ())
-        )
+        Frank.CacheStriping.getOrBuild staticBodyLocks staticBodyCache key (fun () ->
+            System.Threading.Interlocked.Increment(&staticBodyBuildCount) |> ignore
+            build ())
 
     let computeBody (mediaType: string) (origin: string) (effective: LinkedDataConfig) (ctx: HttpContext) : string =
         match effective.GraphFactory with
@@ -295,15 +315,16 @@ type LinkedDataMiddleware
     member internal _.StaticBodyBuildCount = staticBodyBuildCount
 
     /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of distinct
-    /// (origin, mediaType) entries currently retained for the given config's static-body
-    /// cache — proves the Host-header-flood cache-DoS fix (#405): bounded at
-    /// Frank.BoundedCache.DefaultCapacity regardless of how many distinct Host header
-    /// values a client sends. 0 when the config has never been served (cache not yet
-    /// created for it).
-    member internal _.StaticBodyCacheSizeFor(config: LinkedDataConfig) : int =
-        match staticBodyCache.TryGetValue config with
-        | true, cache -> cache.Count
-        | false, _ -> 0
+    /// (config, origin, mediaType) entries currently retained across this middleware's ONE
+    /// shared static-body cache — proves the Host-header-flood cache-DoS fix (#468,
+    /// originally #405): bounded at Frank.Builder.CacheCapacity regardless of how many
+    /// distinct Host header values a client sends. Reads the concrete MemoryCache's real
+    /// Count. #468 folds LinkedDataConfig identity INTO the cache key (StaticBodyCacheKey)
+    /// rather than partitioning into one inner cache per config (ConditionalWeakTable's old
+    /// shape) — so this reports the WHOLE cache's size, not one config's slice; every
+    /// existing call site only ever exercises a single config, where the two numbers
+    /// coincide.
+    member internal _.StaticBodyCacheSize = (staticBodyCache :?> MemoryCache).Count
 
     member private this.ServeRdf(ctx: HttpContext, mediaType: string, effective: LinkedDataConfig) : Task =
         match Frank.OriginValidation.tryValidateOrigin ctx.Request with

@@ -7,6 +7,7 @@ open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Features
+open Microsoft.Extensions.Caching.Memory
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.Primitives
 open Microsoft.Net.Http.Headers
@@ -81,29 +82,29 @@ module private HostRelative =
                     Pattern = pattern } ]
             ))
 
-    /// Builds (or reuses) the origin-keyed host-relative ShapesGraph. `cache`/`onBuild` are
-    /// owned by the calling ValidationMiddleware instance (#382) so this function stays free of
-    /// module-level mutable state — the caller supplies its caching policy explicitly (Rule 13).
-    /// `cache` is a Frank.BoundedCache (#405/#422: bounds retained memory to a hard ceiling
-    /// independent of how many distinct Host header values a client sends — an unauthenticated
-    /// client varying Host could otherwise mint unbounded permanent entries, the SAME defect
-    /// #405 closed for DiscoveryMiddleware/LinkedDataMiddleware) — `Shapes.toShapesGraph` still
-    /// runs at most once per origin, even if two requests race on a brand-new one.
+    /// Builds (or reuses) the origin-keyed host-relative ShapesGraph. `locks`/`cache`/`onBuild`
+    /// are owned by the calling ValidationMiddleware instance (#382) so this function stays free
+    /// of module-level mutable state — the caller supplies its caching policy explicitly (Rule 13).
+    /// `cache` is a keyed IMemoryCache (#468, originally #405/#422: bounds retained memory to a
+    /// hard ceiling independent of how many distinct Host header values a client sends — an
+    /// unauthenticated client varying Host could otherwise mint unbounded permanent entries, the
+    /// SAME defect closed for DiscoveryMiddleware/LinkedDataMiddleware) — `Shapes.toShapesGraph`
+    /// still runs at most once per origin, even if two requests race on a brand-new one
+    /// (Frank.CacheStriping.getOrBuild's double-checked-locking guarantee).
     let private getOrBuildShapesGraph
-        (cache: Frank.BoundedCache<string, VDS.RDF.Shacl.ShapesGraph>)
+        (locks: Frank.StripedLocks)
+        (cache: IMemoryCache)
         (onBuild: unit -> unit)
         (props: (Uri * string * string option) list)
         (origin: string)
         : VDS.RDF.Shacl.ShapesGraph =
-        cache.GetOrAdd(
-            origin,
-            (fun () ->
-                onBuild ()
-                Shapes.toShapesGraph (resolveProps props origin))
-        )
+        Frank.CacheStriping.getOrBuild locks cache origin (fun () ->
+            onBuild ()
+            Shapes.toShapesGraph (resolveProps props origin))
 
     let validateDynamic
-        (cache: Frank.BoundedCache<string, VDS.RDF.Shacl.ShapesGraph>)
+        (locks: Frank.StripedLocks)
+        (cache: IMemoryCache)
         (onBuild: unit -> unit)
         (props: (Uri * string * string option) list)
         (origin: string)
@@ -112,10 +113,17 @@ module private HostRelative =
         if props.IsEmpty then
             None
         else
-            let sg = getOrBuildShapesGraph cache onBuild props origin
+            let sg = getOrBuildShapesGraph locks cache onBuild props origin
             Some(Validator.validate sg data)
 
-type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logger: ILogger<ValidationMiddleware>) =
+type ValidationMiddleware
+    (
+        next: RequestDelegate,
+        config: ValidationConfig,
+        logger: ILogger<ValidationMiddleware>,
+        [<Microsoft.Extensions.DependencyInjection.FromKeyedServices("validation:shapes")>] hostRelativeShapesCache:
+            IMemoryCache
+    ) =
 
     do
         if isNull (box config.Shapes) then
@@ -128,15 +136,14 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
             invalidArg (nameof config) "ValidationConfig.MaxBodyBytes must be positive"
 
     /// Host-relative ShapesGraph cache, one entry per distinct request origin (issue #382).
-    /// #405/#422: Frank.BoundedCache bounds retained memory to a hard ceiling regardless of
-    /// how many distinct Host header values a client sends — the origin string is only ever
-    /// validated for SYNTACTIC well-formedness (Frank.OriginValidation.tryValidateOrigin),
-    /// never checked against a configured allowlist, so an unbounded cache here would let an
-    /// unauthenticated client mint unlimited permanent entries (the same defect #405 closed
-    /// for DiscoveryMiddleware's resolvedAlpsCache/resolvedHomeResourcesCache and
-    /// LinkedDataMiddleware's staticBodyCache).
-    let hostRelativeShapesCache =
-        Frank.BoundedCache<string, VDS.RDF.Shacl.ShapesGraph>(Frank.BoundedCache.DefaultCapacity)
+    /// #468 (originally #405/#422): the constructor-injected keyed IMemoryCache
+    /// ("validation:shapes") bounds retained memory to a hard ceiling regardless of how many
+    /// distinct Host header values a client sends — the origin string is only ever validated
+    /// for SYNTACTIC well-formedness (Frank.OriginValidation.tryValidateOrigin), never
+    /// checked against a configured allowlist, so an unbounded cache here would let an
+    /// unauthenticated client mint unlimited permanent entries.
+    let hostRelativeShapesLocks =
+        Frank.StripedLocks(Frank.CacheStriping.DefaultStripeCount)
 
     let mutable hostRelativeShapesBuildCount = 0
 
@@ -150,6 +157,7 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
         else
             let dynReport =
                 HostRelative.validateDynamic
+                    hostRelativeShapesLocks
                     hostRelativeShapesCache
                     (fun () -> System.Threading.Interlocked.Increment(&hostRelativeShapesBuildCount) |> ignore)
                     config.HostRelativeProperties
@@ -174,10 +182,11 @@ type ValidationMiddleware(next: RequestDelegate, config: ValidationConfig, logge
 
     /// Test-only visibility (internal + InternalsVisibleTo, #392 pattern): number of distinct
     /// origins currently retained in the host-relative ShapesGraph cache — proves the
-    /// Host-header-flood cache-DoS fix (#405/#422): bounded at
-    /// Frank.BoundedCache.DefaultCapacity regardless of how many distinct Host header values
-    /// a client sends.
-    member internal _.HostRelativeShapesCacheSize = hostRelativeShapesCache.Count
+    /// Host-header-flood cache-DoS fix (#468, originally #405/#422): bounded at
+    /// Frank.Builder.CacheCapacity regardless of how many distinct Host header values a
+    /// client sends. Reads the concrete MemoryCache's real Count, never a hand-rolled counter.
+    member internal _.HostRelativeShapesCacheSize =
+        (hostRelativeShapesCache :?> MemoryCache).Count
 
     member private _.InvokeCore(ctx: HttpContext, origin: string) : Task =
         if not (JsonLdBody.isLdJson ctx) then

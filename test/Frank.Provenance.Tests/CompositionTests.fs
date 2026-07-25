@@ -134,6 +134,7 @@ let private startComposedServer () =
 
     builder.Services.AddSingleton(valConfig) |> ignore
     builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
+    registerBoundedMemoryCaches builder.Services |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     // Outermost: Provenance (buffers for prov-profile; passes through otherwise).
@@ -185,6 +186,7 @@ let private startComposedServerLdOuter () =
     |> ignore
 
     builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
+    registerBoundedMemoryCaches builder.Services |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     // LinkedData OUTERMOST — the previously-broken order.
@@ -227,6 +229,7 @@ let private startProvServer (provConfig: ProvenanceConfig) =
         :> IProvenanceStore)
     |> ignore
 
+    registerBoundedMemoryCaches builder.Services |> ignore
     let app = builder.Build()
     app.UseMiddleware<ProvenanceMiddleware>() |> ignore
 
@@ -249,6 +252,7 @@ let private startLinkedDataServer (ldConfig: LinkedDataConfig) =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
+    registerBoundedMemoryCaches builder.Services |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore
@@ -316,6 +320,7 @@ let private startDiscoveryServer (discConfig: DiscoveryConfig) =
     builder.Services.AddRouting() |> ignore
     let dataSource = ResourceEndpointDataSource([| endpoint |])
     builder.Services.AddSingleton<ResourceEndpointDataSource>(dataSource) |> ignore
+    registerBoundedMemoryCaches builder.Services |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<DiscoveryMiddleware.DiscoveryMiddleware>() |> ignore
@@ -328,6 +333,7 @@ let private startValidationServer (valConfig: ValidationConfig) =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(valConfig) |> ignore
+    registerBoundedMemoryCaches builder.Services |> ignore
     let app = builder.Build()
     app.UseMiddleware<ValidationMiddleware>() |> ignore
 
@@ -679,6 +685,7 @@ let tests =
 
               builder.Services.AddSingleton(valConfig) |> ignore
 
+              registerBoundedMemoryCaches builder.Services |> ignore
               let app = builder.Build()
               app.UseMiddleware<ProvenanceMiddleware>() |> ignore
               app.UseMiddleware<ValidationMiddleware>() |> ignore

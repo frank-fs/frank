@@ -15,7 +15,7 @@
     <Compile Include="ClrTypeName.fs" />
     <Compile Include="UriResolution.fs" />
     <Compile Include="OriginValidation.fs" />
-    <Compile Include="BoundedCache.fs" />
+    <Compile Include="CacheStriping.fs" />
     <Compile Include="GeneratedModuleReflection.fs" />
     <Compile Include="Builder.fs" />
   </ItemGroup>
@@ -53,10 +53,9 @@
     </AssemblyAttribute>
   </ItemGroup>
 
-  <!-- BoundedCache (#405) is tested directly in isolation, mirroring the pattern above, and
-       its DefaultCapacity constant is asserted against from all three consumer test suites
-       (#422 cluster: ValidationMiddleware's hostRelativeShapesCache joined
-       DiscoveryMiddleware's/LinkedDataMiddleware's caches on BoundedCache). -->
+  <!-- #468: Frank.Builder.CacheCapacity (the four keyed IMemoryCache regions' shared
+       SizeLimit) is asserted against from all four consumer test suites (Discovery,
+       Validation, LinkedData, and Frank.Tests itself). -->
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>Frank.Tests</_Parameter1>

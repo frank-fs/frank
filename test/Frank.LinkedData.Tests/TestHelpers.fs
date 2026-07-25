@@ -1,12 +1,22 @@
 module Frank.LinkedData.Tests.TestHelpers
 
+open System
 open System.Net.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
+open Microsoft.Extensions.Caching.Memory
 open Microsoft.Extensions.DependencyInjection
 open VDS.RDF
+open Frank.Builder
 open Frank.LinkedData
+
+/// #468: a fresh, independently-budgeted IMemoryCache mirroring the keyed registration
+/// WebHostBuilder.Run wires in production — used by tests that construct LinkedDataMiddleware
+/// directly (bypassing DI) and so must supply its keyed IMemoryCache constructor parameter
+/// by hand.
+let newBoundedMemoryCache () : IMemoryCache =
+    new MemoryCache(MemoryCacheOptions(SizeLimit = Nullable(int64 Frank.Builder.CacheCapacity))) :> IMemoryCache
 
 /// Build a minimal fixture IGraph with one outbound triple (seeAlso to schema.org/Game).
 let buildFixtureGraph () : IGraph =
@@ -59,6 +69,7 @@ let startServer (config: LinkedDataConfig) =
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(config) |> ignore
     builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
+    registerBoundedMemoryCaches builder.Services |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore
@@ -146,6 +157,7 @@ let startServerWithPlainRoute (config: LinkedDataConfig) =
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(config) |> ignore
     builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
+    registerBoundedMemoryCaches builder.Services |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore
@@ -165,6 +177,7 @@ let startServerWithTttRoutes () =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
+    registerBoundedMemoryCaches builder.Services |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore

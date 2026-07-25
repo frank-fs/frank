@@ -7,6 +7,7 @@ open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open VDS.RDF
 open Expecto
+open Frank.Builder
 open Frank.LinkedData
 open Frank.LinkedData.Tests.TestHelpers
 
@@ -15,14 +16,11 @@ open Frank.LinkedData.Tests.TestHelpers
 let private buildEndpointGraph () : IGraph =
     let g = new Graph()
 
-    let subject =
-        g.CreateUriNode(Uri "https://example.org/vocab/TttSquare")
+    let subject = g.CreateUriNode(Uri "https://example.org/vocab/TttSquare")
 
-    let rdfType =
-        g.CreateUriNode(Uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+    let rdfType = g.CreateUriNode(Uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
 
-    let owlClass =
-        g.CreateUriNode(Uri "http://www.w3.org/2002/07/owl#Class")
+    let owlClass = g.CreateUriNode(Uri "http://www.w3.org/2002/07/owl#Class")
 
     g.Assert(Triple(subject, rdfType, owlClass)) |> ignore
     g :> IGraph
@@ -38,20 +36,17 @@ let private startServerWithMetadata (endpointConfig: LinkedDataConfig) =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     builder.Services.AddSingleton(LinkedDataVocabularyConfig.None) |> ignore
+    registerBoundedMemoryCaches builder.Services |> ignore
     let app = builder.Build()
     app.UseRouting() |> ignore
     app.UseMiddleware<LinkedDataMiddleware>() |> ignore
 
-    app
-        .MapGet("/vocab", Func<string>(fun () -> "vocab-fallback"))
-        .WithMetadata(endpointConfig)
+    app.MapGet("/vocab", Func<string>(fun () -> "vocab-fallback")).WithMetadata(endpointConfig)
     |> ignore
 
     app.MapGet("/data", Func<string>(fun () -> "downstream")) |> ignore
 
-    app
-        .MapPost("/vocab-post", Func<string>(fun () -> "post-downstream"))
-        .WithMetadata(endpointConfig)
+    app.MapPost("/vocab-post", Func<string>(fun () -> "post-downstream")).WithMetadata(endpointConfig)
     |> ignore
 
     app.StartAsync().GetAwaiter().GetResult()
@@ -60,6 +55,7 @@ let private startServerWithMetadata (endpointConfig: LinkedDataConfig) =
 [<Tests>]
 let endpointMetadataTests =
     let endpointGraph = buildEndpointGraph ()
+
     let endpointConfig =
         { LinkedDataConfig.Empty with
             Graph = endpointGraph
