@@ -553,6 +553,64 @@ let describedByScopingTests =
                    |> List.exists (fun l -> l.Contains "rel=\"profile\"" && l.Contains "/alps/test"))
                   "profile Link is unaffected by rel=\"type\" scoping" ]
 
+// ── #433 AC1/AC2: a resource declaring multiple relations advertises ALL of them via
+// OPTIONS rel="type", and a single-relation resource is byte-identical to before #433 ──
+
+let private multiRelationScopedConfig =
+    { ProfileUri = "/alps/test"
+      HomeRoute = "/"
+      AlpsDescriptors = []
+      DescribedByLinks =
+        [ { ClassIri = "https://schema.org/Game"
+            Link = "<https://schema.org/Game>; rel=\"type\"" }
+          { ClassIri = "https://schema.org/MoveAction"
+            Link = "<https://schema.org/MoveAction>; rel=\"type\"" } ]
+      ResourceHrefVars = Map.empty }
+
+[<Tests>]
+let multiValuedRelationTests =
+    testList
+        "DiscoveryMiddleware — #433: multi-valued relation advertises every declared semantic type"
+        [ testCase
+              "AC1: OPTIONS /games/demo1 rel=\"type\" Link set is EXACTLY {Game, MoveAction} — no collapsing to one"
+          <| fun _ ->
+              use app = startMultiRelationScopedServer multiRelationScopedConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Options, "/games/demo1")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+              let links = typeLinks resp |> List.sort
+
+              let expected =
+                  List.sort
+                      [ "<https://schema.org/Game>; rel=\"type\""
+                        "<https://schema.org/MoveAction>; rel=\"type\"" ]
+
+              Expect.equal links expected "rel=\"type\" Link set is exactly {Game, MoveAction}"
+              Expect.equal links.Length 2 "exactly two rel=\"type\" links — never collapsed to a single value"
+
+          testCase
+              "AC2: a single-relation resource's OPTIONS response is byte-identical to the pre-#433 single-value form (regression guard)"
+          <| fun _ ->
+              use app = startScopedRelationServer scopedRelationConfig
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Options, "/games/abc")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+
+              let allow = allowValues resp |> List.sort
+              Expect.equal allow (List.sort [ "GET"; "HEAD"; "OPTIONS" ]) "Allow header unchanged"
+
+              let links = linkValues resp |> List.sort
+
+              let expected =
+                  List.sort
+                      [ "<https://schema.org/Game>; rel=\"type\""
+                        "</alps/test>; rel=\"profile\"; type=\"application/alps+json\"" ]
+
+              Expect.equal
+                  links
+                  expected
+                  "Link header set is byte-identical to the single-relation pre-#433 form — exactly 2 entries (profile + type), no duplication, no collapse" ]
+
 // ── #398 AC3: Allow header is a single comma-joined wire-level value ─────────
 
 /// Raw (non-comma-split) values for the given header on either general response

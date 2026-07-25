@@ -27,15 +27,16 @@ let private httpMethodsOf (re: RouteEndpoint) : string list option =
     | null -> None
     | meta -> Some(meta.HttpMethods |> Seq.toList)
 
-/// Declared relation IRI on an endpoint via ResourceRelationMetadata, or None when absent —
-/// the GetMetadata<ResourceRelationMetadata>() |> box → null-check → unbox → .Relation idiom
-/// shared by every endpoint-metadata scan in this file (#398 /simplify item 2).
-/// ResourceRelationMetadata is an F# record — it doesn't support the `null` pattern
-/// directly, so box it first.
-let private relationOf (re: RouteEndpoint) : string option =
-    match re.Metadata.GetMetadata<ResourceRelationMetadata>() |> box with
-    | null -> None
-    | relBox -> Some((unbox<ResourceRelationMetadata> relBox).Relation)
+/// Declared relation IRI(s) on an endpoint via ResourceRelationMetadata, in declaration
+/// order — a resource composes more than one semantic type by stamping `relation` more
+/// than once (or via the list overload); each call adds its OWN ResourceRelationMetadata
+/// instance to the endpoint's metadata collection. GetOrderedMetadata returns EVERY
+/// instance (unlike GetMetadata, which returns only the last-added one) — the idiom every
+/// endpoint-metadata scan in this file uses instead of collapsing to a single value (#433).
+let private relationsOf (re: RouteEndpoint) : string list =
+    re.Metadata.GetOrderedMetadata<ResourceRelationMetadata>()
+    |> Seq.map (fun m -> m.Relation)
+    |> Seq.toList
 
 /// Accepted request CLR type full name declared on an endpoint via IAcceptsMetadata,
 /// normalized via Frank.ClrTypeName so a module-nested/generic request type correlates
@@ -81,9 +82,7 @@ let internal producedResponseTypesOf (re: RouteEndpoint) : string list =
 /// future signal is now exactly ONE function appended to this list;
 /// isLiveDescriptor/filterReachableDescriptors below never change.
 let internal correlationExtractors: (RouteEndpoint -> string list) list =
-    [ relationOf >> Option.toList
-      acceptedRequestTypeOf >> Option.toList
-      producedResponseTypesOf ]
+    [ relationsOf; acceptedRequestTypeOf >> Option.toList; producedResponseTypesOf ]
 
 /// Union of every correlation key any of `extractors` contributes across every live
 /// endpoint in `dataSource` — the single set isLiveDescriptor/filterReachableDescriptors
@@ -142,7 +141,8 @@ let internal advertisedMethods (methods: string list) : string list =
 /// Endpoints carrying ResourceRelationMetadata contribute to one merged entry per
 /// (Relation, Href) pair — a resource with both GET and POST produces a single entry
 /// with allow ⊇ {GET, HEAD, OPTIONS, POST}. HEAD is added when GET is present;
-/// OPTIONS is always added (RFC 7231 §7.4.1).
+/// OPTIONS is always added (RFC 7231 §7.4.1). A resource declaring MULTIPLE relations
+/// (#433) contributes ONE entry PER declared relation — never collapsed to a single key.
 /// Returns a list that may contain multiple entries with the same Relation when two
 /// distinct hrefs share a relation IRI; caller is responsible for deduplication.
 /// resourceHrefVars maps each relation IRI to its template-variable meaning IRIs.
@@ -160,10 +160,12 @@ let homeResourcesFromEndpoints
     (dataSource: EndpointDataSource)
     : JsonHomeResource list =
     scanRouteEndpoints dataSource
-    |> Seq.choose (fun re ->
-        match relationOf re, httpMethodsOf re with
-        | Some relation, Some methods -> Some(relation, re.RoutePattern.RawText, methods)
-        | _ -> None)
+    |> Seq.collect (fun re ->
+        match httpMethodsOf re with
+        | None -> Seq.empty
+        | Some methods ->
+            relationsOf re
+            |> Seq.map (fun relation -> relation, re.RoutePattern.RawText, methods))
     |> Seq.groupBy (fun (relation, href, _) -> (relation, href))
     |> Seq.map (fun ((relation, href), entries) ->
         let allMethods =
@@ -228,7 +230,7 @@ let private correlateMethodsByRelationAndRequestType
     let byRequestType = ResizeArray<string * string>()
 
     for re, m in endpointMethodPairs do
-        relationOf re |> Option.iter (fun r -> byRelation.Add(r, m))
+        relationsOf re |> List.iter (fun r -> byRelation.Add(r, m))
         acceptedRequestTypeOf re |> Option.iter (fun t -> byRequestType.Add(t, m))
 
     let toMethodsMap (pairs: ResizeArray<string * string>) =
@@ -505,7 +507,7 @@ let internal methodsForPath (routeTemplates: EndpointTemplate list) (requestPath
 /// (#421), shared with methodsForPath — a request needing both never parses twice.
 let internal relationsForPath (routeTemplates: EndpointTemplate list) (requestPath: string) : string list =
     endpointsForPath routeTemplates requestPath
-    |> List.choose relationOf
+    |> List.collect relationsOf
     |> List.distinct
 
 /// Static discovery for the application:

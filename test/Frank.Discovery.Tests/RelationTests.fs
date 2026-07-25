@@ -30,6 +30,14 @@ let private tryGetRelationMeta (ep: Microsoft.AspNetCore.Http.Endpoint) =
     else
         Some(boxed |> unbox<ResourceRelationMetadata>)
 
+/// ALL declared relation IRIs on an endpoint, in declaration order — #433: a resource may
+/// compose more than one semantic type by stamping `relation` more than once (or via the
+/// list overload); GetOrderedMetadata returns every instance, not just the last.
+let private allRelationIris (ep: Microsoft.AspNetCore.Http.Endpoint) : string list =
+    ep.Metadata.GetOrderedMetadata<ResourceRelationMetadata>()
+    |> Seq.map (fun m -> m.Relation)
+    |> Seq.toList
+
 /// Spin a minimal TestServer seeded with two Frank resources, each carrying `relation`.
 /// Reuses TestHelpers.buildDiscoveryApp's ResourceEndpointDataSource wiring (#411 — the
 /// SAME concrete type DiscoveryMiddleware's production constructor receives via
@@ -80,6 +88,50 @@ let relationOpTests =
               let meta = tryGetRelationMeta ep
               Expect.isSome meta "ResourceRelationMetadata present"
               Expect.stringStarts meta.Value.Relation "http" "IRI is absolute" ]
+
+/// #433: the `relation` CE op must compose across multiple declarations — a resource
+/// whose GET embodies one vocabulary class and whose POST embodies another advertises
+/// BOTH, never collapsing to the last-declared one.
+[<Tests>]
+let relationCompositionTests =
+    testList
+        "relation CE op composes multiple relations (#433)"
+        [ testCase "calling `relation` twice on the same resource accumulates both IRIs, not overwrite"
+          <| fun _ ->
+              let res =
+                  resource "/games/{id}" {
+                      relation "https://schema.org/Game"
+                      relation "https://schema.org/MoveAction"
+                      get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("game")))
+                  }
+
+              let iris = allRelationIris res.Endpoints.[0]
+
+              Expect.equal
+                  iris
+                  [ "https://schema.org/Game"; "https://schema.org/MoveAction" ]
+                  "both declared relation IRIs are present, in declaration order — the second call does not overwrite the first"
+
+          testCase "`relation` accepts a string list and stamps every IRI"
+          <| fun _ ->
+              let res =
+                  resource "/games/{id}" {
+                      relation [ "https://schema.org/Game"; "https://schema.org/MoveAction" ]
+                      get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("game")))
+                  }
+
+              let iris = allRelationIris res.Endpoints.[0]
+
+              Expect.equal
+                  iris
+                  [ "https://schema.org/Game"; "https://schema.org/MoveAction" ]
+                  "the list overload stamps one ResourceRelationMetadata instance per IRI, in list order"
+
+          testCase "a single `relation` call is unaffected — exactly one IRI, unchanged from before #433"
+          <| fun _ ->
+              let ep = buildGameEndpoint ()
+              let iris = allRelationIris ep
+              Expect.equal iris [ "https://schema.org/Game" ] "exactly one relation IRI for a single declaration" ]
 
 [<Tests>]
 let runtimeJsonHomeTests =
@@ -429,3 +481,51 @@ let jsonHomeFromDeclaredConfigTests =
               let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
               Expect.stringContains body "resources" "resources key"
               Expect.stringContains body "https://schema.org/Game" "Game IRI from endpoint metadata" ]
+
+// ── #433: a resource declaring multiple relations must not collapse to one entry ──
+
+let private multiRelationConfig: DiscoveryConfig =
+    { DiscoveryConfig.Empty with
+        ProfileUri = "/alps/test"
+        HomeRoute = "/" }
+
+let private startMultiRelationJsonHomeServer () =
+    // Fixed (non-templated) route deliberately — this fixture investigates relation-key
+    // multiplicity, and a templated href would additionally require a derived href-vars
+    // meaning IRI for every variable, an orthogonal concern already covered elsewhere.
+    let gameResource =
+        resource "/games" {
+            relation "https://schema.org/Game"
+            relation "https://schema.org/MoveAction"
+            get (RequestDelegate(fun ctx -> ctx.Response.WriteAsync("game")))
+        }
+
+    let app = buildDiscoveryApp None multiRelationConfig gameResource.Endpoints
+    app.StartAsync().GetAwaiter().GetResult()
+    app
+
+[<Tests>]
+let jsonHomeMultiRelationTests =
+    testList
+        "runtime JSON Home — #433 a resource with two declared relations appears once per relation, never collapsed"
+        [ testCase "both declared relation IRIs appear as SEPARATE resource keys, not collapsed to one"
+          <| fun _ ->
+              use app = startMultiRelationJsonHomeServer ()
+              use client = app.GetTestClient()
+              use req = new HttpRequestMessage(HttpMethod.Get, "/")
+              req.Headers.Add("Accept", "application/json-home")
+              let resp = client.SendAsync(req).GetAwaiter().GetResult()
+              Expect.equal (int resp.StatusCode) 200 "200 OK"
+              let body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+              use doc = JsonDocument.Parse body
+
+              let keys =
+                  doc.RootElement.GetProperty("resources").EnumerateObject()
+                  |> Seq.map (fun p -> p.Name)
+                  |> Seq.toList
+                  |> List.sort
+
+              Expect.equal
+                  keys
+                  (List.sort [ "https://schema.org/Game"; "https://schema.org/MoveAction" ])
+                  "exactly two resource entries, one per declared relation — no collapse to a single value" ]

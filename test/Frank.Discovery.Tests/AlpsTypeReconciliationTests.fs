@@ -214,6 +214,29 @@ let methodsByRelationTests =
                   "methods unioned across endpoints sharing a relation"
           }
 
+          test
+              "methodsByRelation: an endpoint carrying TWO ResourceRelationMetadata entries contributes its methods to BOTH relations independently (#433)" {
+              let ep =
+                  routeEndpoint
+                      "/games/{id}"
+                      [| "GET" |]
+                      [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
+                        box ({ Relation = "https://schema.org/MoveAction" }: ResourceRelationMetadata) ]
+
+              let ds = TestEndpointDataSource([| ep |]) :> EndpointDataSource
+              let result = DiscoveryMiddleware.methodsByRelation ds
+
+              Expect.equal
+                  (Map.find "https://schema.org/Game" result)
+                  (Set.ofList [ "GET" ])
+                  "the first declared relation gets the endpoint's real methods"
+
+              Expect.equal
+                  (Map.find "https://schema.org/MoveAction" result)
+                  (Set.ofList [ "GET" ])
+                  "the second declared relation ALSO gets the endpoint's real methods — neither is dropped"
+          }
+
           test "methodsByRelation: endpoint without ResourceRelationMetadata is excluded" {
               let ep = routeEndpoint "/plain" [| "GET" |] []
               let ds = TestEndpointDataSource([| ep |]) :> EndpointDataSource

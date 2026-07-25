@@ -296,6 +296,22 @@ let buildFConfApp (config: DiscoveryConfig) : WebApplication =
 
     runWebHostSpecOnTestServer spec
 
+/// Spin a TestServer with ONE route ("/games/{id}") carrying TWO ResourceRelationMetadata
+/// entries — a resource composing more than one declared vocabulary class (#433, e.g. GET
+/// embodies schema:Game while POST embodies schema:MoveAction). Used by the #433 AC1
+/// multi-valued rel="type" scoping acceptance test.
+let startMultiRelationScopedServer (config: DiscoveryConfig) =
+    let endpoints: Endpoint[] =
+        [| routeEndpoint
+               "/games/{id}"
+               [| "GET" |]
+               [ box ({ Relation = "https://schema.org/Game" }: ResourceRelationMetadata)
+                 box ({ Relation = "https://schema.org/MoveAction" }: ResourceRelationMetadata) ] |]
+
+    let app = buildDiscoveryApp None config endpoints
+    app.StartAsync().GetAwaiter().GetResult()
+    app
+
 /// Spin a TestServer with THREE routes carrying different relation exposure:
 ///   - "/tictactoe" — routed, but declares NO ResourceRelationMetadata.
 ///   - "/games/{id}" — declares relation "https://schema.org/Game".
