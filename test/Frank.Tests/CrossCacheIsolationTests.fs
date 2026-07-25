@@ -20,12 +20,6 @@ open Expecto
 open Frank
 open Frank.Builder
 
-let private cacheKeys =
-    [ "discovery:alps"
-      "discovery:home"
-      "validation:shapes"
-      "linkeddata:staticbody" ]
-
 /// A fresh service provider wired via the SAME production registration function
 /// WebHostBuilder.Run calls on both TFM branches — never a hand-rolled `new MemoryCache(...)`
 /// per test.

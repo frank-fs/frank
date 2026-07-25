@@ -7,6 +7,7 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.Logging.Abstractions
 open Expecto
+open Frank.Builder
 open Frank.Validation
 open Frank.Validation.Tests.MiddlewareTestHelpers
 

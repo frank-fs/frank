@@ -10,13 +10,6 @@ open Frank.Builder
 open Frank.Semantic
 open Frank.Validation
 
-/// #468: a fresh, independently-budgeted IMemoryCache mirroring the keyed registration
-/// WebHostBuilder.Run wires in production — used by tests that construct ValidationMiddleware
-/// directly (bypassing DI) and so must supply its keyed IMemoryCache constructor parameter
-/// by hand.
-let newBoundedMemoryCache () : IMemoryCache =
-    new MemoryCache(MemoryCacheOptions(SizeLimit = Nullable(int64 Frank.Builder.CacheCapacity))) :> IMemoryCache
-
 let private offlineLoader = JsonLdLoader.synthesizing [ "https://schema.org/" ]
 
 let orderConfig () : ValidationConfig =

@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.Logging.Abstractions
 open Expecto
+open Frank.Builder
 open Frank.Discovery
 open Frank.Discovery.Tests.TestHelpers
 

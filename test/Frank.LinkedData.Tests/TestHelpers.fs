@@ -11,13 +11,6 @@ open VDS.RDF
 open Frank.Builder
 open Frank.LinkedData
 
-/// #468: a fresh, independently-budgeted IMemoryCache mirroring the keyed registration
-/// WebHostBuilder.Run wires in production — used by tests that construct LinkedDataMiddleware
-/// directly (bypassing DI) and so must supply its keyed IMemoryCache constructor parameter
-/// by hand.
-let newBoundedMemoryCache () : IMemoryCache =
-    new MemoryCache(MemoryCacheOptions(SizeLimit = Nullable(int64 Frank.Builder.CacheCapacity))) :> IMemoryCache
-
 /// Build a minimal fixture IGraph with one outbound triple (seeAlso to schema.org/Game).
 let buildFixtureGraph () : IGraph =
     let graph = new Graph()

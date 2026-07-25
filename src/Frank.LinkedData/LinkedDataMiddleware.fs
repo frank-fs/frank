@@ -254,7 +254,7 @@ module private Serializers =
 /// equality on Origin/MediaType. NoComparison is required alongside CustomEquality: without
 /// it F# would try to auto-derive IComparable too, which fails to compile for the same
 /// function-field reason.
-[<CustomEquality; NoComparison>]
+[<Struct; CustomEquality; NoComparison>]
 type private StaticBodyCacheKey =
     { Config: LinkedDataConfig
       Origin: string
@@ -268,8 +268,14 @@ type private StaticBodyCacheKey =
             && this.MediaType = o.MediaType
         | _ -> false
 
+    /// Combines the three components directly (no intermediate tuple allocation) — this
+    /// runs on every cachedStaticBody call, hit or miss, so avoiding the extra heap
+    /// allocation a tuple would need matters on this hot path (#468 /simplify finding).
     override this.GetHashCode() =
-        hash (RuntimeHelpers.GetHashCode this.Config, this.Origin, this.MediaType)
+        let mutable h = RuntimeHelpers.GetHashCode this.Config
+        h <- h * 397 ^^^ this.Origin.GetHashCode()
+        h <- h * 397 ^^^ this.MediaType.GetHashCode()
+        h
 
 /// Content-negotiation middleware serving per-endpoint RDF graphs in multiple
 /// representations: application/ld+json, text/turtle, application/rdf+xml.

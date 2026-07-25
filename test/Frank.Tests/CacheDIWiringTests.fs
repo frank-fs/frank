@@ -20,12 +20,6 @@ open Microsoft.Extensions.DependencyInjection
 open Expecto
 open Frank.Builder
 
-let private cacheKeys =
-    [ "discovery:alps"
-      "discovery:home"
-      "validation:shapes"
-      "linkeddata:staticbody" ]
-
 let private newServiceProvider () : IServiceProvider =
     let services = ServiceCollection()
     registerBoundedMemoryCaches services |> ignore

@@ -8,6 +8,7 @@ open Microsoft.Extensions.Logging.Abstractions
 open Microsoft.Extensions.Primitives
 open Expecto
 open VDS.RDF
+open Frank.Builder
 open Frank.LinkedData
 open Frank.LinkedData.Tests.TestHelpers
 

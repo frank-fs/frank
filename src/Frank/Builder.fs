@@ -487,31 +487,35 @@ module Builder =
     [<Literal>]
     let CacheCapacity = 1000
 
-    let private newBoundedMemoryCache () : IMemoryCache =
+    /// Internal (not private) so the four consumer test projects — already granted
+    /// InternalsVisibleTo below for CacheCapacity — build identical MemoryCache instances in
+    /// their own TestServer wiring instead of each re-declaring this factory (Constitution #8).
+    let internal newBoundedMemoryCache () : IMemoryCache =
         new MemoryCache(MemoryCacheOptions(SizeLimit = System.Nullable(int64 CacheCapacity))) :> IMemoryCache
 
-    /// #468: registers the four independently-budgeted IMemoryCache regions consumed by
+    /// #468: the four independently-budgeted IMemoryCache region keys — one per
     /// DiscoveryMiddleware's resolvedAlpsCache/resolvedHomeResourcesCache,
     /// ValidationMiddleware's hostRelativeShapesCache, and LinkedDataMiddleware's
-    /// staticBodyCache via keyed DI. Each key gets its OWN MemoryCache instance (own
-    /// SizeLimit accounting) — a flood against one must never evict another's entries, a
-    /// stronger guarantee than grouping by middleware (Discovery's two caches don't share a
-    /// budget either). Called from BOTH WebHostBuilder.Run TFM branches below AND from test
-    /// helpers that mirror Run's own wiring sequence on a TestServer (e.g.
+    /// staticBodyCache. Exposed (not inlined into registerBoundedMemoryCaches) so tests
+    /// asserting cross-cache isolation/DI-wiring iterate the SAME list production wiring
+    /// uses, rather than hand-copying the four string literals and risking drift.
+    let cacheKeys =
+        [ "discovery:alps"
+          "discovery:home"
+          "validation:shapes"
+          "linkeddata:staticbody" ]
+
+    /// #468: registers all four regions from cacheKeys. Each key gets its OWN MemoryCache
+    /// instance (own SizeLimit accounting) — a flood against one must never evict another's
+    /// entries, a stronger guarantee than grouping by middleware (Discovery's two caches
+    /// don't share a budget either). Called from BOTH WebHostBuilder.Run TFM branches below
+    /// AND from test helpers that mirror Run's own wiring sequence on a TestServer (e.g.
     /// Frank.Discovery.Tests.runWebHostSpecOnTestServer) so the two can never drift
     /// (Constitution #8: no duplicated logic).
     let registerBoundedMemoryCaches (services: IServiceCollection) : IServiceCollection =
-        services.AddKeyedSingleton<IMemoryCache>("discovery:alps", (fun _ _ -> newBoundedMemoryCache ()))
-        |> ignore
-
-        services.AddKeyedSingleton<IMemoryCache>("discovery:home", (fun _ _ -> newBoundedMemoryCache ()))
-        |> ignore
-
-        services.AddKeyedSingleton<IMemoryCache>("validation:shapes", (fun _ _ -> newBoundedMemoryCache ()))
-        |> ignore
-
-        services.AddKeyedSingleton<IMemoryCache>("linkeddata:staticbody", (fun _ _ -> newBoundedMemoryCache ()))
-        |> ignore
+        for key in cacheKeys do
+            services.AddKeyedSingleton<IMemoryCache>(key, (fun _ _ -> newBoundedMemoryCache ()))
+            |> ignore
 
         services
 
