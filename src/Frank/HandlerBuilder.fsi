@@ -1,4 +1,4 @@
-namespace Frank.OpenApi
+namespace Frank.Builder
 
 open System
 open System.Threading.Tasks

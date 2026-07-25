@@ -12,23 +12,28 @@ module ResourceBuilderExtensions =
     /// Helper to add a HandlerDefinition to a ResourceSpec
     let private addHandlerDefinition (httpMethod: string) (spec: ResourceSpec) (def: HandlerDefinition) : ResourceSpec =
         // Add the handler
-        let specWithHandler = { spec with Handlers = (httpMethod, def.Handler) :: spec.Handlers }
+        let specWithHandler =
+            { spec with
+                Handlers = (httpMethod, def.Handler) :: spec.Handlers }
         // Wrap metadata conventions to only apply to this specific HTTP method
         let conventions = HandlerDefinitionMetadata.toConventions def
+
         let methodSpecificConventions =
-            conventions |> List.map (fun conv ->
+            conventions
+            |> List.map (fun conv ->
                 fun (builder: EndpointBuilder) ->
                     // Find HttpMethodMetadata in the builder's metadata list
                     let httpMethodMeta =
                         builder.Metadata
                         |> Seq.tryFind (fun m -> m :? HttpMethodMetadata)
                         |> Option.map (fun m -> m :?> HttpMethodMetadata)
+
                     match httpMethodMeta with
-                    | Some meta when meta.HttpMethods |> Seq.contains httpMethod ->
-                        conv builder
-                    | _ -> ()
-            )
-        { specWithHandler with Metadata = specWithHandler.Metadata @ methodSpecificConventions }
+                    | Some meta when meta.HttpMethods |> Seq.contains httpMethod -> conv builder
+                    | _ -> ())
+
+        { specWithHandler with
+            Metadata = specWithHandler.Metadata @ methodSpecificConventions }
 
     type ResourceBuilder with
 

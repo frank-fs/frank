@@ -7,10 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="HandlerDefinition.fsi" />
-    <Compile Include="HandlerDefinition.fs" />
-    <Compile Include="HandlerBuilder.fsi" />
-    <Compile Include="HandlerBuilder.fs" />
     <Compile Include="ResourceBuilderExtensions.fsi" />
     <Compile Include="ResourceBuilderExtensions.fs" />
     <Compile Include="WebHostBuilderExtensions.fsi" />

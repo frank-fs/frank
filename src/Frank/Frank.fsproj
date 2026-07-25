@@ -7,6 +7,10 @@
   <ItemGroup>
     <Compile Include="ContentNegotiation.fsi" />
     <Compile Include="ContentNegotiation.fs" />
+    <Compile Include="HandlerDefinition.fsi" />
+    <Compile Include="HandlerDefinition.fs" />
+    <Compile Include="HandlerBuilder.fsi" />
+    <Compile Include="HandlerBuilder.fs" />
     <Compile Include="ResourceBuilder.fsi" />
     <Compile Include="ResourceBuilder.fs" />
     <Compile Include="WebHostBuilder.fsi" />

@@ -59,7 +59,7 @@ type ResourceBuilder(routeTemplate) =
     member __.Yield(_) = ResourceSpec.Empty
 
     [<CustomOperation("name")>]
-    member __.Name(spec, name) = { spec with Name = name }
+    member __.Name(spec: ResourceSpec, name: string) = { spec with Name = name }
 
     static member AddMetadata(spec: ResourceSpec, convention: EndpointBuilder -> unit) : ResourceSpec =
         { spec with

@@ -1,8 +1,13 @@
-namespace Frank.OpenApi
+namespace Frank.Builder
 
 open System
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
+
+[<AutoOpen>]
+module internal MediaTypes =
+    [<Literal>]
+    val ApplicationJson : string = "application/json"
 
 type ProducesInfo =
     { StatusCode: int
@@ -23,6 +28,7 @@ type HandlerDefinition =
       Tags: string list
       Produces: ProducesInfo list
       Accepts: AcceptsInfo list }
+
     static member Empty : HandlerDefinition
 
 module HandlerDefinitionMetadata =
