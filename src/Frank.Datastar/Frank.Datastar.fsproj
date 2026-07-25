@@ -7,12 +7,19 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Consts.fsi" />
     <Compile Include="Consts.fs" />
+    <Compile Include="Types.fsi" />
     <Compile Include="Types.fs" />
+    <Compile Include="ServerSentEvent.fsi" />
     <Compile Include="ServerSentEvent.fs" />
+    <Compile Include="SseDataLineWriter.fsi" />
     <Compile Include="SseDataLineWriter.fs" />
+    <Compile Include="SseDataLineStream.fsi" />
     <Compile Include="SseDataLineStream.fs" />
+    <Compile Include="ServerSentEventGenerator.fsi" />
     <Compile Include="ServerSentEventGenerator.fs" />
+    <Compile Include="Frank.Datastar.fsi" />
     <Compile Include="Frank.Datastar.fs" />
   </ItemGroup>
 

@@ -7,10 +7,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="AuthRequirement.fsi" />
     <Compile Include="AuthRequirement.fs" />
+    <Compile Include="AuthConfig.fsi" />
     <Compile Include="AuthConfig.fs" />
+    <Compile Include="EndpointAuth.fsi" />
     <Compile Include="EndpointAuth.fs" />
+    <Compile Include="ResourceBuilderExtensions.fsi" />
     <Compile Include="ResourceBuilderExtensions.fs" />
+    <Compile Include="WebHostBuilderExtensions.fsi" />
     <Compile Include="WebHostBuilderExtensions.fs" />
   </ItemGroup>
 

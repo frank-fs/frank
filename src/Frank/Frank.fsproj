@@ -5,8 +5,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="ContentNegotiation.fsi" />
     <Compile Include="ContentNegotiation.fs" />
-    <Compile Include="Builder.fs" />
+    <Compile Include="ResourceBuilder.fsi" />
+    <Compile Include="ResourceBuilder.fs" />
+    <Compile Include="WebHostBuilder.fsi" />
+    <Compile Include="WebHostBuilder.fs" />
   </ItemGroup>
 
   <ItemGroup>

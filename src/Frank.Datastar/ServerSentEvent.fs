@@ -6,12 +6,12 @@ open System.Text
 open Microsoft.Extensions.Primitives
 
 module internal ServerSentEvent =
-    let private eventPrefix = "event: "B
-    let private idPrefix = "id: "B
-    let private retryPrefix = "retry: "B
+    let internal eventPrefix = "event: "B
+    let internal idPrefix = "id: "B
+    let internal retryPrefix = "retry: "B
     let dataPrefix = "data: "B
 
-    let inline private writeUtf8String (str:string) (writer:IBufferWriter<byte>) =
+    let inline internal writeUtf8String (str:string) (writer:IBufferWriter<byte>) =
         let span = writer.GetSpan(Encoding.UTF8.GetByteCount(str))
         let bytesWritten = Encoding.UTF8.GetBytes(str.AsSpan(), span)
         writer.Advance(bytesWritten)
@@ -23,7 +23,7 @@ module internal ServerSentEvent =
         writer.Advance(bytes.Length)
         writer
 
-    let inline private writeUtf8Segment (segment:StringSegment) (writer:IBufferWriter<byte>) =
+    let inline internal writeUtf8Segment (segment:StringSegment) (writer:IBufferWriter<byte>) =
         let span = writer.GetSpan(Encoding.UTF8.GetByteCount(segment))
         let bytesWritten = Encoding.UTF8.GetBytes(segment.AsSpan(), span)
         writer.Advance(bytesWritten)

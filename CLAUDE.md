@@ -42,6 +42,8 @@ tests/
 
 F# 8.0+ targeting .NET 8.0/9.0/10.0 (multi-targeting): Follow standard conventions
 
+Every `.fs` module/file under `src/Frank.*/` gets a matching `.fsi` signature file, added directly above it in the `<Compile>` order in the `.fsproj`. This applies to new files going forward, not just historical ones. Signature files exist to make the public API explicit — private/internal members stay out of the `.fsi` unless another file in the same assembly needs them (then mark them `internal`, not `private`, in both the `.fs` and `.fsi`). Verify with a real build across every targeted TFM, not just net10.0 — signature mismatches (return type inferred as `Task` vs `Task<unit>`, missing `[<Class>]`/`[<Sealed>]` attribute, wrong overload order for same-named members) only surface at compile time.
+
 ## Recent Changes
 - 016-openapi: Added F# 8.0+ targeting .NET 9.0 and .NET 10.0 (multi-targeting) + Frank 7.1.0 (project reference), FSharp.Data.JsonSchema.OpenApi 3.0.0 (NuGet), Microsoft.AspNetCore.OpenApi (9.0.x / 10.0.x conditional), Microsoft.AspNetCore.App (framework reference)
 - 015-datastar-streaming-html: Added F# 8.0+ targeting .NET 8.0, 9.0, and 10.0 + ASP.NET Core (HttpResponse, IBufferWriter, PipeWriter), System.IO (TextWriter), System.Buffers (ArrayPool)

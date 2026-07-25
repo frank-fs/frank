@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="DuplicateHandlerAnalyzer.fsi" />
     <Compile Include="DuplicateHandlerAnalyzer.fs" />
   </ItemGroup>
 
