@@ -9,6 +9,10 @@
   <ItemGroup>
     <Compile Include="UriTemplate.fsi" />
     <Compile Include="UriTemplate.fs" />
+    <Compile Include="HomeMetadata.fsi" />
+    <Compile Include="HomeMetadata.fs" />
+    <Compile Include="ResourceBuilderExtensions.fsi" />
+    <Compile Include="ResourceBuilderExtensions.fs" />
   </ItemGroup>
 
   <ItemGroup>
