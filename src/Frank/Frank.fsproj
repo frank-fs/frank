@@ -5,6 +5,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="WebLink.fsi" />
+    <Compile Include="WebLink.fs" />
     <Compile Include="ContentNegotiation.fsi" />
     <Compile Include="ContentNegotiation.fs" />
     <Compile Include="HandlerDefinition.fsi" />

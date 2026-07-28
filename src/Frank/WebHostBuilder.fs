@@ -10,6 +10,10 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.FileProviders
 open Microsoft.Extensions.Hosting
 
+type private StaticLinkProvider(links: WebLink[]) =
+    interface IResponseLinkProvider with
+        member _.GetLinks(_) = links :> seq<_>
+
 type WebHostSpec =
     { Host: (IWebHostBuilder -> IWebHostBuilder)
       BeforeRoutingMiddleware: (IApplicationBuilder -> IApplicationBuilder)
@@ -43,6 +47,19 @@ type WebHostBuilder(args) =
                     .Host(webBuilder)
                     .ConfigureServices(spec.Services >> ignore)
                     .Configure(fun app ->
+                        let linkProviders =
+                            app.ApplicationServices.GetServices<IResponseLinkProvider>() |> Array.ofSeq
+
+                        // Annotate both lambda parameters. IApplicationBuilder.Use has two
+                        // overloads -- Func<HttpContext, Func<Task>, Task> and
+                        // Func<HttpContext, RequestDelegate, Task> -- and F# cannot pick
+                        // between them from an unannotated lambda.
+                        match WebLink.middleware linkProviders with
+                        | Some run ->
+                            app.Use(fun (ctx: HttpContext) (next: RequestDelegate) -> run ctx (fun () -> next.Invoke ctx))
+                            |> ignore
+                        | None -> ()
+
                         app
                         |> spec.BeforeRoutingMiddleware
                         |> fun app -> app.UseRouting()
@@ -113,6 +130,17 @@ type WebHostBuilder(args) =
     member __.Service(spec, f) =
         { spec with
             Services = spec.Services >> f }
+
+    [<CustomOperation("link")>]
+    member __.Link(spec, target: string, rel: string) : WebHostSpec =
+        { spec with
+            Services =
+                spec.Services
+                >> fun services ->
+                    services.AddSingleton<IResponseLinkProvider>(StaticLinkProvider [| WebLink.create target rel |])
+                    |> ignore
+
+                    services }
 
     [<CustomOperation("useDefaults")>]
     member __.UseDefaults(spec) = { spec with UseDefaults = true }
