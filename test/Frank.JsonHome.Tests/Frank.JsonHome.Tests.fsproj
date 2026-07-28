@@ -12,6 +12,7 @@
     <Compile Include="UriTemplateTests.fs" />
     <Compile Include="ResourceMetadataTests.fs" />
     <Compile Include="ApiSurfaceTests.fs" />
+    <Compile Include="JsonHomeDocumentTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
