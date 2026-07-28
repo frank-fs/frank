@@ -23,14 +23,15 @@
 
   <ItemGroup>
     <PackageReference Update="FSharp.Core" Version="10.1.*" />
-    <!-- Pinned exact (not floating) 10.0.0: 10.0.3+ tightened UnwrapOpenApiSchema and
-         rejects the anyOf branches FSharp.Data.JsonSchema.OpenApi emits for F# DUs.
-         Do not float this until fsprojects/FSharp.Data.JsonSchema#30 is resolved. -->
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
-    <!-- Overrides the transitive floor Microsoft.AspNetCore.OpenApi 10.0.0 pulls (2.0.0),
+    <!-- Was pinned exact to 10.0.0 because 10.0.3+ tightened UnwrapOpenApiSchema and
+         rejected the anyOf branches FSharp.Data.JsonSchema.OpenApi emitted for F# DUs
+         (fsprojects/FSharp.Data.JsonSchema#30). Fixed upstream in
+         FSharp.Data.JsonSchema.OpenApi 3.1.0 — floating again. -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.*" />
+    <!-- Overrides the transitive floor Microsoft.AspNetCore.OpenApi pulls (2.0.0),
          which carries NU1903 (GHSA-v5pm-xwqc-g5wc). Keep >= 2.7.5 regardless of the pin above. -->
     <PackageReference Include="Microsoft.OpenApi" Version="2.9.0" />
-    <PackageReference Include="FSharp.Data.JsonSchema.OpenApi" Version="3.0.1" />
+    <PackageReference Include="FSharp.Data.JsonSchema.OpenApi" Version="3.1.0" />
     <PackageReference Include="Scalar.AspNetCore" Version="1.2.38" />
   </ItemGroup>
 
