@@ -3,6 +3,9 @@ namespace Frank.Builder
 open System
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Http.Metadata
+open Microsoft.AspNetCore.Routing
 
 [<Sealed>]
 type HandlerBuilder() =
@@ -39,73 +42,61 @@ type HandlerBuilder() =
 
     // Metadata operations
     [<CustomOperation("name")>]
-    member _.Name(def: HandlerDefinition, name: string) = { def with Name = Some name }
+    member _.Name(def: HandlerDefinition, name: string) =
+        HandlerDefinition.addMetadata (EndpointNameMetadata(name)) def
 
     [<CustomOperation("summary")>]
-    member _.Summary(def: HandlerDefinition, summary: string) = { def with Summary = Some summary }
+    member _.Summary(def: HandlerDefinition, summary: string) =
+        HandlerDefinition.addMetadata (EndpointSummaryAttribute(summary)) def
 
     [<CustomOperation("description")>]
     member _.Description(def: HandlerDefinition, description: string) =
-        { def with
-            Description = Some description }
+        HandlerDefinition.addMetadata (EndpointDescriptionAttribute(description)) def
 
     [<CustomOperation("tags")>]
-    member _.Tags(def: HandlerDefinition, tags: string list) = { def with Tags = tags }
+    member _.Tags(def: HandlerDefinition, tags: string list) =
+        if List.isEmpty tags then
+            def
+        else
+            HandlerDefinition.addMetadata (TagsAttribute(tags |> List.toArray)) def
 
     // Response type operations
     [<CustomOperation("produces")>]
     member _.Produces(def: HandlerDefinition, responseType: Type, statusCode: int) =
-        let info =
-            { StatusCode = statusCode
-              ResponseType = Some responseType
-              ContentTypes = [ ApplicationJson ]
-              Description = None }
-
-        { def with
-            Produces = def.Produces @ [ info ] }
+        HandlerDefinition.addMetadata
+            (ProducesResponseTypeMetadata(statusCode, responseType, [| ApplicationJson |]))
+            def
 
     [<CustomOperation("produces")>]
     member _.Produces(def: HandlerDefinition, responseType: Type, statusCode: int, contentTypes: string list) =
-        let info =
-            { StatusCode = statusCode
-              ResponseType = Some responseType
-              ContentTypes = contentTypes
-              Description = None }
+        let contentTypes =
+            if List.isEmpty contentTypes then
+                [| ApplicationJson |]
+            else
+                contentTypes |> Array.ofList
 
-        { def with
-            Produces = def.Produces @ [ info ] }
+        HandlerDefinition.addMetadata (ProducesResponseTypeMetadata(statusCode, responseType, contentTypes)) def
 
     [<CustomOperation("producesEmpty")>]
     member _.ProducesEmpty(def: HandlerDefinition, statusCode: int) =
-        let info =
-            { StatusCode = statusCode
-              ResponseType = None
-              ContentTypes = []
-              Description = None }
-
-        { def with
-            Produces = def.Produces @ [ info ] }
+        HandlerDefinition.addMetadata
+            (ProducesResponseTypeMetadata(statusCode, typeof<Void>, [| ApplicationJson |]))
+            def
 
     // Request type operation
     [<CustomOperation("accepts")>]
     member _.Accepts(def: HandlerDefinition, requestType: Type) =
-        let info =
-            { RequestType = requestType
-              ContentTypes = [ ApplicationJson ]
-              IsOptional = false }
-
-        { def with
-            Accepts = def.Accepts @ [ info ] }
+        HandlerDefinition.addMetadata (AcceptsMetadata([| ApplicationJson |], requestType, false)) def
 
     [<CustomOperation("accepts")>]
     member _.Accepts(def: HandlerDefinition, requestType: Type, contentTypes: string list) =
-        let info =
-            { RequestType = requestType
-              ContentTypes = contentTypes
-              IsOptional = false }
+        let contentTypes =
+            if List.isEmpty contentTypes then
+                [| ApplicationJson |]
+            else
+                contentTypes |> Array.ofList
 
-        { def with
-            Accepts = def.Accepts @ [ info ] }
+        HandlerDefinition.addMetadata (AcceptsMetadata(contentTypes, requestType, false)) def
 
 [<AutoOpen>]
 module HandlerBuilderInstance =

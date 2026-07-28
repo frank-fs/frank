@@ -3,12 +3,18 @@ module Frank.Tests.HandlerBuilderTests
 open System
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Http.Metadata
+open Microsoft.AspNetCore.Routing
 open Expecto
 open Frank.Builder
 
 // Sample types for testing
 type Product = { Name: string; Price: decimal }
 type CreateRequest = { Name: string }
+
+/// Stands in for metadata an external library would attach.
+type CustomMarker(label: string) =
+    member _.Label = label
 
 [<Tests>]
 let tests =
@@ -18,15 +24,10 @@ let tests =
               let def = handler { handle (fun (ctx: HttpContext) -> Task.CompletedTask) }
 
               Expect.isNotNull def.Handler "Handler should be set"
-              Expect.isNone def.Name "Name should be None"
-              Expect.isNone def.Summary "Summary should be None"
-              Expect.isNone def.Description "Description should be None"
-              Expect.isEmpty def.Tags "Tags should be empty"
-              Expect.isEmpty def.Produces "Produces should be empty"
-              Expect.isEmpty def.Accepts "Accepts should be empty"
+              Expect.isEmpty def.Metadata "Metadata should be empty"
           }
 
-          test "handler with metadata operations populates fields correctly" {
+          test "handler with metadata operations emits endpoint metadata" {
               let def =
                   handler {
                       name "createProduct"
@@ -36,13 +37,28 @@ let tests =
                       handle (fun (ctx: HttpContext) -> Task.CompletedTask)
                   }
 
-              Expect.equal def.Name (Some "createProduct") "Name should be set"
-              Expect.equal def.Summary (Some "Creates a new product") "Summary should be set"
-              Expect.equal def.Description (Some "Detailed description of product creation") "Description should be set"
-              Expect.equal def.Tags [ "Products"; "Admin" ] "Tags should be set"
+              let nameMeta = HandlerDefinition.tryFind<IEndpointNameMetadata> def
+              Expect.isSome nameMeta "Name metadata should be present"
+              Expect.equal nameMeta.Value.EndpointName "createProduct" "Name should be set"
+
+              let summaryMeta = HandlerDefinition.tryFind<IEndpointSummaryMetadata> def
+              Expect.isSome summaryMeta "Summary metadata should be present"
+              Expect.equal summaryMeta.Value.Summary "Creates a new product" "Summary should be set"
+
+              let descMeta = HandlerDefinition.tryFind<IEndpointDescriptionMetadata> def
+              Expect.isSome descMeta "Description metadata should be present"
+
+              Expect.equal
+                  descMeta.Value.Description
+                  "Detailed description of product creation"
+                  "Description should be set"
+
+              let tagsMeta = HandlerDefinition.tryFind<ITagsMetadata> def
+              Expect.isSome tagsMeta "Tags metadata should be present"
+              Expect.sequenceEqual tagsMeta.Value.Tags [ "Products"; "Admin" ] "Tags should be set"
           }
 
-          test "handler with produces operation populates Produces list" {
+          test "handler with produces operation emits response metadata" {
               let def =
                   handler {
                       produces typeof<Product> 200
@@ -50,18 +66,21 @@ let tests =
                       handle (fun (ctx: HttpContext) -> Task.CompletedTask)
                   }
 
-              Expect.hasLength def.Produces 2 "Should have 2 produces entries"
+              let produces = HandlerDefinition.findAll<IProducesResponseTypeMetadata> def
+              Expect.hasLength produces 2 "Should have 2 produces entries"
 
-              let first = def.Produces.[0]
-              Expect.equal first.StatusCode 200 "First status code should be 200"
-              Expect.equal first.ResponseType (Some typeof<Product>) "First response type should be Product"
-              Expect.equal first.ContentTypes [ "application/json" ] "First content types should be default"
+              Expect.equal produces.[0].StatusCode 200 "First status code should be 200"
+              Expect.equal produces.[0].Type (typeof<Product>) "First response type should be Product"
 
-              let second = def.Produces.[1]
-              Expect.equal second.StatusCode 201 "Second status code should be 201"
+              Expect.sequenceEqual
+                  produces.[0].ContentTypes
+                  [ "application/json" ]
+                  "First content types should be default"
+
+              Expect.equal produces.[1].StatusCode 201 "Second status code should be 201"
           }
 
-          test "handler with producesEmpty operation for no-content responses" {
+          test "handler with producesEmpty operation emits Void response metadata" {
               let def =
                   handler {
                       producesEmpty 204
@@ -69,20 +88,21 @@ let tests =
                       handle (fun (ctx: HttpContext) -> Task.CompletedTask)
                   }
 
-              Expect.hasLength def.Produces 2 "Should have 2 produces entries"
+              let produces = HandlerDefinition.findAll<IProducesResponseTypeMetadata> def
+              Expect.hasLength produces 2 "Should have 2 produces entries"
 
-              let first = def.Produces.[0]
-              Expect.equal first.StatusCode 204 "First status code should be 204"
-              Expect.isNone first.ResponseType "First response type should be None"
-              Expect.isEmpty first.ContentTypes "First content types should be empty"
-              Expect.isNone first.Description "First description should be None"
+              Expect.equal produces.[0].StatusCode 204 "First status code should be 204"
+              Expect.equal produces.[0].Type (typeof<Void>) "First response type should be Void"
 
-              let second = def.Produces.[1]
-              Expect.equal second.StatusCode 404 "Second status code should be 404"
-              Expect.isNone second.ResponseType "Second response type should be None"
+              Expect.sequenceEqual
+                  produces.[0].ContentTypes
+                  [ "application/json" ]
+                  "Empty responses still carry the JSON default content type"
+
+              Expect.equal produces.[1].StatusCode 404 "Second status code should be 404"
           }
 
-          test "handler with accepts operation populates Accepts list" {
+          test "handler with accepts operation emits request metadata" {
               let def =
                   handler {
                       accepts typeof<CreateRequest>
@@ -90,16 +110,18 @@ let tests =
                       handle (fun (ctx: HttpContext) -> Task.CompletedTask)
                   }
 
-              Expect.hasLength def.Accepts 2 "Should have 2 accepts entries"
+              let accepts = HandlerDefinition.findAll<IAcceptsMetadata> def
+              Expect.hasLength accepts 2 "Should have 2 accepts entries"
 
-              let first = def.Accepts.[0]
-              Expect.equal first.RequestType typeof<CreateRequest> "First request type should be CreateRequest"
-              Expect.equal first.ContentTypes [ "application/json" ] "First content types should be default"
-              Expect.isFalse first.IsOptional "First should not be optional"
+              Expect.equal accepts.[0].RequestType (typeof<CreateRequest>) "First request type should be CreateRequest"
 
-              let second = def.Accepts.[1]
-              Expect.equal second.RequestType typeof<Product> "Second request type should be Product"
-              Expect.equal second.ContentTypes [ "application/json" ] "Second content types should be default"
+              Expect.sequenceEqual
+                  accepts.[0].ContentTypes
+                  [ "application/json" ]
+                  "First content types should be default"
+
+              Expect.isFalse accepts.[0].IsOptional "First should not be optional"
+              Expect.equal accepts.[1].RequestType (typeof<Product>) "Second request type should be Product"
           }
 
           test "handler with all metadata combined accumulates correctly" {
@@ -115,18 +137,50 @@ let tests =
                       handle (fun (ctx: HttpContext) -> Task.CompletedTask)
                   }
 
-              Expect.equal handlerDef.Name (Some "createProduct") "Name should be set"
-              Expect.equal handlerDef.Summary (Some "Create product") "Summary should be set"
+              Expect.hasLength handlerDef.Metadata 7 "Should have 7 metadata entries"
 
-              Expect.equal
-                  handlerDef.Description
-                  (Some "Creates a new product in the catalog")
-                  "Description should be set"
+              Expect.hasLength
+                  (HandlerDefinition.findAll<IProducesResponseTypeMetadata> handlerDef)
+                  2
+                  "Should have 2 produces entries"
 
-              Expect.equal handlerDef.Tags [ "Products" ] "Tags should be set"
-              Expect.hasLength handlerDef.Produces 2 "Should have 2 produces entries"
-              Expect.hasLength handlerDef.Accepts 1 "Should have 1 accepts entry"
+              Expect.hasLength
+                  (HandlerDefinition.findAll<IAcceptsMetadata> handlerDef)
+                  1
+                  "Should have 1 accepts entry"
+
               Expect.isNotNull handlerDef.Handler "Handler should be set"
+          }
+
+          test "metadata is retained in declaration order" {
+              let def =
+                  handler {
+                      name "first"
+                      tags [ "second" ]
+                      producesEmpty 204
+                      handle (fun (ctx: HttpContext) -> Task.CompletedTask)
+                  }
+
+              let kinds =
+                  def.Metadata
+                  |> List.map (fun m ->
+                      match m with
+                      | :? IEndpointNameMetadata -> "name"
+                      | :? ITagsMetadata -> "tags"
+                      | :? IProducesResponseTypeMetadata -> "produces"
+                      | _ -> "other")
+
+              Expect.equal kinds [ "name"; "tags"; "produces" ] "Order should match declaration order"
+          }
+
+          test "external metadata can be attached and read back" {
+              let def =
+                  handler { handle (fun (ctx: HttpContext) -> Task.CompletedTask) }
+                  |> HandlerDefinition.addMetadata (CustomMarker "discovery")
+
+              let marker = HandlerDefinition.tryFind<CustomMarker> def
+              Expect.isSome marker "Custom metadata should be readable"
+              Expect.equal marker.Value.Label "discovery" "Custom metadata should round-trip"
           }
 
           test "handler without handle operation fails validation" {
@@ -161,15 +215,27 @@ let tests =
                       handle (fun (ctx: HttpContext) -> Task.CompletedTask)
                   }
 
-              Expect.hasLength def.Produces 1 "Should have 1 produces entry"
-              let produces = def.Produces.[0]
+              let produces = HandlerDefinition.findAll<IProducesResponseTypeMetadata> def
+              Expect.hasLength produces 1 "Should have 1 produces entry"
 
               Expect.containsAll
-                  produces.ContentTypes
+                  produces.[0].ContentTypes
                   [ "application/xml"; "application/json" ]
                   "Should support both XML and JSON"
 
-              Expect.hasLength def.Accepts 1 "Should have 1 accepts entry"
-              let accepts = def.Accepts.[0]
-              Expect.contains accepts.ContentTypes "application/xml" "Should accept XML"
+              let accepts = HandlerDefinition.findAll<IAcceptsMetadata> def
+              Expect.hasLength accepts 1 "Should have 1 accepts entry"
+              Expect.contains accepts.[0].ContentTypes "application/xml" "Should accept XML"
+          }
+
+          test "handler with empty tags does not emit tags metadata" {
+              let def =
+                  handler {
+                      tags []
+                      handle (fun (ctx: HttpContext) -> Task.CompletedTask)
+                  }
+
+              let tagsMeta = HandlerDefinition.tryFind<ITagsMetadata> def
+              Expect.isNone tagsMeta "Empty tags should not add ITagsMetadata"
+              Expect.isEmpty def.Metadata "Metadata should remain empty when tags is []"
           } ]
