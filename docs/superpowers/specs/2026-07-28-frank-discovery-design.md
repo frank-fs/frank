@@ -288,3 +288,9 @@ Because that would describe the wrong thing. An ALPS profile explains the semant
 The derivation source that would genuinely make sense is HTML templates — that is the document ALPS exists to annotate. Frank deliberately has no dedicated template language: Hox, Oxpecker.ViewEngine, Giraffe, and Falco are separate integrations, by design. There is nothing single to derive from, and building four derivations would re-couple Frank to view engines it intentionally keeps at arm's length.
 
 So vocabulary is authored. If a future Frank gains a first-class hypermedia representation, deriving from *that* is the option worth revisiting — not reflecting CLR types.
+
+## Future work (separate)
+
+Authoring's one real cost is that nothing checks a profile against what the application actually renders: rename a field in a Hox template and the profile silently lies. `Frank.Analyzers` (FSharp.Analyzers.SDK) is the natural home for closing that — an analyzer that inspects authored profiles against view-engine templates or format serializers and reports descriptor ids that appear in one and not the other.
+
+That reaches across every view engine Frank integrates with, so it is its own piece of work, not part of this one. Noted here so the drift risk is not mistaken for an unexamined gap.
