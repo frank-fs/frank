@@ -13,6 +13,8 @@
     <Compile Include="HomeMetadata.fs" />
     <Compile Include="ResourceBuilderExtensions.fsi" />
     <Compile Include="ResourceBuilderExtensions.fs" />
+    <Compile Include="ApiSurface.fsi" />
+    <Compile Include="ApiSurface.fs" />
   </ItemGroup>
 
   <ItemGroup>
