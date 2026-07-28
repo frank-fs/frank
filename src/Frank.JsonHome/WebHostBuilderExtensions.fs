@@ -1,5 +1,6 @@
 namespace Frank.JsonHome
 
+open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Mvc.ApiExplorer
@@ -33,15 +34,25 @@ module WebHostBuilderExtensions =
                     // overloads that F# cannot choose between otherwise.
                     app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
                         if ctx.Request.Path.Equals(PathString options.Path) then
-                            let provider =
-                                ctx.RequestServices.GetRequiredService<IApiDescriptionGroupCollectionProvider>()
+                            task {
+                                let provider =
+                                    ctx.RequestServices.GetRequiredService<IApiDescriptionGroupCollectionProvider>()
 
-                            let resources =
-                                provider.ApiDescriptionGroups.Items
-                                |> Seq.collect (fun g -> g.Items)
-                                |> ApiSurface.ofApiDescriptions
+                                let all =
+                                    provider.ApiDescriptionGroups.Items
+                                    |> Seq.collect (fun g -> g.Items)
+                                    |> ApiSurface.ofApiDescriptions
 
-                            JsonHome.write options resources ctx
+                                let! resources = AuthorizationFilter.apply ctx all
+
+                                if AuthorizationFilter.varies all then
+                                    // A shared cache must never serve one principal's view to another.
+                                    ctx.Response.Headers.CacheControl <- "private, no-cache"
+                                    ctx.Response.Headers.Vary <- "Authorization"
+
+                                do! JsonHome.write options resources ctx
+                            }
+                            :> Task
                         else
                             next.Invoke ctx) }
 

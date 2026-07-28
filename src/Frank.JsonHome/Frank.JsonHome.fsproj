@@ -17,6 +17,8 @@
     <Compile Include="ApiSurface.fs" />
     <Compile Include="JsonHome.fsi" />
     <Compile Include="JsonHome.fs" />
+    <Compile Include="AuthorizationFilter.fsi" />
+    <Compile Include="AuthorizationFilter.fs" />
     <Compile Include="WebHostBuilderExtensions.fsi" />
     <Compile Include="WebHostBuilderExtensions.fs" />
   </ItemGroup>
