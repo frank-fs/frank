@@ -5,6 +5,7 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.OpenApi
 open Microsoft.AspNetCore.Routing
+open Microsoft.Extensions.Primitives
 open Microsoft.Extensions.DependencyInjection
 open FSharp.Data.JsonSchema.OpenApi
 open Frank.Builder
@@ -19,6 +20,14 @@ module WebHostBuilderExtensions =
         endpoints.MapOpenApi(openApiRoutePattern) |> ignore
         endpoints.MapScalarApiReference(fun (options: ScalarOptions) ->
             options.WithOpenApiRoutePattern(openApiRoutePattern) |> ignore) |> ignore
+
+    let private serviceDescLinkHeaderValue =
+        StringValues(sprintf "<%s>; rel=\"service-desc\"; type=\"application/json\"" openApiRoutePattern)
+
+    let addServiceDescLinkHeader (app: IApplicationBuilder) =
+        app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
+            ctx.Response.Headers.Append("Link", serviceDescLinkHeaderValue)
+            next.Invoke ctx)
 
     let private configureOpenApiDefaults (options: OpenApiOptions) =
         options.AddSchemaTransformer(FSharpSchemaTransformer()) |> ignore
@@ -54,6 +63,7 @@ module WebHostBuilderExtensions =
                     ) |> ignore
                     services
                 Middleware = spec.Middleware >> fun app ->
+                    addServiceDescLinkHeader app |> ignore
                     app.UseEndpoints(mapOpenApiEndpoints) |> ignore
                     app }
 
@@ -66,5 +76,6 @@ module WebHostBuilderExtensions =
                     ) |> ignore
                     services
                 Middleware = spec.Middleware >> fun app ->
+                    addServiceDescLinkHeader app |> ignore
                     app.UseEndpoints(mapOpenApiEndpoints) |> ignore
                     app }
