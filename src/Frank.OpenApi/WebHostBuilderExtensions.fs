@@ -13,6 +13,13 @@ open Scalar.AspNetCore
 [<AutoOpen>]
 module WebHostBuilderExtensions =
 
+    let private openApiRoutePattern = "/.well-known/openapi.json"
+
+    let private mapOpenApiEndpoints (endpoints: IEndpointRouteBuilder) =
+        endpoints.MapOpenApi(openApiRoutePattern) |> ignore
+        endpoints.MapScalarApiReference(fun (options: ScalarOptions) ->
+            options.WithOpenApiRoutePattern(openApiRoutePattern) |> ignore) |> ignore
+
     let private configureOpenApiDefaults (options: OpenApiOptions) =
         options.AddSchemaTransformer(FSharpSchemaTransformer()) |> ignore
         options.AddOperationTransformer(fun operation context _ct ->
@@ -47,9 +54,7 @@ module WebHostBuilderExtensions =
                     ) |> ignore
                     services
                 Middleware = spec.Middleware >> fun app ->
-                    app.UseEndpoints(fun endpoints ->
-                        endpoints.MapOpenApi() |> ignore
-                        endpoints.MapScalarApiReference() |> ignore) |> ignore
+                    app.UseEndpoints(mapOpenApiEndpoints) |> ignore
                     app }
 
         [<CustomOperation("useOpenApi")>]
@@ -61,7 +66,5 @@ module WebHostBuilderExtensions =
                     ) |> ignore
                     services
                 Middleware = spec.Middleware >> fun app ->
-                    app.UseEndpoints(fun endpoints ->
-                        endpoints.MapOpenApi() |> ignore
-                        endpoints.MapScalarApiReference() |> ignore) |> ignore
+                    app.UseEndpoints(mapOpenApiEndpoints) |> ignore
                     app }

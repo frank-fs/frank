@@ -346,14 +346,14 @@ Enable OpenAPI document generation in your application:
 let main args =
     webHost args {
         useDefaults
-        useOpenApi  // Adds /openapi/v1.json endpoint
+        useOpenApi  // Adds /.well-known/openapi.json endpoint
 
         resource productsResource
     }
     0
 ```
 
-The OpenAPI document will be available at `/openapi/v1.json`.
+The OpenAPI document will be available at `/.well-known/openapi.json`.
 
 ### Content Negotiation
 

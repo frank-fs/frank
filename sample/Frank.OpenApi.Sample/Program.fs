@@ -58,7 +58,7 @@ let rootHandler =
             do! ctx.Response.WriteAsJsonAsync({|
                 name = "Product Catalog API"
                 version = "1.0.0"
-                openApiUrl = "/openapi/v1.json"
+                openApiUrl = "/.well-known/openapi.json"
                 scalarUrl = "/scalar/v1"
             |})
         })
