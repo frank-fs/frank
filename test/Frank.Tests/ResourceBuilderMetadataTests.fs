@@ -55,4 +55,36 @@ let tests =
               for httpMethod in [ "GET"; "POST" ] do
                   let marker = (endpointFor resource httpMethod).Metadata.GetMetadata<MethodMarker>()
                   Expect.isNotNull marker (httpMethod + " endpoint should carry the marker")
+          }
+
+          test "handler definition metadata is scoped to its own HTTP method" {
+              let listing =
+                  handler {
+                      name "listThings"
+                      handle (fun (ctx: HttpContext) -> Task.CompletedTask)
+                  }
+
+              let creating =
+                  handler {
+                      name "createThing"
+                      handle (fun (ctx: HttpContext) -> Task.CompletedTask)
+                  }
+
+              let built =
+                  resource "/things" {
+                      get listing
+                      post creating
+                  }
+
+              let getName =
+                  (endpointFor built "GET").Metadata.GetMetadata<Microsoft.AspNetCore.Routing.EndpointNameMetadata>()
+
+              Expect.isNotNull getName "GET endpoint should carry a name"
+              Expect.equal getName.EndpointName "listThings" "GET should carry its own name only"
+
+              let postName =
+                  (endpointFor built "POST").Metadata.GetMetadata<Microsoft.AspNetCore.Routing.EndpointNameMetadata>()
+
+              Expect.isNotNull postName "POST endpoint should carry a name"
+              Expect.equal postName.EndpointName "createThing" "POST should carry its own name only"
           } ]

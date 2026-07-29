@@ -89,6 +89,16 @@ type ResourceBuilder(routeTemplate) =
 
         ResourceBuilder.AddMetadata(spec, methodScoped)
 
+    static member AddHandlerDefinition(httpMethod: string, spec: ResourceSpec, def: HandlerDefinition) : ResourceSpec =
+        let specWithHandler =
+            { spec with
+                Handlers = (httpMethod, def.Handler) :: spec.Handlers }
+
+        HandlerDefinitionMetadata.toConventions def
+        |> List.fold
+            (fun s conv -> ResourceBuilder.AddMethodMetadata(httpMethod, s, conv))
+            specWithHandler
+
     static member AddHandler(httpMethod, spec, handler) =
         { spec with
             Handlers = (httpMethod, handler) :: spec.Handlers }
@@ -152,6 +162,9 @@ type ResourceBuilder(routeTemplate) =
     member __.Delete(spec, handler: HttpContext -> unit) =
         ResourceBuilder.AddHandler(HttpMethods.Delete, spec, handler)
 
+    member _.Delete(spec: ResourceSpec, handlerDef: HandlerDefinition) =
+        ResourceBuilder.AddHandlerDefinition(HttpMethods.Delete, spec, handlerDef)
+
     [<CustomOperation("get")>]
     member __.Get(spec, handler: RequestDelegate) =
         ResourceBuilder.AddHandler(HttpMethods.Get, spec, handler)
@@ -167,6 +180,9 @@ type ResourceBuilder(routeTemplate) =
 
     member __.Get(spec, handler: HttpContext -> unit) =
         ResourceBuilder.AddHandler(HttpMethods.Get, spec, handler)
+
+    member _.Get(spec: ResourceSpec, handlerDef: HandlerDefinition) =
+        ResourceBuilder.AddHandlerDefinition(HttpMethods.Get, spec, handlerDef)
 
     [<CustomOperation("head")>]
     member __.Head(spec, handler: RequestDelegate) =
@@ -186,6 +202,9 @@ type ResourceBuilder(routeTemplate) =
     member __.Head(spec, handler: HttpContext -> unit) =
         ResourceBuilder.AddHandler(HttpMethods.Head, spec, handler)
 
+    member _.Head(spec: ResourceSpec, handlerDef: HandlerDefinition) =
+        ResourceBuilder.AddHandlerDefinition(HttpMethods.Head, spec, handlerDef)
+
     [<CustomOperation("options")>]
     member __.Options(spec, handler: RequestDelegate) =
         ResourceBuilder.AddHandler(HttpMethods.Options, spec, handler)
@@ -203,6 +222,9 @@ type ResourceBuilder(routeTemplate) =
 
     member __.Options(spec, handler: HttpContext -> unit) =
         ResourceBuilder.AddHandler(HttpMethods.Options, spec, handler)
+
+    member _.Options(spec: ResourceSpec, handlerDef: HandlerDefinition) =
+        ResourceBuilder.AddHandlerDefinition(HttpMethods.Options, spec, handlerDef)
 
     [<CustomOperation("patch")>]
     member __.Patch(spec, handler: RequestDelegate) =
@@ -222,6 +244,9 @@ type ResourceBuilder(routeTemplate) =
     member __.Patch(spec, handler: HttpContext -> unit) =
         ResourceBuilder.AddHandler(HttpMethods.Patch, spec, handler)
 
+    member _.Patch(spec: ResourceSpec, handlerDef: HandlerDefinition) =
+        ResourceBuilder.AddHandlerDefinition(HttpMethods.Patch, spec, handlerDef)
+
     [<CustomOperation("post")>]
     member __.Post(spec, handler: RequestDelegate) =
         ResourceBuilder.AddHandler(HttpMethods.Post, spec, handler)
@@ -240,6 +265,9 @@ type ResourceBuilder(routeTemplate) =
     member __.Post(spec, handler: HttpContext -> unit) =
         ResourceBuilder.AddHandler(HttpMethods.Post, spec, handler)
 
+    member _.Post(spec: ResourceSpec, handlerDef: HandlerDefinition) =
+        ResourceBuilder.AddHandlerDefinition(HttpMethods.Post, spec, handlerDef)
+
     [<CustomOperation("put")>]
     member __.Put(spec, handler: RequestDelegate) =
         ResourceBuilder.AddHandler(HttpMethods.Put, spec, handler)
@@ -255,6 +283,9 @@ type ResourceBuilder(routeTemplate) =
 
     member __.Put(spec, handler: HttpContext -> unit) =
         ResourceBuilder.AddHandler(HttpMethods.Put, spec, handler)
+
+    member _.Put(spec: ResourceSpec, handlerDef: HandlerDefinition) =
+        ResourceBuilder.AddHandlerDefinition(HttpMethods.Put, spec, handlerDef)
 
     [<CustomOperation("trace")>]
     member __.Trace(spec, handler: RequestDelegate) =
