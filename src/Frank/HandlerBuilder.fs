@@ -3,7 +3,6 @@ namespace Frank.Builder
 open System
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
-open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http.Metadata
 open Microsoft.AspNetCore.Routing
 

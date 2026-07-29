@@ -2,6 +2,7 @@ module Sample.OpenApi.Handlers
 
 open System
 open Microsoft.AspNetCore.Http
+open Frank.Builder
 open Frank.OpenApi
 open Sample.OpenApi
 

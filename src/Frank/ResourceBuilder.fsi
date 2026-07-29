@@ -29,9 +29,18 @@ type ResourceBuilder =
 
     static member AddMetadata: spec: ResourceSpec * convention: (EndpointBuilder -> unit) -> ResourceSpec
 
+    /// Scopes a convention to endpoints registered under the given HTTP method, by
+    /// inspecting the `HttpMethodMetadata` already present on the endpoint builder.
+    /// Granularity is per-method, not per-handler: if a resource registers multiple
+    /// handlers under the same HTTP method, the convention applies to all of them,
+    /// not just one.
     static member AddMethodMetadata:
         httpMethod: string * spec: ResourceSpec * convention: (EndpointBuilder -> unit) -> ResourceSpec
 
+    /// Shared helper behind the `Get`/`Post`/etc. `HandlerDefinition` overloads: adds
+    /// the handler and projects `HandlerDefinitionMetadata.toConventions` through
+    /// `AddMethodMetadata`, so the definition's metadata only applies to endpoints
+    /// registered under the given HTTP method.
     static member AddHandlerDefinition:
         httpMethod: string * spec: ResourceSpec * def: HandlerDefinition -> ResourceSpec
 
