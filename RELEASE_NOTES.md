@@ -20,6 +20,7 @@
 - **Authorization Filtering:** reads stock `IAuthorizeData`/`AuthorizationPolicy` endpoint metadata, so it works with `Frank.Auth` without referencing it and equally with a plain `AuthorizeAttribute`. Evaluation failures deny. The document is dispatched as a real endpoint through the same routing stage as every other resource — after any `useAuthentication`/`useAuthorization` middleware, regardless of where `useJsonHome` appears in the `webHost { }` block — so filtering sees the real principal rather than an anonymous one. Emits `Cache-Control: private, no-cache` and `Vary: Authorization` whenever any resource is guarded.
 - **Route Template Translation:** ASP.NET route templates (`{id:guid}`, `{id?}`, `{*rest}`) are translated to RFC 6570 URI Templates for `hrefTemplate`.
 - **No Breaking Changes:** entirely additive — no changes to `Frank` core.
+- **Sample:** `sample/Frank.JsonHome.Sample` demonstrates the discovery metadata and, curling the same `/.well-known/home.json` as anonymous vs. an authenticated admin, the authorization filtering actually changing what the document lists.
 
 **Example Usage:**
 ```fsharp
