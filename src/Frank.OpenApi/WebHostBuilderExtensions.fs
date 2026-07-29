@@ -26,7 +26,10 @@ module WebHostBuilderExtensions =
 
     let addServiceDescLinkHeader (app: IApplicationBuilder) =
         app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
-            ctx.Response.Headers.Append("Link", serviceDescLinkHeaderValue)
+            ctx.Response.OnStarting(fun () ->
+                ctx.Response.Headers.Append("Link", serviceDescLinkHeaderValue)
+                Task.CompletedTask)
+            |> ignore
             next.Invoke ctx)
 
     let private configureOpenApiDefaults (options: OpenApiOptions) =

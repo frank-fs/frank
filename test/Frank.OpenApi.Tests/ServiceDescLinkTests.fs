@@ -3,6 +3,7 @@ module Frank.OpenApi.Tests.ServiceDescLinkTests
 open System.Net.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
+open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
@@ -66,6 +67,41 @@ let createRealUseOpenApiWithConfigureTestServer (resources: Resource list) =
     host.Start()
     host.GetTestClient()
 
+/// Same harness as createRealUseOpenApiTestServer, but with UseExceptionHandler
+/// wrapping the pipeline, to verify the Link header survives an unhandled
+/// exception being converted into an error response.
+let createRealUseOpenApiTestServerWithExceptionHandler (resources: Resource list) =
+    let allEndpoints = resources |> List.collect (fun r -> r.Endpoints |> Array.toList) |> List.toArray
+    let spec = (webHost [||]).UseOpenApi(WebHostSpec.Empty)
+    let builder =
+        Host.CreateDefaultBuilder([||])
+            .ConfigureWebHost(fun webBuilder ->
+                webBuilder
+                    .UseTestServer()
+                    .ConfigureServices(fun services ->
+                        services.AddRouting() |> ignore
+                        spec.Services services |> ignore)
+                    .Configure(fun app ->
+                        app.UseExceptionHandler(fun errApp ->
+                            errApp.Run(fun ctx ->
+                                ctx.Response.StatusCode <- 500
+                                ctx.Response.WriteAsync("error")))
+                        |> ignore
+                        spec.BeforeRoutingMiddleware app |> ignore
+                        app.UseRouting() |> ignore
+                        spec.Middleware app |> ignore
+                        app.UseEndpoints(fun endpoints ->
+                            endpoints.DataSources.Add(TestEndpointDataSource(allEndpoints)))
+                        |> ignore)
+                |> ignore)
+
+    let host = builder.Build()
+    host.Start()
+    host.GetTestClient()
+
+let private throwingHandler : RequestDelegate =
+    RequestDelegate(fun _ctx -> failwith "boom")
+
 let private expectedLinkValue =
     "<" + openApiRoutePattern + ">; rel=\"service-desc\"; type=\"application/json\""
 
@@ -108,5 +144,17 @@ let tests =
             let client = createRealUseOpenApiWithConfigureTestServer [ products ]
             let! (response: HttpResponseMessage) = client.GetAsync("/products")
             expectLinkHeader response "GET /products (configure overload)"
+        }
+
+        testTask "the header survives an unhandled exception regenerating the response via UseExceptionHandler" {
+            let products =
+                resource "/boom" {
+                    name "Boom"
+                    get throwingHandler
+                }
+            let client = createRealUseOpenApiTestServerWithExceptionHandler [ products ]
+            let! (response: HttpResponseMessage) = client.GetAsync("/boom")
+            Expect.equal (int response.StatusCode) 500 "Should return 500 after the handler throws"
+            expectLinkHeader response "GET /boom (after exception, via UseExceptionHandler)"
         }
     ]

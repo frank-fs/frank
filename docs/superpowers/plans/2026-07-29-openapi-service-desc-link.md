@@ -17,10 +17,11 @@
 - Target is exactly `openApiRoutePattern` (the existing private `"/.well-known/openapi.json"` constant already in `WebHostBuilderExtensions.fs`) — do not make this configurable, it isn't today and this feature doesn't need to change that.
 - `type` parameter is exactly `"application/json"` (verified: `MapOpenApi` serves the document with this content type — confirmed via string constants in the installed `Microsoft.AspNetCore.OpenApi` assembly; no specialized `application/vnd.oai.openapi+json` media type is in use).
 - The formatted header value MUST be computed once, at module-load time (a top-level `let`), not per-request inside the middleware closure — the middleware runs on every request in the app, including unrelated 404s.
-- No `Response.OnStarting` wrapper. `BeforeRoutingMiddleware` composes before `UseRouting()` even runs, so nothing has touched the response yet — a direct `ctx.Response.Headers.Append(...)` call before invoking `next` is always safe.
+- **`Response.OnStarting` IS required** (a prior version of this constraint said otherwise; that was wrong). A direct `ctx.Response.Headers.Append(...)` call before invoking `next` is bypassed when `UseExceptionHandler` catches a downstream exception and calls `Response.Clear()` before regenerating the response — verified empirically that `Response.Clear()` does NOT clear already-registered `OnStarting` callbacks, so registering the header write via `OnStarting` survives exactly this scenario, and a direct write does not. `OnStarting` also remains correct for streaming/SSE responses (Frank's native Datastar support) — it fires exactly once, immediately before the first byte of any response.
 - **Placement is load-bearing and verified empirically, not just by inspection: `addServiceDescLinkHeader` MUST be composed into `BeforeRoutingMiddleware`, not `Middleware`.** `EndpointMiddleware` is terminal for any endpoint that ASP.NET Core's routing has already matched, regardless of which specific `UseEndpoints()` call registered that endpoint — `UseRouting()` matches once, globally, against the union of all registered endpoints, and the *first* `EndpointMiddleware` instance encountered in the pipeline invokes whatever endpoint matched and does not call `next()`. A throwaway probe (two separate `UseEndpoints()` calls with a marker middleware sandwiched between them, run against a real `TestServer`) confirmed: middleware placed after a `UseEndpoints()` call never runs for *any* matched request from *either* call — only for unmatched (404) requests. This means ordering the header-append merely *before this module's own* `app.UseEndpoints(mapOpenApiEndpoints)` call, while still inside `Middleware`, is NOT sufficient — a *different* package's (or the app's own `plug`-registered) `UseEndpoints()` call composed earlier in the same `Middleware` chain would still bypass it for every matched request in the whole app. `BeforeRoutingMiddleware` runs before `UseRouting()` is even called, per `Frank.WebHostBuilder.Run`'s pipeline (`BeforeRoutingMiddleware -> UseRouting() -> Middleware -> UseEndpoints(resources)`), so no endpoint has been matched yet and nothing downstream can ever short-circuit it — structurally, not by convention. This is the same placement `Frank.JsonHome` uses for its own Link-header middleware, for the identical reason.
 - `addServiceDescLinkHeader` MUST be `public` (listed in `WebHostBuilderExtensions.fsi`, not `private` in the `.fs`) — `Frank.WebHostBuilder.Run` calls the blocking `.Build().Run()` (real Kestrel), so it cannot be wired to a `TestServer`. The only way for a test to exercise the real code path (rather than a hand-copied duplicate of the wiring) is to call the real `UseOpenApi` member to get a `WebHostSpec`, then apply its `Services`/`BeforeRoutingMiddleware`/`Middleware` functions onto a `TestServer`-based host directly, in the same order `WebHostBuilder.Run` uses (`BeforeRoutingMiddleware` before `UseRouting()`, `Middleware` after).
 - No new `WebHostBuilder` custom operation. The header is unconditional, automatic behavior of `useOpenApi` (both overloads) — there is nothing to separately opt into or configure.
+- **The guarantee is scoped, not absolute — do not overclaim it in docs or comments.** `BeforeRoutingMiddleware` placement plus `OnStarting` defeats (a) any number of `UseEndpoints()` calls in any order, and (b) an unhandled exception regenerated via `UseExceptionHandler`. It does NOT defeat an earlier-composed short-circuiting gate — e.g. `plugBeforeRouting`/`plugBeforeRoutingWhen` registered *ahead of* `useOpenApi` in the same `webHost { }` block that doesn't call `next()`. That's inherent to middleware ordering (nothing can run after a gate ahead of it that never hands off control) and isn't fixable by any placement. `RELEASE_NOTES.md` and the `.fsi` doc comment must state this precisely rather than claiming an unconditional guarantee.
 
 ---
 
@@ -64,7 +65,9 @@ Create `test/Frank.OpenApi.Tests/ServiceDescLinkTests.fs`:
 module Frank.OpenApi.Tests.ServiceDescLinkTests
 
 open System.Net.Http
+open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
+open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
@@ -128,6 +131,41 @@ let createRealUseOpenApiWithConfigureTestServer (resources: Resource list) =
     host.Start()
     host.GetTestClient()
 
+/// Same harness as createRealUseOpenApiTestServer, but with UseExceptionHandler
+/// wrapping the pipeline, to verify the Link header survives an unhandled
+/// exception being converted into an error response.
+let createRealUseOpenApiTestServerWithExceptionHandler (resources: Resource list) =
+    let allEndpoints = resources |> List.collect (fun r -> r.Endpoints |> Array.toList) |> List.toArray
+    let spec = (webHost [||]).UseOpenApi(WebHostSpec.Empty)
+    let builder =
+        Host.CreateDefaultBuilder([||])
+            .ConfigureWebHost(fun webBuilder ->
+                webBuilder
+                    .UseTestServer()
+                    .ConfigureServices(fun services ->
+                        services.AddRouting() |> ignore
+                        spec.Services services |> ignore)
+                    .Configure(fun app ->
+                        app.UseExceptionHandler(fun errApp ->
+                            errApp.Run(fun ctx ->
+                                ctx.Response.StatusCode <- 500
+                                ctx.Response.WriteAsync("error")))
+                        |> ignore
+                        spec.BeforeRoutingMiddleware app |> ignore
+                        app.UseRouting() |> ignore
+                        spec.Middleware app |> ignore
+                        app.UseEndpoints(fun endpoints ->
+                            endpoints.DataSources.Add(TestEndpointDataSource(allEndpoints)))
+                        |> ignore)
+                |> ignore)
+
+    let host = builder.Build()
+    host.Start()
+    host.GetTestClient()
+
+let private throwingHandler : RequestDelegate =
+    RequestDelegate(fun _ctx -> failwith "boom")
+
 let private expectedLinkValue =
     "<" + openApiRoutePattern + ">; rel=\"service-desc\"; type=\"application/json\""
 
@@ -171,6 +209,18 @@ let tests =
             let! (response: HttpResponseMessage) = client.GetAsync("/products")
             expectLinkHeader response "GET /products (configure overload)"
         }
+
+        testTask "the header survives an unhandled exception regenerating the response via UseExceptionHandler" {
+            let products =
+                resource "/boom" {
+                    name "Boom"
+                    get throwingHandler
+                }
+            let client = createRealUseOpenApiTestServerWithExceptionHandler [ products ]
+            let! (response: HttpResponseMessage) = client.GetAsync("/boom")
+            Expect.equal (int response.StatusCode) 500 "Should return 500 after the handler throws"
+            expectLinkHeader response "GET /boom (after exception, via UseExceptionHandler)"
+        }
     ]
 ```
 
@@ -211,9 +261,18 @@ module WebHostBuilderExtensions =
     /// pipeline dispatches whatever matched regardless of which `UseEndpoints()` call
     /// registered it, without calling `next()`. Middleware placed anywhere in `Middleware`
     /// (even before this module's own `UseEndpoints` call) can still be bypassed by an
-    /// earlier `UseEndpoints()` call composed in by a different package or by `plug`.
-    /// `BeforeRoutingMiddleware` runs before `UseRouting()` even executes, so nothing
-    /// downstream can ever short-circuit it -- structurally, not just by convention.
+    /// earlier `UseEndpoints()` call composed in by a different package or by `plug`;
+    /// `BeforeRoutingMiddleware` runs before `UseRouting()` even executes, so no
+    /// `UseEndpoints()` call anywhere can ever short-circuit it.
+    ///
+    /// Uses `Response.OnStarting` rather than a direct header write, so the header
+    /// survives `UseExceptionHandler` regenerating the response after an unhandled
+    /// exception (`Response.Clear()` does not clear already-registered `OnStarting`
+    /// callbacks -- verified empirically). It can still be skipped if the app registers
+    /// its own short-circuiting gate (e.g. `plugBeforeRouting` for a maintenance-mode
+    /// check) *ahead* of `useOpenApi` in the same `webHost { }` block and that gate
+    /// doesn't call `next()` -- that's inherent to middleware ordering (nothing can run
+    /// after a gate that never hands off control) and isn't specific to this feature.
     val addServiceDescLinkHeader : app:IApplicationBuilder -> IApplicationBuilder
 
     type WebHostBuilder with
@@ -242,7 +301,10 @@ Add this directly after the existing `mapOpenApiEndpoints` function (before `con
 
     let addServiceDescLinkHeader (app: IApplicationBuilder) =
         app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
-            ctx.Response.Headers.Append("Link", serviceDescLinkHeaderValue)
+            ctx.Response.OnStarting(fun () ->
+                ctx.Response.Headers.Append("Link", serviceDescLinkHeaderValue)
+                Task.CompletedTask)
+            |> ignore
             next.Invoke ctx)
 ```
 
@@ -321,4 +383,4 @@ Run after the task:
 - [ ] `dotnet build src/Frank.OpenApi/Frank.OpenApi.fsproj` succeeds
 - [ ] `dotnet build Frank.sln` succeeds
 - [ ] `dotnet test test/Frank.OpenApi.Tests/Frank.OpenApi.Tests.fsproj` passes (all files, not just the new one)
-- [ ] The three new tests specifically cover: an arbitrary resource response, the OpenAPI document's own response, and the `configure`-taking `UseOpenApi` overload
+- [ ] The four new tests specifically cover: an arbitrary resource response, the OpenAPI document's own response, the `configure`-taking `UseOpenApi` overload, and survival through `UseExceptionHandler` after an unhandled exception

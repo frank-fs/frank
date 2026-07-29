@@ -29,7 +29,10 @@ let private serviceDescLinkHeaderValue =
 
 let addServiceDescLinkHeader (app: IApplicationBuilder) =
     app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
-        ctx.Response.Headers.Append("Link", serviceDescLinkHeaderValue)
+        ctx.Response.OnStarting(fun () ->
+            ctx.Response.Headers.Append("Link", serviceDescLinkHeaderValue)
+            Task.CompletedTask)
+        |> ignore
         next.Invoke ctx)
 ```
 
@@ -50,9 +53,14 @@ The header value is formatted exactly once, at module-load time (`let serviceDes
 
 **Placement: `BeforeRoutingMiddleware`, not `Middleware` — this was gotten wrong once during this feature's own implementation and corrected after further investigation.** The first draft placed `addServiceDescLinkHeader` inside `Middleware`, ordered before this module's own `app.UseEndpoints(mapOpenApiEndpoints)` call. That's necessary but not sufficient. Verified empirically (a throwaway probe: two separate `UseEndpoints()` calls in one pipeline with a marker middleware sandwiched between them) that `UseRouting()` matches endpoints globally, once, against the union of *all* registered endpoints regardless of which `UseEndpoints()` call registered them — and the *first* `EndpointMiddleware` instance encountered in the pipeline dispatches whatever matched, without calling `next()`, regardless of origin. So middleware placed anywhere in `Middleware` — even before this module's own `UseEndpoints` call — can still be silently bypassed by a *different* package's (or the app's own `plug`-registered) `UseEndpoints()` call, if that call happens to be composed earlier in the same `Middleware` chain. Only for unmatched (404) requests would our middleware still run.
 
-`BeforeRoutingMiddleware` runs before `UseRouting()` is even called (per `Frank`'s `WebHostBuilder.Run`: `BeforeRoutingMiddleware -> UseRouting() -> Middleware -> UseEndpoints(resources)`), so no endpoint has been matched yet and nothing downstream — no matter how many `UseEndpoints()` calls or in what order — can ever short-circuit it. This is the same placement `Frank.JsonHome` already uses for its own Link-header-and-document-serving middleware, for exactly this reason (advertising on every response, including 404s).
+`BeforeRoutingMiddleware` runs before `UseRouting()` is even called (per `Frank`'s `WebHostBuilder.Run`: `BeforeRoutingMiddleware -> UseRouting() -> Middleware -> UseEndpoints(resources)`), so no endpoint has been matched yet and no `UseEndpoints()` call anywhere — regardless of how many exist or in what order — can ever short-circuit it. This is the same placement `Frank.JsonHome` already uses for its own Link-header-and-document-serving middleware, for exactly this reason (advertising on every response, including 404s).
 
-Because the header is appended unconditionally before calling `next()`, and nothing has run yet at this point in the pipeline (not even routing), `Response.Headers.Append` is always safe here — no `Response.OnStarting` callback is needed. (An even earlier draft of this design used `OnStarting` defensively; that turned out to be unnecessary complexity, and has been dropped.)
+**This is scoped precisely, not an absolute guarantee against every possible pipeline shape — an adversarial review during this feature's implementation surfaced two real gaps in the original overclaimed wording, one of which was fixed and one of which is inherent to any middleware system:**
+
+1. **Fixed: `Response.OnStarting`, not a direct pre-`next()` header write.** The original implementation called `ctx.Response.Headers.Append(...)` directly before `next.Invoke ctx`. That is bypassed when `UseExceptionHandler` catches an unhandled exception downstream and calls `Response.Clear()` before regenerating the error response — clearing headers set by *any* middleware anywhere in the pipeline, not something specific to this feature or its placement. Verified empirically that `Response.OnStarting` callbacks registered before the throw are *not* cleared by `Response.Clear()` and still fire when the regenerated response starts — so `addServiceDescLinkHeader` registers its header write via `OnStarting` rather than writing directly, and the header now survives an unhandled exception passing through `UseExceptionHandler`. Covered by a regression test (`ServiceDescLinkTests.fs`: "the header survives an unhandled exception regenerating the response via UseExceptionHandler").
+2. **Not fixable, and not attempted: an earlier-composed short-circuiting `BeforeRoutingMiddleware` gate.** If an app registers its own gate via `plugBeforeRouting`/`plugBeforeRoutingWhen` *ahead of* `useOpenApi` in the same `webHost { }` block (e.g. a maintenance-mode check that returns 403 without calling `next()`), `addServiceDescLinkHeader` — composed later via `>>` — never runs for that request. This is inherent to how middleware pipelines compose: nothing placed anywhere can run after a gate ahead of it that never hands off control, and no alternative placement removes this — even the earliest possible position could still be preceded by something else. `RELEASE_NOTES.md` documents this explicitly rather than presenting the guarantee as unconditional.
+
+Because the header write is deferred to `OnStarting` rather than issued directly, it remains correct for streaming/SSE responses too (Frank's native Datastar support) — `OnStarting` fires exactly once, immediately before the first byte of any response, streamed or not.
 
 `Append`, not header-index assignment, is what makes this safe to coexist with anything else — including `Frank.JsonHome`'s own independent `Link` header contribution — without either clobbering the other.
 
@@ -68,6 +76,7 @@ At minimum:
 - A request to an arbitrary registered resource (not the OpenAPI document itself) returns a `Link` response header containing `</.well-known/openapi.json>; rel="service-desc"; type="application/json"`.
 - A request to the OpenAPI document's own route also carries the header (no special-casing excludes it).
 - The header value is present and correctly formed regardless of which `UseOpenApi` overload is used.
+- A resource handler that throws still produces a `Link`-header-bearing error response when the app uses `UseExceptionHandler` (regression test for the `OnStarting` fix above).
 
 ## Out of scope
 
