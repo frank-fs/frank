@@ -65,6 +65,30 @@ type ResourceBuilder(routeTemplate) =
         { spec with
             Metadata = spec.Metadata @ [ convention ] }
 
+    static member AddMethodMetadata
+        (
+            httpMethod: string,
+            spec: ResourceSpec,
+            convention: EndpointBuilder -> unit
+        ) : ResourceSpec =
+        // ResourceSpec.Metadata conventions run against every endpoint in the
+        // resource. Build() adds HttpMethodMetadata before running them, so a
+        // convention can scope itself by inspecting the builder.
+        let methodScoped (builder: EndpointBuilder) =
+            let matches =
+                builder.Metadata
+                |> Seq.tryPick (fun m ->
+                    match m with
+                    | :? HttpMethodMetadata as meta -> Some meta
+                    | _ -> None)
+                |> Option.map (fun meta -> meta.HttpMethods |> Seq.contains httpMethod)
+                |> Option.defaultValue false
+
+            if matches then
+                convention builder
+
+        ResourceBuilder.AddMetadata(spec, methodScoped)
+
     static member AddHandler(httpMethod, spec, handler) =
         { spec with
             Handlers = (httpMethod, handler) :: spec.Handlers }

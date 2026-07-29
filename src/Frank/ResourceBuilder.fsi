@@ -29,6 +29,9 @@ type ResourceBuilder =
 
     static member AddMetadata: spec: ResourceSpec * convention: (EndpointBuilder -> unit) -> ResourceSpec
 
+    static member AddMethodMetadata:
+        httpMethod: string * spec: ResourceSpec * convention: (EndpointBuilder -> unit) -> ResourceSpec
+
     static member AddHandler: httpMethod: string * spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
 
     static member AddHandler:
