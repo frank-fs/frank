@@ -59,9 +59,6 @@ type WebHostBuilder =
     [<CustomOperation("service")>]
     member Service: spec: WebHostSpec * f: (IServiceCollection -> IServiceCollection) -> WebHostSpec
 
-    [<CustomOperation("link")>]
-    member Link: spec: WebHostSpec * target: string * rel: string -> WebHostSpec
-
     [<CustomOperation("useDefaults")>]
     member UseDefaults: spec: WebHostSpec -> WebHostSpec
 

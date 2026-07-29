@@ -4,6 +4,9 @@ open System.IO
 open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Mvc.ApiExplorer
+open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Primitives
 
 type JsonHomeOptions =
     { Path: string
@@ -176,3 +179,42 @@ module JsonHome =
     let write (options: JsonHomeOptions) (resources: ResourceDescription list) (ctx: HttpContext) : Task =
         ctx.Response.ContentType <- MediaType
         ctx.Response.WriteAsync(serialize options resources)
+
+    /// RFC 8288 parameter values are quoted strings, so a backslash or quote in
+    /// the relation type has to be escaped.
+    let private escapeParam (value: string) =
+        value.Replace("\\", "\\\\").Replace("\"", "\\\"")
+
+    let middleware (options: JsonHomeOptions) =
+        // The advertised link never varies by request, so it is built once here
+        // rather than formatted on every response.
+        let link =
+            StringValues("<" + options.Path + ">; rel=\"" + escapeParam options.Rel + "\"")
+
+        fun (ctx: HttpContext) (next: unit -> Task) ->
+            // Append rather than assign: other packages may advertise links too,
+            // and Link is a multi-value header.
+            ctx.Response.Headers.Append("Link", link)
+
+            if ctx.Request.Path.Equals(PathString options.Path) then
+                task {
+                    let provider =
+                        ctx.RequestServices.GetRequiredService<IApiDescriptionGroupCollectionProvider>()
+
+                    let all =
+                        provider.ApiDescriptionGroups.Items
+                        |> Seq.collect (fun g -> g.Items)
+                        |> ApiSurface.ofApiDescriptions
+
+                    let! resources = AuthorizationFilter.apply ctx all
+
+                    if AuthorizationFilter.varies all then
+                        // A shared cache must never serve one principal's view to another.
+                        ctx.Response.Headers.CacheControl <- "private, no-cache"
+                        ctx.Response.Headers.Vary <- "Authorization"
+
+                    do! write options resources ctx
+                }
+                :> Task
+            else
+                next ()

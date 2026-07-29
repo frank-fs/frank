@@ -71,35 +71,12 @@ let private createServer (resources: Resource list) =
                         services.AddSingleton<EndpointDataSource>(TestEndpointDataSource endpoints)
                         |> ignore)
                     .Configure(fun app ->
-                        app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
-                            let links = [| WebLink.create options.Path options.Rel |]
+                        // The same middleware useJsonHome installs. WebHostBuilder.Run
+                        // builds and blocks, so the pipeline is wired by hand, but the
+                        // code under test is the real thing rather than a copy.
+                        let run = JsonHome.middleware options
 
-                            match
-                                WebLink.middleware
-                                    [| { new IResponseLinkProvider with
-                                           member _.GetLinks(_) = links :> seq<_> } |]
-                            with
-                            | Some run -> run ctx (fun () -> next.Invoke ctx)
-                            | None -> next.Invoke ctx)
-                        |> ignore
-
-                        app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
-                            if ctx.Request.Path.Equals(PathString options.Path) then
-                                task {
-                                    let provider =
-                                        ctx.RequestServices.GetRequiredService<Microsoft.AspNetCore.Mvc.ApiExplorer.IApiDescriptionGroupCollectionProvider>()
-
-                                    let all =
-                                        provider.ApiDescriptionGroups.Items
-                                        |> Seq.collect (fun g -> g.Items)
-                                        |> ApiSurface.ofApiDescriptions
-
-                                    let! kept = AuthorizationFilter.apply ctx all
-                                    do! JsonHome.write options kept ctx
-                                }
-                                :> Task
-                            else
-                                next.Invoke ctx)
+                        app.Use(fun (ctx: HttpContext) (next: RequestDelegate) -> run ctx (fun () -> next.Invoke ctx))
                         |> ignore
 
                         app

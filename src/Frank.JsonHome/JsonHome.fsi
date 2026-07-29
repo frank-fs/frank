@@ -26,3 +26,9 @@ module JsonHome =
 
     /// Writes the document as an HTTP response.
     val write: options: JsonHomeOptions -> resources: ResourceDescription list -> ctx: HttpContext -> Task
+
+    /// The middleware useJsonHome installs: advertises the document with a Link
+    /// header on every response, and serves it at the configured path. Exposed
+    /// as a plain function because WebHostBuilder.Run blocks, so tests wire the
+    /// pipeline by hand.
+    val middleware: options: JsonHomeOptions -> (HttpContext -> (unit -> Task) -> Task)
