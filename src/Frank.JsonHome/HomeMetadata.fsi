@@ -17,3 +17,23 @@ type DocsMetadata = { Uri: string }
 
 /// This resource's status hint.
 type StatusMetadata = { Status: ResourceStatus }
+
+/// A precondition a resource requires on state-changing requests, per the
+/// JSON Home "preconditionRequired" hint.
+[<RequireQualifiedAccess>]
+type Precondition =
+    | ETag
+    | LastModified
+
+/// HTTP range-specifiers this resource accepts.
+type AcceptRangesMetadata = { Units: string list }
+
+/// RFC 7240 preferences this resource supports.
+type AcceptPreferMetadata = { Preferences: string list }
+
+/// Preconditions this resource requires on state-changing requests.
+type PreconditionRequiredMetadata = { Preconditions: Precondition list }
+
+/// An HTTP authentication scheme this resource accepts, with the protection
+/// spaces it belongs to. Realms are optional and may be empty.
+type AuthSchemeMetadata = { Scheme: string; Realms: string list }

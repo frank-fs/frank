@@ -35,6 +35,11 @@ module JsonHome =
         | ResourceStatus.Deprecated -> "deprecated"
         | ResourceStatus.Gone -> "gone"
 
+    let private preconditionName precondition =
+        match precondition with
+        | Precondition.ETag -> "etag"
+        | Precondition.LastModified -> "last-modified"
+
     let private writeStringArray (writer: Utf8JsonWriter) name values =
         writer.WriteStartArray(name: string)
 
@@ -56,6 +61,10 @@ module JsonHome =
         not (List.isEmpty resource.Methods)
         || not (List.isEmpty resource.Formats)
         || not (List.isEmpty (acceptHints resource))
+        || not (List.isEmpty resource.AcceptRanges)
+        || not (List.isEmpty resource.AcceptPrefer)
+        || not (List.isEmpty resource.PreconditionRequired)
+        || not (List.isEmpty resource.AuthSchemes)
         || resource.Docs.IsSome
         || resource.Status.IsSome
 
@@ -77,7 +86,32 @@ module JsonHome =
         for hint, contentTypes in acceptHints resource do
             writeStringArray writer hint contentTypes
 
+        if not (List.isEmpty resource.AcceptRanges) then
+            writeStringArray writer "acceptRanges" resource.AcceptRanges
+
+        if not (List.isEmpty resource.AcceptPrefer) then
+            writeStringArray writer "acceptPrefer" resource.AcceptPrefer
+
         resource.Docs |> Option.iter (fun uri -> writer.WriteString("docs", uri))
+
+        if not (List.isEmpty resource.PreconditionRequired) then
+            writeStringArray writer "preconditionRequired" (resource.PreconditionRequired |> List.map preconditionName)
+
+        if not (List.isEmpty resource.AuthSchemes) then
+            writer.WriteStartArray "authSchemes"
+
+            for scheme, realms in resource.AuthSchemes do
+                writer.WriteStartObject()
+                writer.WriteString("scheme", scheme)
+
+                // realms is optional, so a scheme covering none omits it.
+                if not (List.isEmpty realms) then
+                    writeStringArray writer "realms" realms
+
+                writer.WriteEndObject()
+
+            writer.WriteEndArray()
+
         resource.Status |> Option.iter (fun s -> writer.WriteString("status", statusName s))
 
         writer.WriteEndObject()

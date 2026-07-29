@@ -52,6 +52,43 @@ let tests =
               Expect.equal status.Status ResourceStatus.Deprecated "Status is deprecated"
           }
 
+          test "the optional hint operations attach metadata" {
+              let built =
+                  resource "/files/{name}" {
+                      rel "tag:example.com,2026:file"
+                      acceptRanges [ "bytes" ]
+                      acceptPrefer [ "return=minimal" ]
+                      preconditionRequired [ Precondition.ETag ]
+                      authScheme "Basic" [ "private" ]
+                      authScheme "Bearer" []
+                      get noop
+                  }
+
+              let endpoint = built.Endpoints.[0]
+
+              Expect.equal
+                  (endpoint.Metadata.GetMetadata<AcceptRangesMetadata>()).Units
+                  [ "bytes" ]
+                  "acceptRanges units"
+
+              Expect.equal
+                  (endpoint.Metadata.GetMetadata<AcceptPreferMetadata>()).Preferences
+                  [ "return=minimal" ]
+                  "acceptPrefer preferences"
+
+              Expect.equal
+                  (endpoint.Metadata.GetMetadata<PreconditionRequiredMetadata>()).Preconditions
+                  [ Precondition.ETag ]
+                  "preconditionRequired preconditions"
+
+              let schemes = endpoint.Metadata.GetOrderedMetadata<AuthSchemeMetadata>()
+              Expect.hasLength schemes 2 "Two auth schemes, in declaration order"
+              Expect.equal schemes.[0].Scheme "Basic" "First scheme"
+              Expect.equal schemes.[0].Realms [ "private" ] "First scheme's realms"
+              Expect.equal schemes.[1].Scheme "Bearer" "Second scheme"
+              Expect.isEmpty schemes.[1].Realms "Second scheme has no realms"
+          }
+
           test "resources without a rel carry no rel metadata" {
               let built = resource "/internal" { get noop }
 

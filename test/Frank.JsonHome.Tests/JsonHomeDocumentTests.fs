@@ -14,6 +14,10 @@ let private widgets =
       Methods = [ "GET" ]
       Formats = []
       Accepts = []
+      AcceptRanges = []
+      AcceptPrefer = []
+      PreconditionRequired = []
+      AuthSchemes = []
       Docs = None
       Status = None
       Metadata = [] }
@@ -26,6 +30,10 @@ let private widget =
       Methods = [ "GET"; "PUT"; "DELETE"; "PATCH" ]
       Formats = [ "application/json" ]
       Accepts = [ "PATCH", [ "application/json-patch+json" ] ]
+      AcceptRanges = []
+      AcceptPrefer = []
+      PreconditionRequired = []
+      AuthSchemes = []
       Docs = None
       Status = None
       Metadata = [] }
@@ -124,6 +132,50 @@ let tests =
               let entry = root.GetProperty("resources").GetProperty "tag:me@example.com,2016:widgets"
 
               Expect.isFalse (fst (entry.TryGetProperty "hints")) "No empty hints object"
+          }
+
+          test "emits acceptRanges, acceptPrefer, preconditionRequired, and authSchemes" {
+              let guarded =
+                  { widgets with
+                      AcceptRanges = [ "bytes" ]
+                      AcceptPrefer = [ "return=minimal"; "wait" ]
+                      PreconditionRequired = [ Precondition.ETag; Precondition.LastModified ]
+                      AuthSchemes = [ "Basic", [ "private" ]; "Bearer", [] ] }
+
+              let root = parse (JsonHome.serialize JsonHomeOptions.Default [ guarded ])
+
+              let hints =
+                  root.GetProperty("resources").GetProperty("tag:me@example.com,2016:widgets").GetProperty "hints"
+
+              let strings name =
+                  hints.GetProperty(name: string).EnumerateArray()
+                  |> Seq.map (fun e -> e.GetString())
+                  |> List.ofSeq
+
+              Expect.equal (strings "acceptRanges") [ "bytes" ] "acceptRanges"
+              Expect.equal (strings "acceptPrefer") [ "return=minimal"; "wait" ] "acceptPrefer"
+
+              Expect.equal
+                  (strings "preconditionRequired")
+                  [ "etag"; "last-modified" ]
+                  "preconditionRequired uses the draft's spellings"
+
+              let schemes = hints.GetProperty("authSchemes").EnumerateArray() |> List.ofSeq
+              Expect.hasLength schemes 2 "Two auth schemes"
+
+              Expect.equal (schemes.[0].GetProperty("scheme").GetString()) "Basic" "First scheme"
+
+              Expect.equal
+                  (schemes.[0].GetProperty("realms").EnumerateArray()
+                   |> Seq.map (fun e -> e.GetString())
+                   |> List.ofSeq)
+                  [ "private" ]
+                  "First scheme's realms"
+
+              Expect.equal (schemes.[1].GetProperty("scheme").GetString()) "Bearer" "Second scheme"
+
+              // realms is optional, so a scheme without any omits it entirely.
+              Expect.isFalse (fst (schemes.[1].TryGetProperty "realms")) "No empty realms array"
           }
 
           test "emits the status hint" {

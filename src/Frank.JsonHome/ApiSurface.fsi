@@ -12,6 +12,11 @@ type ResourceDescription =
       Formats: string list
       /// Request content types, keyed by HTTP method.
       Accepts: (string * string list) list
+      AcceptRanges: string list
+      AcceptPrefer: string list
+      PreconditionRequired: Precondition list
+      /// Authentication schemes, each with the protection spaces it covers.
+      AuthSchemes: (string * string list) list
       Docs: string option
       Status: ResourceStatus option
       /// Endpoint metadata, retained for authorization filtering.

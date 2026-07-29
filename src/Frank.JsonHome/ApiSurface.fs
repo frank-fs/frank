@@ -10,6 +10,10 @@ type ResourceDescription =
       Methods: string list
       Formats: string list
       Accepts: (string * string list) list
+      AcceptRanges: string list
+      AcceptPrefer: string list
+      PreconditionRequired: Precondition list
+      AuthSchemes: (string * string list) list
       Docs: string option
       Status: ResourceStatus option
       Metadata: obj list }
@@ -85,6 +89,19 @@ module ApiSurface =
                       Methods = group |> List.map (fun d -> d.HttpMethod) |> List.distinct
                       Formats = formats
                       Accepts = accepts
+                      AcceptRanges =
+                        pick<AcceptRangesMetadata> metadata
+                        |> Option.map (fun r -> r.Units)
+                        |> Option.defaultValue []
+                      AcceptPrefer =
+                        pick<AcceptPreferMetadata> metadata
+                        |> Option.map (fun p -> p.Preferences)
+                        |> Option.defaultValue []
+                      PreconditionRequired =
+                        pick<PreconditionRequiredMetadata> metadata
+                        |> Option.map (fun p -> p.Preconditions)
+                        |> Option.defaultValue []
+                      AuthSchemes = pickAll<AuthSchemeMetadata> metadata |> List.map (fun s -> s.Scheme, s.Realms)
                       Docs = pick<DocsMetadata> metadata |> Option.map (fun d -> d.Uri)
                       Status = pick<StatusMetadata> metadata |> Option.map (fun s -> s.Status)
                       Metadata = metadata })

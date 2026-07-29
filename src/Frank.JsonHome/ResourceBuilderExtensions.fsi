@@ -27,3 +27,24 @@ module ResourceBuilderExtensions =
         /// Marks this resource gone.
         [<CustomOperation("gone")>]
         member Gone: spec: ResourceSpec -> ResourceSpec
+
+        /// Declares the HTTP range-specifiers this resource accepts, typically
+        /// "bytes".
+        [<CustomOperation("acceptRanges")>]
+        member AcceptRanges: spec: ResourceSpec * units: string list -> ResourceSpec
+
+        /// Declares the RFC 7240 preferences this resource supports. A server
+        /// remains free to ignore any of them.
+        [<CustomOperation("acceptPrefer")>]
+        member AcceptPrefer: spec: ResourceSpec * preferences: string list -> ResourceSpec
+
+        /// Declares that state-changing requests to this resource must carry a
+        /// precondition.
+        [<CustomOperation("preconditionRequired")>]
+        member PreconditionRequired: spec: ResourceSpec * preconditions: Precondition list -> ResourceSpec
+
+        /// Declares an HTTP authentication scheme this resource accepts, with
+        /// the protection spaces it belongs to. May be used more than once.
+        /// Pass an empty list when the scheme covers no named realm.
+        [<CustomOperation("authScheme")>]
+        member AuthScheme: spec: ResourceSpec * scheme: string * realms: string list -> ResourceSpec
