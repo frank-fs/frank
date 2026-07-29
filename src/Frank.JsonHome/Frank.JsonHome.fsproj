@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <PackageTags>json-home;hypermedia;discovery;rest</PackageTags>
+    <Description>JSON Home document support for the Frank web framework</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="UriTemplate.fsi" />
+    <Compile Include="UriTemplate.fs" />
+    <Compile Include="HomeMetadata.fsi" />
+    <Compile Include="HomeMetadata.fs" />
+    <Compile Include="ResourceBuilderExtensions.fsi" />
+    <Compile Include="ResourceBuilderExtensions.fs" />
+    <Compile Include="ApiSurface.fsi" />
+    <Compile Include="ApiSurface.fs" />
+    <Compile Include="AuthorizationFilter.fsi" />
+    <Compile Include="AuthorizationFilter.fs" />
+    <Compile Include="JsonHome.fsi" />
+    <Compile Include="JsonHome.fs" />
+    <Compile Include="WebHostBuilderExtensions.fsi" />
+    <Compile Include="WebHostBuilderExtensions.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Frank/Frank.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <AssemblyName>Frank.JsonHome.Sample</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="ApiKeyAuth.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Frank/Frank.fsproj" />
+    <ProjectReference Include="../../src/Frank.Auth/Frank.Auth.fsproj" />
+    <ProjectReference Include="../../src/Frank.JsonHome/Frank.JsonHome.fsproj" />
+  </ItemGroup>
+
+</Project>
