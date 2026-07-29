@@ -16,6 +16,7 @@ open Microsoft.Extensions.FileProviders
 open Microsoft.Extensions.Hosting
 open Expecto
 open Frank.Builder
+open Frank.Auth
 open Frank.JsonHome
 
 let [<Literal>] TestScheme = "TestScheme"
@@ -48,7 +49,11 @@ type TestAuthHandler(options, logger, encoder) =
 let private options = JsonHomeOptions.Default
 
 let private createServer (resources: Resource list) =
-    let endpoints = resources |> List.collect (fun r -> List.ofArray r.Endpoints) |> Array.ofList
+    // Same composition useJsonHome performs: the document is one more
+    // resource, dispatched through the same routing/UseEndpoints stage as
+    // everything else -- after UseAuthentication/UseAuthorization, not before.
+    let allResources = JsonHome.documentResource options :: resources
+    let endpoints = allResources |> List.collect (fun r -> List.ofArray r.Endpoints) |> Array.ofList
 
     let host =
         Host
@@ -74,9 +79,10 @@ let private createServer (resources: Resource list) =
                         // The same middleware useJsonHome installs. WebHostBuilder.Run
                         // builds and blocks, so the pipeline is wired by hand, but the
                         // code under test is the real thing rather than a copy.
-                        let run = JsonHome.middleware options
+                        let runLinkHeader = JsonHome.linkHeaderMiddleware options
 
-                        app.Use(fun (ctx: HttpContext) (next: RequestDelegate) -> run ctx (fun () -> next.Invoke ctx))
+                        app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
+                            runLinkHeader ctx (fun () -> next.Invoke ctx))
                         |> ignore
 
                         app
@@ -133,4 +139,39 @@ let tests =
 
               Expect.contains (found.Headers.GetValues "Link") expected "Link on a matched route"
               Expect.contains (missing.Headers.GetValues "Link") expected "Link on a 404"
+          }
+
+          testTask "an authenticated principal that satisfies a guard sees the guarded resource" {
+              // Regression test: the document must be dispatched after
+              // UseAuthentication/UseAuthorization populate ctx.User, or
+              // AuthorizationFilter.apply always evaluates against an
+              // anonymous principal and every guarded resource disappears --
+              // even for a request that legitimately satisfies the guard.
+              let adminResource =
+                  resource "/admin" {
+                      rel "tag:example.com,2026:admin"
+                      requireRole "admin"
+                      get ok
+                  }
+
+              let client = createServer [ adminResource ]
+
+              let! (anonymous: HttpResponseMessage) = client.GetAsync options.Path
+              let! (anonymousBody: string) = anonymous.Content.ReadAsStringAsync()
+              let anonymousRoot = JsonDocument.Parse(anonymousBody).RootElement
+
+              Expect.isFalse
+                  (fst (anonymousRoot.GetProperty("resources").TryGetProperty "tag:example.com,2026:admin"))
+                  "Anonymous request does not see the admin resource"
+
+              let request = new HttpRequestMessage(HttpMethod.Get, options.Path)
+              request.Headers.Add("X-Test-User", "alice")
+              request.Headers.Add("X-Test-Roles", "admin")
+              let! (asAdmin: HttpResponseMessage) = client.SendAsync request
+              let! (adminBody: string) = asAdmin.Content.ReadAsStringAsync()
+              let adminRoot = JsonDocument.Parse(adminBody).RootElement
+
+              Expect.isTrue
+                  (fst (adminRoot.GetProperty("resources").TryGetProperty "tag:example.com,2026:admin"))
+                  "An authenticated admin sees the admin resource"
           } ]

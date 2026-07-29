@@ -7,6 +7,7 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Mvc.ApiExplorer
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Primitives
+open Frank.Builder
 
 type JsonHomeOptions =
     { Path: string
@@ -185,7 +186,7 @@ module JsonHome =
     let private escapeParam (value: string) =
         value.Replace("\\", "\\\\").Replace("\"", "\\\"")
 
-    let middleware (options: JsonHomeOptions) =
+    let linkHeaderMiddleware (options: JsonHomeOptions) =
         // The advertised link never varies by request, so it is built once here
         // rather than formatted on every response.
         let link =
@@ -195,26 +196,31 @@ module JsonHome =
             // Append rather than assign: other packages may advertise links too,
             // and Link is a multi-value header.
             ctx.Response.Headers.Append("Link", link)
+            next ()
 
-            if ctx.Request.Path.Equals(PathString options.Path) then
-                task {
-                    let provider =
-                        ctx.RequestServices.GetRequiredService<IApiDescriptionGroupCollectionProvider>()
+    let private documentHandler (options: JsonHomeOptions) (ctx: HttpContext) : Task =
+        task {
+            let provider =
+                ctx.RequestServices.GetRequiredService<IApiDescriptionGroupCollectionProvider>()
 
-                    let all =
-                        provider.ApiDescriptionGroups.Items
-                        |> Seq.collect (fun g -> g.Items)
-                        |> ApiSurface.ofApiDescriptions
+            let all =
+                provider.ApiDescriptionGroups.Items
+                |> Seq.collect (fun g -> g.Items)
+                |> ApiSurface.ofApiDescriptions
 
-                    let! resources = AuthorizationFilter.apply ctx all
+            let! resources = AuthorizationFilter.apply ctx all
 
-                    if AuthorizationFilter.varies all then
-                        // A shared cache must never serve one principal's view to another.
-                        ctx.Response.Headers.CacheControl <- "private, no-cache"
-                        ctx.Response.Headers.Vary <- "Authorization"
+            if AuthorizationFilter.varies all then
+                // A shared cache must never serve one principal's view to another.
+                ctx.Response.Headers.CacheControl <- "private, no-cache"
+                ctx.Response.Headers.Vary <- "Authorization"
 
-                    do! write options resources ctx
-                }
-                :> Task
-            else
-                next ()
+            do! write options resources ctx
+        }
+
+    let documentResource (options: JsonHomeOptions) : Resource =
+        // "options" would collide with ResourceBuilder's own OPTIONS custom
+        // operation if referenced as a bare identifier inside this computation
+        // expression, hence the rebinding before entering it.
+        let homeOptions = options
+        resource homeOptions.Path { get (RequestDelegate(documentHandler homeOptions)) }

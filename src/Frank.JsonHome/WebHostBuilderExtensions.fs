@@ -9,7 +9,8 @@ open Frank.Builder
 module WebHostBuilderExtensions =
 
     let private install (options: JsonHomeOptions) (spec: WebHostSpec) =
-        let run = JsonHome.middleware options
+        let runLinkHeader = JsonHome.linkHeaderMiddleware options
+        let document = JsonHome.documentResource options
 
         { spec with
             Services =
@@ -25,7 +26,15 @@ module WebHostBuilderExtensions =
                     // Both lambda parameters must be annotated: IApplicationBuilder.Use has
                     // Func<HttpContext, Func<Task>, Task> and Func<HttpContext, RequestDelegate, Task>
                     // overloads that F# cannot choose between otherwise.
-                    app.Use(fun (ctx: HttpContext) (next: RequestDelegate) -> run ctx (fun () -> next.Invoke ctx)) }
+                    app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
+                        runLinkHeader ctx (fun () -> next.Invoke ctx))
+            // Dispatched through the app's own, single, structurally-last
+            // UseEndpoints(...) call in WebHostBuilder.Run -- after every
+            // Middleware-composed stage, including useAuthentication and
+            // useAuthorization, regardless of where useJsonHome sits in the
+            // webHost {} block. AuthorizationFilter.apply reads ctx.User, and
+            // that must already reflect the real principal by the time it runs.
+            Endpoints = Array.append spec.Endpoints document.Endpoints }
 
     type WebHostBuilder with
 
