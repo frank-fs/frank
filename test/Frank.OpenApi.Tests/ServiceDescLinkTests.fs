@@ -29,6 +29,7 @@ let createRealUseOpenApiTestServer (resources: Resource list) =
                         services.AddRouting() |> ignore
                         spec.Services services |> ignore)
                     .Configure(fun app ->
+                        spec.BeforeRoutingMiddleware app |> ignore
                         app.UseRouting() |> ignore
                         spec.Middleware app |> ignore
                         app.UseEndpoints(fun endpoints ->
@@ -53,6 +54,7 @@ let createRealUseOpenApiWithConfigureTestServer (resources: Resource list) =
                         services.AddRouting() |> ignore
                         spec.Services services |> ignore)
                     .Configure(fun app ->
+                        spec.BeforeRoutingMiddleware app |> ignore
                         app.UseRouting() |> ignore
                         spec.Middleware app |> ignore
                         app.UseEndpoints(fun endpoints ->

@@ -7,6 +7,10 @@
 - **Breaking namespace move:** the `get`/`post`/`put`/`delete`/`patch`/`head`/`options` overloads that accept a `HandlerDefinition` moved from `Frank.OpenApi` into Frank core (`Frank.Builder`). If your project only had `open Frank.OpenApi` and not `open Frank.Builder`, add `open Frank.Builder` — the `resource { }` CE already requires it, so most consumers are unaffected.
 - **New: `ResourceBuilder.AddMethodMetadata`** — scopes an endpoint-metadata convention to a single HTTP method within a resource, promoted from a private `Frank.OpenApi` helper to a public core operation.
 
+**Frank.OpenApi - service-desc Link Header**
+
+- **Every response now advertises the OpenAPI document:** apps with `useOpenApi` enabled carry a `Link: <path>; rel="service-desc"; type="application/json"` response header (RFC 8631) on every response, so clients can discover the machine-readable OpenAPI document without prior knowledge of its route. Fully self-contained in `Frank.OpenApi` — no new dependency, no configuration required.
+
 
 ### New in 7.2.1 (Released 2026-06-21)
 

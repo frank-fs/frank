@@ -62,8 +62,8 @@ module WebHostBuilderExtensions =
                         configureOpenApiDefaults options
                     ) |> ignore
                     services
+                BeforeRoutingMiddleware = spec.BeforeRoutingMiddleware >> addServiceDescLinkHeader
                 Middleware = spec.Middleware >> fun app ->
-                    addServiceDescLinkHeader app |> ignore
                     app.UseEndpoints(mapOpenApiEndpoints) |> ignore
                     app }
 
@@ -75,7 +75,7 @@ module WebHostBuilderExtensions =
                         configure options
                     ) |> ignore
                     services
+                BeforeRoutingMiddleware = spec.BeforeRoutingMiddleware >> addServiceDescLinkHeader
                 Middleware = spec.Middleware >> fun app ->
-                    addServiceDescLinkHeader app |> ignore
                     app.UseEndpoints(mapOpenApiEndpoints) |> ignore
                     app }

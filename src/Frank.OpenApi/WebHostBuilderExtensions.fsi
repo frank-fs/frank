@@ -8,11 +8,15 @@ open Frank.Builder
 module WebHostBuilderExtensions =
 
     /// Appends a `Link: <...>; rel="service-desc"; type="application/json"` header
-    /// (RFC 8631) to every response, advertising the OpenAPI document. Must run
-    /// before this module's own `UseEndpoints` call in the middleware pipeline --
-    /// EndpointMiddleware is terminal for any endpoint ASP.NET Core's routing has
-    /// already matched, so middleware placed after a UseEndpoints call never runs
-    /// for matched requests, only for 404s.
+    /// (RFC 8631) to every response, advertising the OpenAPI document. Composed into
+    /// `WebHostSpec.BeforeRoutingMiddleware`, not `Middleware` -- `UseRouting()` matches
+    /// endpoints globally, once, and the first `EndpointMiddleware` encountered in the
+    /// pipeline dispatches whatever matched regardless of which `UseEndpoints()` call
+    /// registered it, without calling `next()`. Middleware placed anywhere in `Middleware`
+    /// (even before this module's own `UseEndpoints` call) can still be bypassed by an
+    /// earlier `UseEndpoints()` call composed in by a different package or by `plug`.
+    /// `BeforeRoutingMiddleware` runs before `UseRouting()` even executes, so nothing
+    /// downstream can ever short-circuit it -- structurally, not just by convention.
     val addServiceDescLinkHeader : app:IApplicationBuilder -> IApplicationBuilder
 
     type WebHostBuilder with

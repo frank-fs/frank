@@ -21,7 +21,7 @@ That shared abstraction turned out to be unnecessary for this: ASP.NET Core's ow
 
 ## Architecture
 
-One new function in `src/Frank.OpenApi/WebHostBuilderExtensions.fs`: `addServiceDescLinkHeader`, wired into both existing `UseOpenApi` overloads' `Middleware` composition, alongside the existing `app.UseEndpoints(mapOpenApiEndpoints)` call. No new files. No new public types. No `Frank` core changes. No new NuGet dependency.
+One new function in `src/Frank.OpenApi/WebHostBuilderExtensions.fs`: `addServiceDescLinkHeader`, wired into both existing `UseOpenApi` overloads' `BeforeRoutingMiddleware` composition (not `Middleware` — see Data flow for why). No new files. No new public types. No `Frank` core changes (both `WebHostSpec` fields used already exist). No new NuGet dependency.
 
 ```fsharp
 let private serviceDescLinkHeaderValue =
@@ -35,22 +35,24 @@ let addServiceDescLinkHeader (app: IApplicationBuilder) =
 
 `addServiceDescLinkHeader` is **public** (not `private`) and listed in `WebHostBuilderExtensions.fsi` — see Testing below for why.
 
-Both `UseOpenApi` overloads gain this in their `Middleware` composition:
+Both `UseOpenApi` overloads gain this:
 
 ```fsharp
+BeforeRoutingMiddleware = spec.BeforeRoutingMiddleware >> addServiceDescLinkHeader
 Middleware = spec.Middleware >> fun app ->
     app.UseEndpoints(mapOpenApiEndpoints) |> ignore
-    addServiceDescLinkHeader app |> ignore
     app
 ```
-
-(Exact composition order/shape to be finalized during implementation planning — the requirement is that both overloads get identical behavior.)
 
 ## Data flow
 
 The header value is formatted exactly once, at module-load time (`let serviceDescLinkHeaderValue = ...`, not computed inside the middleware closure) — not per-request. This matters because the middleware runs for every request in the app, including ones that don't touch OpenAPI at all (e.g. a 404 for an unrelated path), so avoiding repeated string-building on every request is a real, not premature, optimization.
 
-The middleware is added to `useOpenApi`'s `Middleware` stage, which — per `Frank`'s `WebHostBuilder.Run` (`src/Frank/WebHostBuilder.fs`) — composes *after* `UseRouting()` but *before* `UseEndpoints`. This means it always runs before the actual resource/endpoint handler for the request, including Frank's native SSE/streaming (Datastar) endpoints. Because the header is appended unconditionally before calling `next()`, and nothing downstream of this middleware has had a chance to start writing the response yet, `Response.Headers.Append` is always safe here — no `Response.OnStarting` callback is needed. (An earlier draft of this design used `OnStarting` defensively; that turned out to be unnecessary complexity given this middleware's fixed position in the pipeline, and has been dropped.)
+**Placement: `BeforeRoutingMiddleware`, not `Middleware` — this was gotten wrong once during this feature's own implementation and corrected after further investigation.** The first draft placed `addServiceDescLinkHeader` inside `Middleware`, ordered before this module's own `app.UseEndpoints(mapOpenApiEndpoints)` call. That's necessary but not sufficient. Verified empirically (a throwaway probe: two separate `UseEndpoints()` calls in one pipeline with a marker middleware sandwiched between them) that `UseRouting()` matches endpoints globally, once, against the union of *all* registered endpoints regardless of which `UseEndpoints()` call registered them — and the *first* `EndpointMiddleware` instance encountered in the pipeline dispatches whatever matched, without calling `next()`, regardless of origin. So middleware placed anywhere in `Middleware` — even before this module's own `UseEndpoints` call — can still be silently bypassed by a *different* package's (or the app's own `plug`-registered) `UseEndpoints()` call, if that call happens to be composed earlier in the same `Middleware` chain. Only for unmatched (404) requests would our middleware still run.
+
+`BeforeRoutingMiddleware` runs before `UseRouting()` is even called (per `Frank`'s `WebHostBuilder.Run`: `BeforeRoutingMiddleware -> UseRouting() -> Middleware -> UseEndpoints(resources)`), so no endpoint has been matched yet and nothing downstream — no matter how many `UseEndpoints()` calls or in what order — can ever short-circuit it. This is the same placement `Frank.JsonHome` already uses for its own Link-header-and-document-serving middleware, for exactly this reason (advertising on every response, including 404s).
+
+Because the header is appended unconditionally before calling `next()`, and nothing has run yet at this point in the pipeline (not even routing), `Response.Headers.Append` is always safe here — no `Response.OnStarting` callback is needed. (An even earlier draft of this design used `OnStarting` defensively; that turned out to be unnecessary complexity, and has been dropped.)
 
 `Append`, not header-index assignment, is what makes this safe to coexist with anything else — including `Frank.JsonHome`'s own independent `Link` header contribution — without either clobbering the other.
 
@@ -60,7 +62,7 @@ No new `WebHostBuilder` custom operation. The header is automatic, unconditional
 
 ## Testing
 
-`test/Frank.OpenApi.Tests/OpenApiDocumentTests.fs` does not currently exercise `WebHostBuilderExtensions.UseOpenApi` — it hand-rolls an equivalent `Host.CreateDefaultBuilder().UseTestServer()...` setup, because `Frank.WebHostBuilder.Run` calls the blocking `.Build().Run()` (real Kestrel), which cannot be wired to a `TestServer`. To test the real code path rather than a hand-copied duplicate, the new test constructs a `WebHostSpec` by calling the actual `UseOpenApi` member, then applies its `Services`/`Middleware` functions onto a `TestServer`-based host (same harness shape as the existing file, but driving the real function). This mirrors the same fix already applied to `Frank.JsonHome`, where the equivalent middleware was made public for exactly this reason.
+`test/Frank.OpenApi.Tests/OpenApiDocumentTests.fs` does not currently exercise `WebHostBuilderExtensions.UseOpenApi` — it hand-rolls an equivalent `Host.CreateDefaultBuilder().UseTestServer()...` setup, because `Frank.WebHostBuilder.Run` calls the blocking `.Build().Run()` (real Kestrel), which cannot be wired to a `TestServer`. To test the real code path rather than a hand-copied duplicate, the new test constructs a `WebHostSpec` by calling the actual `UseOpenApi` member, then applies its `Services`/`BeforeRoutingMiddleware`/`Middleware` functions onto a `TestServer`-based host in the same order `WebHostBuilder.Run` does (`BeforeRoutingMiddleware` before `UseRouting()`, `Middleware` after) — same harness shape as the existing file, but driving the real function. This mirrors the same fix already applied to `Frank.JsonHome`, where the equivalent middleware was made public for exactly this reason.
 
 At minimum:
 - A request to an arbitrary registered resource (not the OpenAPI document itself) returns a `Link` response header containing `</.well-known/openapi.json>; rel="service-desc"; type="application/json"`.
