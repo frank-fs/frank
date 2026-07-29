@@ -134,6 +134,37 @@ let tests =
               Expect.isFalse (fst (entry.TryGetProperty "hints")) "No empty hints object"
           }
 
+          test "emits acceptPost and acceptPut, and no accept hint for other methods" {
+              let widget =
+                  { widgets with
+                      Accepts =
+                          [ "POST", [ "application/json" ]
+                            "PUT", [ "application/json"; "application/merge-patch+json" ]
+                            // GET is not one of the three methods draft-06 names an
+                            // accept hint for, so its entry contributes nothing.
+                            "GET", [ "application/x-should-not-appear" ] ] }
+
+              let root = parse (JsonHome.serialize JsonHomeOptions.Default [ widget ])
+              let hints = root.GetProperty("resources").GetProperty("tag:me@example.com,2016:widgets").GetProperty "hints"
+
+              let strings name =
+                  hints.GetProperty(name: string).EnumerateArray() |> Seq.map (fun e -> e.GetString()) |> List.ofSeq
+
+              Expect.equal (strings "acceptPost") [ "application/json" ] "acceptPost"
+              Expect.equal (strings "acceptPut") [ "application/json"; "application/merge-patch+json" ] "acceptPut"
+
+              let acceptHintNames =
+                  hints.EnumerateObject()
+                  |> Seq.map (fun p -> p.Name)
+                  |> Seq.filter (fun n -> n.StartsWith "accept")
+                  |> Set.ofSeq
+
+              Expect.equal
+                  acceptHintNames
+                  (Set.ofList [ "acceptPost"; "acceptPut" ])
+                  "GET's accepts entry does not surface as any accept* hint"
+          }
+
           test "emits acceptRanges, acceptPrefer, preconditionRequired, and authSchemes" {
               let guarded =
                   { widgets with

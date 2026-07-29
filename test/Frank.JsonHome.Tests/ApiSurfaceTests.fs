@@ -52,6 +52,25 @@ let tests =
                   "hrefVars carried through"
           }
 
+          test "two resources declaring the same rel on different route templates both pass through" {
+              // Grouping is by route template, not by rel, so this is not
+              // deduplicated or rejected here -- that is tracked separately
+              // (#475). This locks in the current, actual behavior: both
+              // entries survive, each still carrying the shared rel.
+              let metadata: obj list = [ { Rel = "tag:example.com,2026:dup" } ]
+
+              let surface =
+                  ApiSurface.ofApiDescriptions [ describe "first" "GET" metadata; describe "second" "GET" metadata ]
+
+              Expect.hasLength surface 2 "Both route templates produce separate entries"
+              Expect.isTrue (surface |> List.forall (fun r -> r.Rel = "tag:example.com,2026:dup")) "Both carry the shared rel"
+
+              Expect.equal
+                  (surface |> List.map (fun r -> r.Href) |> List.sort)
+                  [ "/first"; "/second" ]
+                  "Distinct hrefs, not merged"
+          }
+
           test "resources without a rel are excluded" {
               let surface = ApiSurface.ofApiDescriptions [ describe "internal" "GET" [] ]
 

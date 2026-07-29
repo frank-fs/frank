@@ -48,11 +48,11 @@ type TestAuthHandler(options, logger, encoder) =
 
 let private options = JsonHomeOptions.Default
 
-let private createServer (resources: Resource list) =
+let private createServer (homeOptions: JsonHomeOptions) (resources: Resource list) =
     // Same composition useJsonHome performs: the document is one more
     // resource, dispatched through the same routing/UseEndpoints stage as
     // everything else -- after UseAuthentication/UseAuthorization, not before.
-    let allResources = JsonHome.documentResource options :: resources
+    let allResources = JsonHome.documentResource homeOptions :: resources
     let endpoints = allResources |> List.collect (fun r -> List.ofArray r.Endpoints) |> Array.ofList
 
     let host =
@@ -79,7 +79,7 @@ let private createServer (resources: Resource list) =
                         // The same middleware useJsonHome installs. WebHostBuilder.Run
                         // builds and blocks, so the pipeline is wired by hand, but the
                         // code under test is the real thing rather than a copy.
-                        let runLinkHeader = JsonHome.linkHeaderMiddleware options
+                        let runLinkHeader = JsonHome.linkHeaderMiddleware homeOptions
 
                         app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
                             runLinkHeader ctx (fun () -> next.Invoke ctx))
@@ -140,7 +140,7 @@ let tests =
                       get ok
                   }
 
-              let client = createServer [ products ]
+              let client = createServer options [ products ]
               let! (response: HttpResponseMessage) = client.GetAsync options.Path
 
               Expect.equal (response.Content.Headers.ContentType.MediaType) "application/json-home" "Media type"
@@ -160,7 +160,7 @@ let tests =
                       get ok
                   }
 
-              let client = createServer [ products ]
+              let client = createServer options [ products ]
 
               let! (found: HttpResponseMessage) = client.GetAsync "/products"
               let! (missing: HttpResponseMessage) = client.GetAsync "/nope"
@@ -184,7 +184,7 @@ let tests =
                       get ok
                   }
 
-              let client = createServer [ adminResource ]
+              let client = createServer options [ adminResource ]
 
               let! (anonymous: HttpResponseMessage) = client.GetAsync options.Path
               let! (anonymousBody: string) = anonymous.Content.ReadAsStringAsync()
@@ -193,6 +193,17 @@ let tests =
               Expect.isFalse
                   (fst (anonymousRoot.GetProperty("resources").TryGetProperty "tag:example.com,2026:admin"))
                   "Anonymous request does not see the admin resource"
+
+              // A shared cache must never serve one principal's view to another
+              // -- these headers apply regardless of what the requester can see,
+              // because the app has a guarded resource at all.
+              Expect.isTrue anonymous.Headers.CacheControl.Private "Cache-Control: private on the anonymous response"
+              Expect.isTrue anonymous.Headers.CacheControl.NoCache "Cache-Control: no-cache on the anonymous response"
+
+              Expect.contains
+                  (List.ofSeq anonymous.Headers.Vary)
+                  "Authorization"
+                  "Vary on the anonymous response"
 
               let request = new HttpRequestMessage(HttpMethod.Get, options.Path)
               request.Headers.Add("X-Test-User", "alice")
@@ -204,6 +215,14 @@ let tests =
               Expect.isTrue
                   (fst (adminRoot.GetProperty("resources").TryGetProperty "tag:example.com,2026:admin"))
                   "An authenticated admin sees the admin resource"
+
+              Expect.isTrue asAdmin.Headers.CacheControl.Private "Cache-Control: private on the admin response too"
+              Expect.isTrue asAdmin.Headers.CacheControl.NoCache "Cache-Control: no-cache on the admin response too"
+
+              Expect.contains
+                  (List.ofSeq asAdmin.Headers.Vary)
+                  "Authorization"
+                  "Vary on the admin response too"
           }
 
           testTask "the Link header survives an exception handler clearing the response" {
@@ -216,4 +235,42 @@ let tests =
 
               Expect.equal (int response.StatusCode) 500 "The exception handler produced the response"
               Expect.isTrue (response.Headers.Contains "Link") "Link header survives Response.Clear()"
+          }
+
+          testTask "a configured path, rel, title, and links all take effect" {
+              let custom =
+                  { Path = "/discovery.json"
+                    Rel = "discovery"
+                    Title = Some "Sample API"
+                    Links = [ "author", "mailto:api-admin@example.com" ] }
+
+              let products =
+                  resource "/products" {
+                      rel "tag:example.com,2026:products"
+                      get ok
+                  }
+
+              let client = createServer custom [ products ]
+
+              let! (matched: HttpResponseMessage) = client.GetAsync "/products"
+
+              Expect.contains
+                  (matched.Headers.GetValues "Link")
+                  "</discovery.json>; rel=\"discovery\""
+                  "Link header uses the configured path and rel"
+
+              let! (response: HttpResponseMessage) = client.GetAsync custom.Path
+              let! (body: string) = response.Content.ReadAsStringAsync()
+              let root = JsonDocument.Parse(body).RootElement
+
+              Expect.equal (root.GetProperty("api").GetProperty("title").GetString()) "Sample API" "api.title"
+
+              Expect.equal
+                  (root.GetProperty("api").GetProperty("links").GetProperty("author").GetString())
+                  "mailto:api-admin@example.com"
+                  "api.links.author"
+
+              Expect.isTrue
+                  (fst (root.GetProperty("resources").TryGetProperty "tag:example.com,2026:products"))
+                  "Resource is present at the configured path"
           } ]

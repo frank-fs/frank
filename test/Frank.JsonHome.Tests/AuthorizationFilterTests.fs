@@ -40,6 +40,17 @@ let private contextFor (roles: string list) =
     ctx.User <- ClaimsPrincipal(ClaimsIdentity(claims, "Test"))
     ctx
 
+/// No AddAuthorization() -- IAuthorizationPolicyProvider and
+/// IAuthorizationService are deliberately left unregistered, so resolving
+/// either throws InvalidOperationException.
+let private contextWithoutAuthorizationServices () =
+    let services = ServiceCollection()
+    services.AddLogging() |> ignore
+
+    let ctx = DefaultHttpContext()
+    ctx.RequestServices <- services.BuildServiceProvider()
+    ctx
+
 [<Tests>]
 let tests =
     testList
@@ -65,4 +76,18 @@ let tests =
               let! result = AuthorizationFilter.apply ctx [ describe "public" []; guarded ]
 
               Expect.equal (result |> List.map (fun (r: ResourceDescription) -> r.Rel)) [ "public"; "admin" ] "Both included"
+          }
+
+          testTask "evaluation failures deny rather than throw or fail open" {
+              // Fail closed: an app whose DI container can't resolve
+              // IAuthorizationPolicyProvider/IAuthorizationService for a
+              // guarded resource must exclude it, not surface it or crash.
+              let ctx = contextWithoutAuthorizationServices ()
+              let guarded = describe "admin" [ AuthorizeAttribute() ]
+              let! result = AuthorizationFilter.apply ctx [ describe "public" []; guarded ]
+
+              Expect.equal
+                  (result |> List.map (fun (r: ResourceDescription) -> r.Rel))
+                  [ "public" ]
+                  "Guarded resource denied on evaluation failure"
           } ]

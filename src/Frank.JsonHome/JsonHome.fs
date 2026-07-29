@@ -161,8 +161,12 @@ module JsonHome =
             writer.WriteEndObject()
 
         writer.WriteStartObject "resources"
-        // Later duplicates would overwrite earlier ones in a JSON object, so
-        // duplicate rels are rejected at startup rather than silently merged.
+        // ApiSurface groups by route template, not by rel, so two resources
+        // that declare the same rel are not merged upstream -- both are
+        // written here as separate object entries under the identical key.
+        // Most JSON parsers resolve that to whichever entry comes last, but
+        // nothing in this pipeline currently detects or rejects the
+        // duplication at startup; that is tracked separately (#475).
         for resource in resources do
             writeResource writer resource
 

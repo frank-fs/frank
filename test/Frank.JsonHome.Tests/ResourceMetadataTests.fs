@@ -52,6 +52,18 @@ let tests =
               Expect.equal status.Status ResourceStatus.Deprecated "Status is deprecated"
           }
 
+          test "gone marks the resource's status distinctly from deprecated" {
+              let built =
+                  resource "/retired" {
+                      rel "tag:example.com,2026:retired"
+                      gone
+                      get noop
+                  }
+
+              let status = built.Endpoints.[0].Metadata.GetMetadata<StatusMetadata>()
+              Expect.equal status.Status ResourceStatus.Gone "gone attaches ResourceStatus.Gone, not Deprecated"
+          }
+
           test "the optional hint operations attach metadata" {
               let built =
                   resource "/files/{name}" {
