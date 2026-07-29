@@ -11,6 +11,7 @@
   <ItemGroup>
     <Compile Include="MetadataTests.fs" />
     <Compile Include="OpenApiDocumentTests.fs" />
+    <Compile Include="ServiceDescLinkTests.fs" />
     <Compile Include="SchemaTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

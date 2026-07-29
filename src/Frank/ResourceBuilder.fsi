@@ -29,6 +29,21 @@ type ResourceBuilder =
 
     static member AddMetadata: spec: ResourceSpec * convention: (EndpointBuilder -> unit) -> ResourceSpec
 
+    /// Scopes a convention to endpoints registered under the given HTTP method, by
+    /// inspecting the `HttpMethodMetadata` already present on the endpoint builder.
+    /// Granularity is per-method, not per-handler: if a resource registers multiple
+    /// handlers under the same HTTP method, the convention applies to all of them,
+    /// not just one.
+    static member AddMethodMetadata:
+        httpMethod: string * spec: ResourceSpec * convention: (EndpointBuilder -> unit) -> ResourceSpec
+
+    /// Shared helper behind the `Get`/`Post`/etc. `HandlerDefinition` overloads: adds
+    /// the handler and projects `HandlerDefinitionMetadata.toConventions` through
+    /// `AddMethodMetadata`, so the definition's metadata only applies to endpoints
+    /// registered under the given HTTP method.
+    static member AddHandlerDefinition:
+        httpMethod: string * spec: ResourceSpec * def: HandlerDefinition -> ResourceSpec
+
     static member AddHandler: httpMethod: string * spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
 
     static member AddHandler:
@@ -70,6 +85,7 @@ type ResourceBuilder =
 
     member Delete: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
     member Delete: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member Delete: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
 
     [<CustomOperation("get")>]
     member Get: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
@@ -83,6 +99,7 @@ type ResourceBuilder =
 
     member Get: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
     member Get: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member Get: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
 
     [<CustomOperation("head")>]
     member Head: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
@@ -96,6 +113,7 @@ type ResourceBuilder =
 
     member Head: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
     member Head: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member Head: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
 
     [<CustomOperation("options")>]
     member Options: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
@@ -109,6 +127,7 @@ type ResourceBuilder =
 
     member Options: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
     member Options: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member Options: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
 
     [<CustomOperation("patch")>]
     member Patch: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
@@ -122,6 +141,7 @@ type ResourceBuilder =
 
     member Patch: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
     member Patch: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member Patch: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
 
     [<CustomOperation("post")>]
     member Post: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
@@ -135,6 +155,7 @@ type ResourceBuilder =
 
     member Post: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
     member Post: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member Post: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
 
     [<CustomOperation("put")>]
     member Put: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
@@ -148,6 +169,7 @@ type ResourceBuilder =
 
     member Put: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
     member Put: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member Put: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
 
     [<CustomOperation("trace")>]
     member Trace: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec

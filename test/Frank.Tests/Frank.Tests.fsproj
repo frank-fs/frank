@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <Compile Include="HandlerBuilderTests.fs" />
+    <Compile Include="ResourceBuilderMetadataTests.fs" />
     <Compile Include="MiddlewareOrderingTests.fs" />
     <Compile Include="MetadataTests.fs" />
     <Compile Include="Program.fs" />

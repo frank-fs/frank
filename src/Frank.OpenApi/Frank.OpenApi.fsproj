@@ -7,8 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="ResourceBuilderExtensions.fsi" />
-    <Compile Include="ResourceBuilderExtensions.fs" />
     <Compile Include="WebHostBuilderExtensions.fsi" />
     <Compile Include="WebHostBuilderExtensions.fs" />
   </ItemGroup>
