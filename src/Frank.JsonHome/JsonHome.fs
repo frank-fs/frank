@@ -193,9 +193,19 @@ module JsonHome =
             StringValues("<" + options.Path + ">; rel=\"" + escapeParam options.Rel + "\"")
 
         fun (ctx: HttpContext) (next: unit -> Task) ->
-            // Append rather than assign: other packages may advertise links too,
-            // and Link is a multi-value header.
-            ctx.Response.Headers.Append("Link", link)
+            // Register via OnStarting rather than appending directly: exception-
+            // handling middleware downstream (UseExceptionHandler and similar)
+            // typically calls Response.Clear() before regenerating its own
+            // response, which wipes out headers already appended -- but not
+            // callbacks already registered via OnStarting, which still fire
+            // right before that regenerated response is sent. Append rather
+            // than assign inside the callback: other packages may advertise
+            // links too, and Link is a multi-value header.
+            ctx.Response.OnStarting(fun () ->
+                ctx.Response.Headers.Append("Link", link)
+                Task.CompletedTask)
+            |> ignore
+
             next ()
 
     let private documentHandler (options: JsonHomeOptions) (ctx: HttpContext) : Task =

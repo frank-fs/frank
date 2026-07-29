@@ -28,9 +28,14 @@ module JsonHome =
     /// Writes the document as an HTTP response.
     val write: options: JsonHomeOptions -> resources: ResourceDescription list -> ctx: HttpContext -> Task
 
-    /// Appends the Link header advertising the document, unconditionally, and
-    /// always calls next. Install it in BeforeRoutingMiddleware so a 404 --
-    /// where a lost client most needs the link -- carries it too. Exposed as a
+    /// Advertises the document with a Link header on every response,
+    /// unconditionally, and always calls next. Install it in
+    /// BeforeRoutingMiddleware so a 404 -- where a lost client most needs the
+    /// link -- carries it too. Registers via Response.OnStarting rather than
+    /// appending the header directly: exception-handling middleware
+    /// downstream typically clears the response before regenerating it, which
+    /// wipes out headers already appended but not callbacks already
+    /// registered, so this is what actually survives onto a 500. Exposed as a
     /// plain function because WebHostBuilder.Run blocks, so tests wire the
     /// pipeline by hand.
     val linkHeaderMiddleware: options: JsonHomeOptions -> (HttpContext -> (unit -> Task) -> Task)

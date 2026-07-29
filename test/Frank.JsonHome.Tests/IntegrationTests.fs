@@ -99,6 +99,36 @@ let private createServer (resources: Resource list) =
 
 let private ok: RequestDelegate = RequestDelegate(fun ctx -> ctx.Response.WriteAsync "OK")
 
+/// A minimal pipeline with UseExceptionHandler ahead of the link-header
+/// middleware, mirroring a standard production setup, and a handler that
+/// always throws.
+let private createFailingServer () =
+    let host =
+        Host
+            .CreateDefaultBuilder([||])
+            .ConfigureWebHost(fun webBuilder ->
+                webBuilder
+                    .UseTestServer()
+                    .Configure(fun app ->
+                        app.UseExceptionHandler(fun errApp ->
+                            errApp.Run(fun ctx ->
+                                ctx.Response.StatusCode <- 500
+                                ctx.Response.WriteAsync "error"))
+                        |> ignore
+
+                        let runLinkHeader = JsonHome.linkHeaderMiddleware options
+
+                        app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
+                            runLinkHeader ctx (fun () -> next.Invoke ctx))
+                        |> ignore
+
+                        app.Run(fun _ -> failwith "boom") |> ignore)
+                |> ignore)
+            .Build()
+
+    host.Start()
+    host.GetTestClient()
+
 [<Tests>]
 let tests =
     testList
@@ -174,4 +204,16 @@ let tests =
               Expect.isTrue
                   (fst (adminRoot.GetProperty("resources").TryGetProperty "tag:example.com,2026:admin"))
                   "An authenticated admin sees the admin resource"
+          }
+
+          testTask "the Link header survives an exception handler clearing the response" {
+              // Regression test: UseExceptionHandler-style middleware typically
+              // calls Response.Clear() before regenerating its own response,
+              // which wipes out a header appended directly but not one
+              // registered via Response.OnStarting.
+              let client = createFailingServer ()
+              let! (response: HttpResponseMessage) = client.GetAsync "/x"
+
+              Expect.equal (int response.StatusCode) 500 "The exception handler produced the response"
+              Expect.isTrue (response.Headers.Contains "Link") "Link header survives Response.Clear()"
           } ]
