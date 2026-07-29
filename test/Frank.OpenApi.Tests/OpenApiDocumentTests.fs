@@ -25,6 +25,8 @@ type TestEndpointDataSource(endpoints: Endpoint[]) =
     override _.Endpoints = endpoints :> _
     override _.GetChangeToken() = NullChangeToken.Singleton :> _
 
+let openApiRoutePattern = "/.well-known/openapi.json"
+
 /// Creates a test server with Frank resources and OpenAPI enabled
 let createOpenApiTestServer (resources: Resource list) =
     let allEndpoints = resources |> List.collect (fun r -> r.Endpoints |> Array.toList) |> List.toArray
@@ -57,8 +59,9 @@ let createOpenApiTestServer (resources: Resource list) =
                             .UseRouting()
                             .UseEndpoints(fun endpoints ->
                                 endpoints.DataSources.Add(TestEndpointDataSource(allEndpoints))
-                                endpoints.MapOpenApi() |> ignore
-                                endpoints.MapScalarApiReference() |> ignore)
+                                endpoints.MapOpenApi(openApiRoutePattern) |> ignore
+                                endpoints.MapScalarApiReference(fun (options: ScalarOptions) ->
+                                    options.WithOpenApiRoutePattern(openApiRoutePattern) |> ignore) |> ignore)
                         |> ignore)
                 |> ignore)
 
@@ -99,7 +102,7 @@ let hasProperty (name: string) (element: JsonElement) =
 /// Helper to get and parse the OpenAPI document
 let getOpenApiDoc (client: HttpClient) =
     task {
-        let! (response: HttpResponseMessage) = client.GetAsync("/openapi/v1.json")
+        let! (response: HttpResponseMessage) = client.GetAsync(openApiRoutePattern)
         let! (body: string) = response.Content.ReadAsStringAsync()
         return response, JsonDocument.Parse(body : string)
     }
@@ -109,14 +112,14 @@ let getOpenApiDoc (client: HttpClient) =
 [<Tests>]
 let us1Tests =
     testList "US1 - Serve OpenAPI Document" [
-        testTask "GET /openapi/v1.json returns 200 with valid OpenAPI document" {
+        testTask "GET /.well-known/openapi.json returns 200 with valid OpenAPI document" {
             let products =
                 resource "/products" {
                     name "Products"
                     get simpleHandler
                 }
             let client = createOpenApiTestServer [ products ]
-            let! (response: HttpResponseMessage) = client.GetAsync("/openapi/v1.json")
+            let! (response: HttpResponseMessage) = client.GetAsync(openApiRoutePattern)
             Expect.equal response.StatusCode HttpStatusCode.OK "Should return 200"
 
             let! (body: string) = response.Content.ReadAsStringAsync()
@@ -181,14 +184,14 @@ let us1Tests =
             Expect.isTrue (hasProperty "get" usersPath) "Should have GET /users"
         }
 
-        testTask "App without OpenAPI does not expose /openapi/v1.json" {
+        testTask "App without OpenAPI does not expose /.well-known/openapi.json" {
             let products =
                 resource "/products" {
                     name "Products"
                     get simpleHandler
                 }
             let client = createPlainTestServer [ products ]
-            let! (response: HttpResponseMessage) = client.GetAsync("/openapi/v1.json")
+            let! (response: HttpResponseMessage) = client.GetAsync(openApiRoutePattern)
             Expect.equal response.StatusCode HttpStatusCode.NotFound "Should return 404 when OpenAPI is not configured"
         }
     ]

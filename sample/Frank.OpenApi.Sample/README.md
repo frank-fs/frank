@@ -61,17 +61,17 @@ The application will start on `http://localhost:5000` (HTTP) and `https://localh
 | DELETE | `/api/products/{id}` | Delete a product |
 | POST | `/api/products/search` | Search products with filters |
 | GET | `/api/products/{id}/negotiate` | Content negotiation example |
-| GET | `/openapi/v1.json` | OpenAPI document |
+| GET | `/.well-known/openapi.json` | OpenAPI document |
 
 ## OpenAPI Document
 
 View the generated OpenAPI document:
 
 ```bash
-curl http://localhost:5000/openapi/v1.json | jq
+curl http://localhost:5000/.well-known/openapi.json | jq
 ```
 
-Or visit `http://localhost:5000/openapi/v1.json` in your browser.
+Or visit `http://localhost:5000/.well-known/openapi.json` in your browser.
 
 ## Example Requests
 

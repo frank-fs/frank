@@ -43,7 +43,7 @@ let hasProperty (name: string) (element: JsonElement) =
 /// Helper to get and parse the OpenAPI document
 let getOpenApiDoc (client: HttpClient) =
     task {
-        let! (response: HttpResponseMessage) = client.GetAsync("/openapi/v1.json")
+        let! (response: HttpResponseMessage) = client.GetAsync(OpenApiDocumentTests.openApiRoutePattern)
         let! (body: string) = response.Content.ReadAsStringAsync()
         return response, JsonDocument.Parse(body : string)
     }
