@@ -1,4 +1,4 @@
-### New in 7.4.0 (Unreleased)
+### New in 7.3.2 (Unreleased)
 
 **Frank Core - HandlerDefinition Metadata Refactor**
 
@@ -6,9 +6,6 @@
 - **`ProducesInfo` and `AcceptsInfo` removed** — these staging record types are no longer needed since metadata is built directly. Use `HandlerDefinition.tryFind<'T>`/`findAll<'T>` to inspect metadata (e.g. `HandlerDefinition.findAll<IProducesResponseTypeMetadata>`) if you referenced these types directly rather than through the `handler { }` CE.
 - **Breaking namespace move:** the `get`/`post`/`put`/`delete`/`patch`/`head`/`options` overloads that accept a `HandlerDefinition` moved from `Frank.OpenApi` into Frank core (`Frank.Builder`). If your project only had `open Frank.OpenApi` and not `open Frank.Builder`, add `open Frank.Builder` — the `resource { }` CE already requires it, so most consumers are unaffected.
 - **New: `ResourceBuilder.AddMethodMetadata`** — scopes an endpoint-metadata convention to a single HTTP method within a resource, promoted from a private `Frank.OpenApi` helper to a public core operation.
-
-
-### New in 7.2.2 (Unreleased)
 
 **Frank.OpenApi - service-desc Link Header**
 
