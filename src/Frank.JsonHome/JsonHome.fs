@@ -43,6 +43,22 @@ module JsonHome =
 
         writer.WriteEndArray()
 
+    let private acceptHints (resource: ResourceDescription) =
+        resource.Accepts
+        |> List.choose (fun (httpMethod, contentTypes) ->
+            match acceptHintName httpMethod with
+            | Some hint when not (List.isEmpty contentTypes) -> Some(hint, contentTypes)
+            | _ -> None)
+
+    /// hints is optional, so an entry with nothing to hint omits it rather than
+    /// carrying an empty object.
+    let private hasHints (resource: ResourceDescription) =
+        not (List.isEmpty resource.Methods)
+        || not (List.isEmpty resource.Formats)
+        || not (List.isEmpty (acceptHints resource))
+        || resource.Docs.IsSome
+        || resource.Status.IsSome
+
     let private writeHints (writer: Utf8JsonWriter) (resource: ResourceDescription) =
         writer.WriteStartObject "hints"
 
@@ -58,10 +74,8 @@ module JsonHome =
 
             writer.WriteEndObject()
 
-        for httpMethod, contentTypes in resource.Accepts do
-            match acceptHintName httpMethod with
-            | Some hint when not (List.isEmpty contentTypes) -> writeStringArray writer hint contentTypes
-            | _ -> ()
+        for hint, contentTypes in acceptHints resource do
+            writeStringArray writer hint contentTypes
 
         resource.Docs |> Option.iter (fun uri -> writer.WriteString("docs", uri))
         resource.Status |> Option.iter (fun s -> writer.WriteString("status", statusName s))
@@ -74,19 +88,21 @@ module JsonHome =
         if resource.IsTemplated then
             writer.WriteString("hrefTemplate", resource.Href)
 
-            let hrefVars = resource.HrefVars |> List.distinctBy fst
+            // draft-06 section 4: "When hrefTemplate is present, the Resource
+            // Object MUST have a hrefVars property." It is written even when the
+            // author declared no variable semantics, so the entry stays valid.
+            writer.WriteStartObject "hrefVars"
 
-            if not (List.isEmpty hrefVars) then
-                writer.WriteStartObject "hrefVars"
+            for name, uri in resource.HrefVars |> List.distinctBy fst do
+                writer.WriteString(name, uri)
 
-                for name, uri in hrefVars do
-                    writer.WriteString(name, uri)
-
-                writer.WriteEndObject()
+            writer.WriteEndObject()
         else
             writer.WriteString("href", resource.Href)
 
-        writeHints writer resource
+        if hasHints resource then
+            writeHints writer resource
+
         writer.WriteEndObject()
 
     let private writeDocument (writer: Utf8JsonWriter) options resources =

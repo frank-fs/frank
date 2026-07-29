@@ -98,6 +98,34 @@ let tests =
               Expect.isFalse (fst (hints.TryGetProperty "formats")) "No formats hint when none are declared"
           }
 
+          test "templated resources always emit hrefVars, even when none are declared" {
+              let root = parse (JsonHome.serialize JsonHomeOptions.Default [ { widget with HrefVars = [] } ])
+
+              let entry = root.GetProperty("resources").GetProperty "tag:me@example.com,2016:widget"
+
+              // draft-06 section 4: "When hrefTemplate is present, the Resource
+              // Object MUST have a hrefVars property."
+              let found, hrefVars = entry.TryGetProperty "hrefVars"
+              Expect.isTrue found "hrefVars accompanies every hrefTemplate"
+              Expect.equal hrefVars.ValueKind JsonValueKind.Object "hrefVars is an object"
+              Expect.isEmpty (hrefVars.EnumerateObject() |> List.ofSeq) "Empty when nothing was declared"
+          }
+
+          test "resources with no hints omit the hints member" {
+              let bare =
+                  { widgets with
+                      Methods = []
+                      Formats = []
+                      Accepts = []
+                      Docs = None
+                      Status = None }
+
+              let root = parse (JsonHome.serialize JsonHomeOptions.Default [ bare ])
+              let entry = root.GetProperty("resources").GetProperty "tag:me@example.com,2016:widgets"
+
+              Expect.isFalse (fst (entry.TryGetProperty "hints")) "No empty hints object"
+          }
+
           test "emits the status hint" {
               let root =
                   parse (
