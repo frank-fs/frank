@@ -12,12 +12,12 @@ let private adminOnly =
     builder.RequireRole "admin" |> ignore
     builder.Build()
 
-let private describe rel (metadata: obj list) =
+let private describeMethods rel (methodMetadata: (string * obj list) list) =
     { Rel = rel
       Href = "/" + rel
       IsTemplated = false
       HrefVars = []
-      Methods = [ "GET" ]
+      Methods = methodMetadata |> List.map fst
       Formats = []
       Accepts = []
       AcceptRanges = []
@@ -26,8 +26,11 @@ let private describe rel (metadata: obj list) =
       AuthSchemes = []
       Docs = None
       Status = None
-      Metadata = metadata
-      MethodMetadata = [ "GET", metadata ] }
+      Metadata = methodMetadata |> List.collect snd
+      MethodMetadata = methodMetadata }
+
+let private describe rel (metadata: obj list) =
+    describeMethods rel [ "GET", metadata ]
 
 let private contextFor (roles: string list) =
     let services = ServiceCollection()
@@ -91,4 +94,61 @@ let tests =
                   (result |> List.map (fun (r: ResourceDescription) -> r.Rel))
                   [ "public" ]
                   "Guarded resource denied on evaluation failure"
+          }
+
+          testTask "methods are filtered independently -- a mixed resource keeps only what the principal can reach" {
+              let ctx = contextFor []
+              let mixed = describeMethods "widgets" [ "GET", []; "DELETE", [ AuthorizeAttribute(); adminOnly ] ]
+
+              let! (result: ResourceDescription list) = AuthorizationFilter.apply ctx [ mixed ]
+
+              Expect.hasLength result 1 "Resource still present"
+              Expect.equal result.[0].Methods [ "GET" ] "Only the public method survives"
+          }
+
+          testTask "a resource with every method hidden is dropped entirely" {
+              let ctx = contextFor []
+              let guarded = describeMethods "admin-only" [ "GET", [ AuthorizeAttribute(); adminOnly ] ]
+
+              let! result = AuthorizationFilter.apply ctx [ guarded ]
+
+              Expect.isEmpty result "Resource with zero visible methods does not appear"
+          }
+
+          testTask "AllowAnonymous on one method keeps it visible even when the resource is otherwise restricted" {
+              let ctx = contextFor []
+              let mixed =
+                  describeMethods
+                      "settings"
+                      [ "GET", [ AllowAnonymousAttribute() ]
+                        "PUT", [ AuthorizeAttribute(); adminOnly ] ]
+
+              let! (result: ResourceDescription list) = AuthorizationFilter.apply ctx [ mixed ]
+
+              Expect.hasLength result 1 "Resource still present"
+              Expect.equal result.[0].Methods [ "GET" ] "AllowAnonymous method survives, restricted one doesn't"
+          }
+
+          testTask "Accepts entries are filtered to the methods that remain visible" {
+              let ctx = contextFor []
+              let mixed =
+                  { describeMethods "orders" [ "GET", []; "POST", [ AuthorizeAttribute(); adminOnly ] ] with
+                      Accepts = [ "GET", [ "text/html" ]; "POST", [ "application/json" ] ] }
+
+              let! (result: ResourceDescription list) = AuthorizationFilter.apply ctx [ mixed ]
+
+              Expect.equal result.[0].Methods [ "GET" ] "Only GET remains"
+              Expect.equal result.[0].Accepts [ "GET", [ "text/html" ] ] "POST's accept entry is dropped with it"
+          }
+
+          testTask "Formats is cleared once GET is no longer visible" {
+              let ctx = contextFor []
+              let mixed =
+                  { describeMethods "orders" [ "GET", [ AuthorizeAttribute(); adminOnly ]; "POST", [] ] with
+                      Formats = [ "application/json" ] }
+
+              let! (result: ResourceDescription list) = AuthorizationFilter.apply ctx [ mixed ]
+
+              Expect.equal result.[0].Methods [ "POST" ] "Only POST remains"
+              Expect.isEmpty result.[0].Formats "Formats was derived from the now-hidden GET"
           } ]
