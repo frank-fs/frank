@@ -75,4 +75,24 @@ let tests =
               let surface = ApiSurface.ofApiDescriptions [ describe "internal" "GET" [] ]
 
               Expect.isEmpty surface "No rel means no entry"
+          }
+
+          test "method metadata is retained per HTTP method, not merged" {
+              let getMetadata: obj list = [ { Rel = "tag:example.com,2026:products" }; box "get-marker" ]
+              let postMetadata: obj list = [ { Rel = "tag:example.com,2026:products" }; box "post-marker" ]
+
+              let surface =
+                  ApiSurface.ofApiDescriptions
+                      [ describe "products" "GET" getMetadata
+                        describe "products" "POST" postMetadata ]
+
+              Expect.hasLength surface 1 "One resource"
+
+              let getEntry = surface.[0].MethodMetadata |> List.find (fun (m, _) -> m = "GET") |> snd
+              let postEntry = surface.[0].MethodMetadata |> List.find (fun (m, _) -> m = "POST") |> snd
+
+              Expect.contains getEntry (box "get-marker") "GET keeps its own marker"
+              Expect.isFalse (getEntry |> List.contains (box "post-marker")) "GET does not see POST's marker"
+              Expect.contains postEntry (box "post-marker") "POST keeps its own marker"
+              Expect.isFalse (postEntry |> List.contains (box "get-marker")) "POST does not see GET's marker"
           } ]

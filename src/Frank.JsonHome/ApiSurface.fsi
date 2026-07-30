@@ -20,7 +20,12 @@ type ResourceDescription =
       Docs: string option
       Status: ResourceStatus option
       /// Endpoint metadata, retained for authorization filtering.
-      Metadata: obj list }
+      Metadata: obj list
+      /// Endpoint metadata for each HTTP method registered on this resource,
+      /// retained separately from Metadata so authorization can be evaluated
+      /// (and Methods/Accepts/Formats filtered) per method rather than merged
+      /// across the whole resource.
+      MethodMetadata: (string * obj list) list }
 
 module ApiSurface =
 

@@ -26,7 +26,8 @@ let private describe rel (metadata: obj list) =
       AuthSchemes = []
       Docs = None
       Status = None
-      Metadata = metadata }
+      Metadata = metadata
+      MethodMetadata = [ "GET", metadata ] }
 
 let private contextFor (roles: string list) =
     let services = ServiceCollection()

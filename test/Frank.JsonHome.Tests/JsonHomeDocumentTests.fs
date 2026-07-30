@@ -20,7 +20,8 @@ let private widgets =
       AuthSchemes = []
       Docs = None
       Status = None
-      Metadata = [] }
+      Metadata = []
+      MethodMetadata = [ "GET", [] ] }
 
 let private widget =
     { Rel = "tag:me@example.com,2016:widget"
@@ -36,7 +37,8 @@ let private widget =
       AuthSchemes = []
       Docs = None
       Status = None
-      Metadata = [] }
+      Metadata = []
+      MethodMetadata = [ "GET", []; "PUT", []; "DELETE", []; "PATCH", [] ] }
 
 [<Tests>]
 let tests =
