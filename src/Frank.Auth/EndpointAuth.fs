@@ -5,7 +5,7 @@ open Microsoft.AspNetCore.Builder
 open Frank.Builder
 
 module EndpointAuth =
-    let toMetadataObjects (requirement: AuthRequirement) : obj list =
+    let private toMetadataObjects (requirement: AuthRequirement) : obj list =
         match requirement with
         | AuthRequirement.Authenticated -> [ AuthorizeAttribute() ]
         | AuthRequirement.Claim(claimType, claimValues) ->

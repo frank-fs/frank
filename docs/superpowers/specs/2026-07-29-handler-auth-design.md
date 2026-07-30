@@ -2,7 +2,7 @@
 
 **Date**: 2026-07-29
 **Branch**: `worktree-handler-auth`
-**Status**: Draft — awaiting review
+**Status**: Implemented
 **Issue**: [#476](https://github.com/frank-fs/frank/issues/476)
 
 ## Context

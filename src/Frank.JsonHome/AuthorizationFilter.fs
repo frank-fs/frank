@@ -24,22 +24,20 @@ module AuthorizationFilter =
         metadata |> List.exists (fun m -> m :? IAllowAnonymous)
 
     let varies (resources: ResourceDescription list) =
-        resources |> List.exists (fun r -> not (List.isEmpty (authorizeData r.Metadata)))
+        resources
+        |> List.exists (fun r -> not (List.isEmpty (authorizeData r.Metadata)) || not (List.isEmpty (policies r.Metadata)))
 
     let private resolvePolicy (ctx: HttpContext) (metadata: obj list) =
         task {
-            match policies metadata with
-            | [] ->
-                let provider = ctx.RequestServices.GetRequiredService<IAuthorizationPolicyProvider>()
-                return! AuthorizationPolicy.CombineAsync(provider, authorizeData metadata)
-            | explicitPolicies -> return AuthorizationPolicy.Combine(explicitPolicies)
+            let provider = ctx.RequestServices.GetRequiredService<IAuthorizationPolicyProvider>()
+            return! AuthorizationPolicy.CombineAsync(provider, authorizeData metadata, policies metadata)
         }
 
     let private isMethodAllowed (ctx: HttpContext) (metadata: obj list) =
         task {
             if isAnonymous metadata then
                 return true
-            elif List.isEmpty (authorizeData metadata) then
+            elif List.isEmpty (authorizeData metadata) && List.isEmpty (policies metadata) then
                 return true
             else
                 try

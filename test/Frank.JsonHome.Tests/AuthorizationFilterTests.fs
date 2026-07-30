@@ -55,6 +55,18 @@ let private contextWithoutAuthorizationServices () =
     ctx.RequestServices <- services.BuildServiceProvider()
     ctx
 
+let private contextForWithPolicy (roles: string list) (configurePolicies: AuthorizationOptions -> unit) =
+    let services = ServiceCollection()
+    services.AddAuthorization(configurePolicies) |> ignore
+    services.AddLogging() |> ignore
+
+    let ctx = DefaultHttpContext()
+    ctx.RequestServices <- services.BuildServiceProvider()
+
+    let claims = roles |> List.map (fun r -> Claim(ClaimTypes.Role, r))
+    ctx.User <- ClaimsPrincipal(ClaimsIdentity(claims, "Test"))
+    ctx
+
 [<Tests>]
 let tests =
     testList
@@ -151,4 +163,26 @@ let tests =
 
               Expect.equal result.[0].Methods [ "POST" ] "Only POST remains"
               Expect.isEmpty result.[0].Formats "Formats was derived from the now-hidden GET"
+          }
+
+          testTask "a named policy composed with an explicit AuthorizationPolicy -- satisfying only the explicit one still denies" {
+              // Regression: resolvePolicy used to discard all IAuthorizeData
+              // (including named-policy AuthorizeAttributes) whenever an
+              // explicit AuthorizationPolicy was also present in the same
+              // method's metadata -- exactly the shape requirePolicy
+              // (resource-level) + requireRole (handler-level) produces
+              // together. An admin who fails the named policy's own claim
+              // requirement must still be denied, not waved through on role
+              // alone.
+              let ctx =
+                  contextForWithPolicy
+                      [ "admin" ]
+                      (fun options -> options.AddPolicy("CanViewReports", fun p -> p.RequireClaim("scope", "reports:read") |> ignore))
+
+              let guarded =
+                  describeMethods "reports" [ "DELETE", [ AuthorizeAttribute("CanViewReports"); AuthorizeAttribute(); adminOnly ] ]
+
+              let! result = AuthorizationFilter.apply ctx [ guarded ]
+
+              Expect.isEmpty result "Admin who lacks the named policy's claim must still be denied, not allowed on role alone"
           } ]

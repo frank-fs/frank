@@ -438,4 +438,71 @@ let handlerLevelTests =
             let! (response: HttpResponseMessage) = sendRequest client HttpMethod.Get "/mixed" None None None
             Expect.equal response.StatusCode HttpStatusCode.OK "AllowAnonymous bypasses the co-declared role requirement"
         }
+
+        testTask "handler-level requireClaim (single value) restricts just that method" {
+            let r =
+                resource "/tickets" {
+                    name "Tickets"
+                    get simpleHandler
+                    delete (handler {
+                        requireClaim "scope" "admin"
+                        handle (fun (ctx: HttpContext) -> ctx.Response.WriteAsync("deleted"))
+                    })
+                }
+            let client = createAuthTestServer [ r ] ignore
+
+            let! (getResponse: HttpResponseMessage) = sendRequest client HttpMethod.Get "/tickets" None None None
+            Expect.equal getResponse.StatusCode HttpStatusCode.OK "GET stays public"
+
+            let! (deleteWrongClaim: HttpResponseMessage) =
+                sendRequest client HttpMethod.Delete "/tickets" (Some "alice") (Some "scope=read") None
+            Expect.equal deleteWrongClaim.StatusCode HttpStatusCode.Forbidden "DELETE without the required claim value is rejected"
+
+            let! (deleteRightClaim: HttpResponseMessage) =
+                sendRequest client HttpMethod.Delete "/tickets" (Some "alice") (Some "scope=admin") None
+            Expect.equal deleteRightClaim.StatusCode HttpStatusCode.OK "DELETE with the required claim value succeeds"
+        }
+
+        testTask "handler-level requireClaim (multi-value list overload) accepts any listed value" {
+            let r =
+                resource "/data-export" {
+                    name "DataExport"
+                    delete (handler {
+                        requireClaim "scope" [ "read"; "write" ]
+                        handle (fun (ctx: HttpContext) -> ctx.Response.WriteAsync("deleted"))
+                    })
+                }
+            let client = createAuthTestServer [ r ] ignore
+
+            let! (noMatch: HttpResponseMessage) =
+                sendRequest client HttpMethod.Delete "/data-export" (Some "alice") (Some "scope=delete") None
+            Expect.equal noMatch.StatusCode HttpStatusCode.Forbidden "No matching claim value is rejected"
+
+            let! (oneMatch: HttpResponseMessage) =
+                sendRequest client HttpMethod.Delete "/data-export" (Some "alice") (Some "scope=write") None
+            Expect.equal oneMatch.StatusCode HttpStatusCode.OK "Any one matching claim value succeeds"
+        }
+
+        testTask "handler-level requirePolicy delegates to a named application-level policy" {
+            let r =
+                resource "/audit" {
+                    name "Audit"
+                    get (handler {
+                        requirePolicy "CanViewAudit"
+                        handle (fun (ctx: HttpContext) -> ctx.Response.WriteAsync("audit-log"))
+                    })
+                }
+            let client =
+                createAuthTestServer [ r ] (fun services ->
+                    services.AddAuthorization(fun options ->
+                        options.AddPolicy("CanViewAudit", fun policy -> policy.RequireClaim("scope", "audit:read") |> ignore))
+                    |> ignore)
+
+            let! (noClaim: HttpResponseMessage) = sendRequest client HttpMethod.Get "/audit" (Some "alice") None None
+            Expect.equal noClaim.StatusCode HttpStatusCode.Forbidden "User not satisfying the named policy is rejected"
+
+            let! (withClaim: HttpResponseMessage) =
+                sendRequest client HttpMethod.Get "/audit" (Some "alice") (Some "scope=audit:read") None
+            Expect.equal withClaim.StatusCode HttpStatusCode.OK "User satisfying the named policy succeeds"
+        }
     ]
