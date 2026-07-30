@@ -15,6 +15,8 @@
     <Compile Include="EndpointAuth.fs" />
     <Compile Include="ResourceBuilderExtensions.fsi" />
     <Compile Include="ResourceBuilderExtensions.fs" />
+    <Compile Include="HandlerBuilderExtensions.fsi" />
+    <Compile Include="HandlerBuilderExtensions.fs" />
     <Compile Include="WebHostBuilderExtensions.fsi" />
     <Compile Include="WebHostBuilderExtensions.fs" />
   </ItemGroup>
