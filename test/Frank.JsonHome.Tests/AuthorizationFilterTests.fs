@@ -32,9 +32,9 @@ let private describeMethods rel (methodMetadata: (string * obj list) list) =
 let private describe rel (metadata: obj list) =
     describeMethods rel [ "GET", metadata ]
 
-let private contextFor (roles: string list) =
+let private contextForWith (roles: string list) (configurePolicies: AuthorizationOptions -> unit) =
     let services = ServiceCollection()
-    services.AddAuthorization() |> ignore
+    services.AddAuthorization(configurePolicies) |> ignore
     services.AddLogging() |> ignore
 
     let ctx = DefaultHttpContext()
@@ -43,6 +43,8 @@ let private contextFor (roles: string list) =
     let claims = roles |> List.map (fun r -> Claim(ClaimTypes.Role, r))
     ctx.User <- ClaimsPrincipal(ClaimsIdentity(claims, "Test"))
     ctx
+
+let private contextFor (roles: string list) = contextForWith roles ignore
 
 /// No AddAuthorization() -- IAuthorizationPolicyProvider and
 /// IAuthorizationService are deliberately left unregistered, so resolving
@@ -53,18 +55,6 @@ let private contextWithoutAuthorizationServices () =
 
     let ctx = DefaultHttpContext()
     ctx.RequestServices <- services.BuildServiceProvider()
-    ctx
-
-let private contextForWithPolicy (roles: string list) (configurePolicies: AuthorizationOptions -> unit) =
-    let services = ServiceCollection()
-    services.AddAuthorization(configurePolicies) |> ignore
-    services.AddLogging() |> ignore
-
-    let ctx = DefaultHttpContext()
-    ctx.RequestServices <- services.BuildServiceProvider()
-
-    let claims = roles |> List.map (fun r -> Claim(ClaimTypes.Role, r))
-    ctx.User <- ClaimsPrincipal(ClaimsIdentity(claims, "Test"))
     ctx
 
 [<Tests>]
@@ -175,7 +165,7 @@ let tests =
               // requirement must still be denied, not waved through on role
               // alone.
               let ctx =
-                  contextForWithPolicy
+                  contextForWith
                       [ "admin" ]
                       (fun options -> options.AddPolicy("CanViewReports", fun p -> p.RequireClaim("scope", "reports:read") |> ignore))
 

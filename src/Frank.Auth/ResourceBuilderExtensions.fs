@@ -7,24 +7,19 @@ module ResourceBuilderExtensions =
     type ResourceBuilder with
         [<CustomOperation("requireAuth")>]
         member _.RequireAuth(spec: ResourceSpec) : ResourceSpec =
-            let config = AuthConfig.empty |> AuthConfig.addRequirement AuthRequirement.Authenticated
-            EndpointAuth.applyAuth config spec
+            EndpointAuth.applyAuth (AuthConfig.single AuthRequirement.Authenticated) spec
 
         [<CustomOperation("requireClaim")>]
         member _.RequireClaim(spec: ResourceSpec, claimType: string, claimValue: string) : ResourceSpec =
-            let config = AuthConfig.empty |> AuthConfig.addRequirement (AuthRequirement.Claim(claimType, [ claimValue ]))
-            EndpointAuth.applyAuth config spec
+            EndpointAuth.applyAuth (AuthConfig.single (AuthRequirement.Claim(claimType, [ claimValue ]))) spec
 
         member _.RequireClaim(spec: ResourceSpec, claimType: string, claimValues: string list) : ResourceSpec =
-            let config = AuthConfig.empty |> AuthConfig.addRequirement (AuthRequirement.Claim(claimType, claimValues))
-            EndpointAuth.applyAuth config spec
+            EndpointAuth.applyAuth (AuthConfig.single (AuthRequirement.Claim(claimType, claimValues))) spec
 
         [<CustomOperation("requireRole")>]
         member _.RequireRole(spec: ResourceSpec, role: string) : ResourceSpec =
-            let config = AuthConfig.empty |> AuthConfig.addRequirement (AuthRequirement.Role role)
-            EndpointAuth.applyAuth config spec
+            EndpointAuth.applyAuth (AuthConfig.single (AuthRequirement.Role role)) spec
 
         [<CustomOperation("requirePolicy")>]
         member _.RequirePolicy(spec: ResourceSpec, policyName: string) : ResourceSpec =
-            let config = AuthConfig.empty |> AuthConfig.addRequirement (AuthRequirement.Policy policyName)
-            EndpointAuth.applyAuth config spec
+            EndpointAuth.applyAuth (AuthConfig.single (AuthRequirement.Policy policyName)) spec

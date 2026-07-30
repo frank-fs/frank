@@ -23,33 +23,48 @@ module AuthorizationFilter =
     let private isAnonymous (metadata: obj list) =
         metadata |> List.exists (fun m -> m :? IAllowAnonymous)
 
-    let varies (resources: ResourceDescription list) =
-        resources
-        |> List.exists (fun r -> not (List.isEmpty (authorizeData r.Metadata)) || not (List.isEmpty (policies r.Metadata)))
+    let private hasAuthorizationMetadata (metadata: obj list) =
+        metadata |> List.exists (fun m -> m :? IAuthorizeData || m :? AuthorizationPolicy)
 
-    let private resolvePolicy (ctx: HttpContext) (metadata: obj list) =
+    let varies (resources: ResourceDescription list) =
+        resources |> List.exists (fun r -> hasAuthorizationMetadata r.Metadata)
+
+    let private resolvePolicy (ctx: HttpContext) (data: IAuthorizeData list) (pols: AuthorizationPolicy list) =
         task {
-            let provider = ctx.RequestServices.GetRequiredService<IAuthorizationPolicyProvider>()
-            return! AuthorizationPolicy.CombineAsync(provider, authorizeData metadata, policies metadata)
+            if List.isEmpty data then
+                // Nothing to resolve via the policy provider -- pols is
+                // guaranteed non-empty here (isMethodAllowed already
+                // short-circuits when both are empty), so this is just a
+                // synchronous combine of the explicit policies, same as
+                // AuthorizationPolicy.CombineAsync would produce with no
+                // IAuthorizeData to fold in, without the provider round-trip.
+                return AuthorizationPolicy.Combine(pols)
+            else
+                let provider = ctx.RequestServices.GetRequiredService<IAuthorizationPolicyProvider>()
+                return! AuthorizationPolicy.CombineAsync(provider, data, pols)
         }
 
     let private isMethodAllowed (ctx: HttpContext) (metadata: obj list) =
         task {
             if isAnonymous metadata then
                 return true
-            elif List.isEmpty (authorizeData metadata) && List.isEmpty (policies metadata) then
-                return true
             else
-                try
-                    match! resolvePolicy ctx metadata with
-                    | null -> return true
-                    | policy ->
-                        let service = ctx.RequestServices.GetRequiredService<IAuthorizationService>()
-                        let! result = service.AuthorizeAsync(ctx.User, box metadata, policy)
-                        return result.Succeeded
-                with _ ->
-                    // Fail closed: an evaluation error must never widen access.
-                    return false
+                let data = authorizeData metadata
+                let pols = policies metadata
+
+                if List.isEmpty data && List.isEmpty pols then
+                    return true
+                else
+                    try
+                        match! resolvePolicy ctx data pols with
+                        | null -> return true
+                        | policy ->
+                            let service = ctx.RequestServices.GetRequiredService<IAuthorizationService>()
+                            let! result = service.AuthorizeAsync(ctx.User, box metadata, policy)
+                            return result.Succeeded
+                    with _ ->
+                        // Fail closed: an evaluation error must never widen access.
+                        return false
         }
 
     let private allowedMethods (ctx: HttpContext) (resource: ResourceDescription) =

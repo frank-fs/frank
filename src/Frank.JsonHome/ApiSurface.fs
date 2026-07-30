@@ -62,7 +62,8 @@ module ApiSurface =
         |> Seq.groupBy (fun d -> d.RelativePath)
         |> Seq.choose (fun (relativePath, group) ->
             let group = List.ofSeq group
-            let metadata = group |> List.collect metadataOf
+            let methodMetadata = group |> List.map (fun d -> d.HttpMethod, metadataOf d)
+            let metadata = methodMetadata |> List.collect snd
 
             match pick<RelMetadata> metadata with
             | None -> None
@@ -106,5 +107,5 @@ module ApiSurface =
                       Docs = pick<DocsMetadata> metadata |> Option.map (fun d -> d.Uri)
                       Status = pick<StatusMetadata> metadata |> Option.map (fun s -> s.Status)
                       Metadata = metadata
-                      MethodMetadata = group |> List.map (fun d -> d.HttpMethod, metadataOf d) })
+                      MethodMetadata = methodMetadata })
         |> List.ofSeq
