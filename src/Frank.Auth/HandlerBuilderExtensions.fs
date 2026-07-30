@@ -8,22 +8,22 @@ module HandlerBuilderExtensions =
     type HandlerBuilder with
         [<CustomOperation("requireAuth")>]
         member _.RequireAuth(def: HandlerDefinition) : HandlerDefinition =
-            EndpointAuth.applyAuthToHandler (AuthConfig.single AuthRequirement.Authenticated) def
+            EndpointAuth.applyAuthToHandler (AuthConfig.singleton AuthRequirement.Authenticated) def
 
         [<CustomOperation("requireClaim")>]
         member _.RequireClaim(def: HandlerDefinition, claimType: string, claimValue: string) : HandlerDefinition =
-            EndpointAuth.applyAuthToHandler (AuthConfig.single (AuthRequirement.Claim(claimType, [ claimValue ]))) def
+            EndpointAuth.applyAuthToHandler (AuthConfig.singleton (AuthRequirement.Claim(claimType, [ claimValue ]))) def
 
         member _.RequireClaim(def: HandlerDefinition, claimType: string, claimValues: string list) : HandlerDefinition =
-            EndpointAuth.applyAuthToHandler (AuthConfig.single (AuthRequirement.Claim(claimType, claimValues))) def
+            EndpointAuth.applyAuthToHandler (AuthConfig.singleton (AuthRequirement.Claim(claimType, claimValues))) def
 
         [<CustomOperation("requireRole")>]
         member _.RequireRole(def: HandlerDefinition, role: string) : HandlerDefinition =
-            EndpointAuth.applyAuthToHandler (AuthConfig.single (AuthRequirement.Role role)) def
+            EndpointAuth.applyAuthToHandler (AuthConfig.singleton (AuthRequirement.Role role)) def
 
         [<CustomOperation("requirePolicy")>]
         member _.RequirePolicy(def: HandlerDefinition, policyName: string) : HandlerDefinition =
-            EndpointAuth.applyAuthToHandler (AuthConfig.single (AuthRequirement.Policy policyName)) def
+            EndpointAuth.applyAuthToHandler (AuthConfig.singleton (AuthRequirement.Policy policyName)) def
 
         [<CustomOperation("allowAnonymous")>]
         member _.AllowAnonymous(def: HandlerDefinition) : HandlerDefinition =

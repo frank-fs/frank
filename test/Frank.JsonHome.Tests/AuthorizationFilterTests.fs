@@ -175,4 +175,40 @@ let tests =
               let! result = AuthorizationFilter.apply ctx [ guarded ]
 
               Expect.isEmpty result "Admin who lacks the named policy's claim must still be denied, not allowed on role alone"
+          }
+
+          testTask "a bare AuthorizationPolicy with no IAuthorizeData is still enforced -- the satisfied case" {
+              // Coverage for resolvePolicy's synchronous fast path (no
+              // IAuthorizeData to resolve via the policy provider). Frank.Auth
+              // itself never produces this shape -- every requirement it emits
+              // pairs an AuthorizeAttribute with any policy -- but it's valid
+              // metadata a third-party consumer could attach directly.
+              let ctx = contextFor [ "admin" ]
+              let guarded = describeMethods "raw-policy" [ "GET", [ adminOnly ] ]
+
+              let! (result: ResourceDescription list) = AuthorizationFilter.apply ctx [ guarded ]
+
+              Expect.hasLength result 1 "Admin satisfies the bare policy"
+              Expect.equal result.[0].Methods [ "GET" ] "GET is visible"
+          }
+
+          testTask "a bare AuthorizationPolicy with no IAuthorizeData is still enforced -- the denied case" {
+              let ctx = contextFor []
+              let guarded = describeMethods "raw-policy" [ "GET", [ adminOnly ] ]
+
+              let! result = AuthorizationFilter.apply ctx [ guarded ]
+
+              Expect.isEmpty result "Anonymous caller doesn't satisfy the bare role policy"
+          }
+
+          test "varies is true when any resource declares IAuthorizeData or an explicit AuthorizationPolicy" {
+              let withAttribute = describe "attr-guarded" [ AuthorizeAttribute() ]
+              let withPolicy = describeMethods "policy-guarded" [ "GET", [ adminOnly ] ]
+              let publicOnly = describe "public" []
+
+              Expect.isTrue (AuthorizationFilter.varies [ withAttribute ]) "IAuthorizeData alone makes it vary"
+              Expect.isTrue (AuthorizationFilter.varies [ withPolicy ]) "A bare AuthorizationPolicy alone makes it vary"
+              Expect.isTrue (AuthorizationFilter.varies [ publicOnly; withPolicy ]) "Varies if any resource is guarded"
+              Expect.isFalse (AuthorizationFilter.varies [ publicOnly ]) "No guarded resources -- does not vary"
+              Expect.isFalse (AuthorizationFilter.varies []) "Empty resource list -- does not vary"
           } ]
