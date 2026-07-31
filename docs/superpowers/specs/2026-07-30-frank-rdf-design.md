@@ -127,6 +127,33 @@ let gameLinkedData (gameUri: string) =
 
 `about subject { ... }` is sugar over repeated `triple subject predicate value` statements — like Turtle's `;` shorthand for not repeating the subject — not containment. `players` is declared and referenced by IRI wherever it's needed; its `about` block could equally have come first, or lived in a different `rdf { }` call merged in later. Nothing here assumes a single root resource, which is what `Frank.Provenance`'s multi-subject PROV graphs (activities, entities, agents, cross-linked) will need next. Raw `triple` is also available directly, without an `about` block, for one-off statements.
 
+### `about` is a genuine nested CE, not string sugar
+
+The brace syntax above isn't decorative — `about subject { ... }` really is a second computation expression, distinct from `rdf { }` itself, entered by calling a function that returns a builder instance:
+
+```fsharp
+type AboutBuilder(subject: Node) =
+    member _.Yield(_) : (string * Value) list = []
+    member _.Zero() : (string * Value) list = []
+    member _.Delay(f) = f ()
+    member _.Combine(a, b) : (string * Value) list = a @ b
+
+    [<CustomOperation("typ")>]
+    member _.Typ(stmts, curie: string) = stmts @ [ RdfType, Value.Node(Node.Iri curie) ]
+
+    [<CustomOperation("property")>]
+    member _.Property(stmts, predicate: string, value: string) =
+        stmts @ [ predicate, Value.Literal(Literal.String value) ]
+    // + overloads for int / bool / DateTimeOffset / Node
+
+    member _.Run(stmts) : (Node * string * Value) list =
+        stmts |> List.map (fun (p, v) -> subject, p, v)
+
+let about subject = AboutBuilder(subject)
+```
+
+The outer `RdfBuilder` then has to absorb an `about` block's result — and bare `triple` calls — as ordinary statements with no `yield!` ceremony, which is why it needs `Combine`/`Delay`/`Yield`/`Zero` at all. This is a different CE shape from Frank core's own `ResourceBuilder`: `resource { }` only ever chains custom operations on itself (`Yield` seeds one `ResourceSpec`, and `get`/`post`/`rel` each take and return that same spec — no sub-blocks, so no `Combine` needed). `rdf { }` has to compose a *second* builder's output as if it were its own statement, which is exactly what `Combine`/`Delay` are for — the standard F# mechanism for nesting one CE inside another, the same shape `seq { for x in xs -> nested { ... } }`-style composition relies on. Worth building correctly since it's the same shape `Frank.Provenance`'s `activity { }`/`entity { }` blocks will need later, grouped under a `prov { }` outer CE the same way `about` groups under `rdf { }`.
+
 ### Serialization
 
 `Doc.toGraph : Doc -> Graph` populates a `VDS.RDF.Graph`: registers declared prefixes on the namespace map, resolves each `Node.Iri` (absolute or CURIE) and mints one real blank node per distinct `Node.Blank` label via `graph.CreateBlankNode()`, then asserts one triple per statement. Flat fold, no recursion — nesting was the old model's problem, not this one's.
@@ -150,7 +177,7 @@ let gameLinkedData (gameUri: string) =
 ## Implementation order
 
 1. **`RdfTypes.fs`** — the model, plus unit tests for construction (no serialization yet).
-2. **`Rdf.fs`: CE + `Doc.toGraph`** — prefix resolution, `about`/`triple`/`typ` statement emission (including the literal/`Node` overloads), blank node minting, multi-valued properties. Unit-tested by inspecting the resulting `Graph`'s triples directly (subject/predicate/object), not through JSON-LD.
+2. **`Rdf.fs`: `AboutBuilder` + `RdfBuilder` + `Doc.toGraph`** — `AboutBuilder` first in isolation (`typ`/`property` overloads accumulating into a subject-bound statement list), then `RdfBuilder`'s `Combine`/`Delay`/`Yield`/`Zero` composing multiple `about` blocks and bare `triple` calls together, then prefix resolution and blank node minting in `toGraph`. Unit-tested by inspecting the resulting `Graph`'s triples directly (subject/predicate/object), not through JSON-LD.
 3. **`Doc.toJsonLd`** — wire up `JsonLdWriter`, expanded-form output.
 4. **tic-tac-toe integration** — replace `gameJsonLd`.
 
@@ -160,7 +187,7 @@ Each stage independently verifiable, matching how `Frank.JsonHome` was staged.
 
 New project `test/Frank.Rdf.Tests`.
 
-- **Unit, no serialization**: CE construction — prefix declarations, `about` grouping, overload resolution (literal and `Node` forms of `property`), multi-valued properties, blank node minting.
+- **Unit, no serialization**: CE construction — prefix declarations, overload resolution (literal and `Node` forms of `property`), multi-valued properties, blank node minting. Separately: `AboutBuilder` in isolation (statement list for one subject), and `RdfBuilder` composition specifically — two consecutive `about` blocks, an `about` block followed by a bare `triple`, and an empty `about` — to verify `Combine`/`Delay`/`Zero` merge correctly rather than dropping or duplicating statements. This is the part most likely to have a subtle bug, since it's the one piece of real CE machinery in the package rather than plain data transformation.
 - **Graph-level**: `toGraph` output asserted by triple count/shape for a representative document (including the two-subject `QuantitativeValue` case), not by string comparison.
 - **Round-trip check** (the JSON-LD equivalent of JsonHome's golden-document test): serialize with `Doc.toJsonLd`, then parse the result back into a graph with dotNetRDF's own JSON-LD reader, and assert the two graphs are isomorphic. This is the strongest available check that the expanded output means what the input graph meant — stronger than diffing against a hand-written expected string, which is exactly the kind of brittleness that made the compact-form attempt fragile.
 - **tic-tac-toe regression**: the existing schema.org fields (`@type`, `name`, `description`, `numberOfPlayers`, `sameAs` to Wikidata/DBpedia) are all present in the new expanded output, via the round-trip graph rather than a literal string comparison against the old compact form.
