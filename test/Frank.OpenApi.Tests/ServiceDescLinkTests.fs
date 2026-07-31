@@ -30,11 +30,15 @@ let createRealUseOpenApiTestServer (resources: Resource list) =
                         services.AddRouting() |> ignore
                         spec.Services services |> ignore)
                     .Configure(fun app ->
-                        spec.BeforeRoutingMiddleware app |> ignore
-                        app.UseRouting() |> ignore
-                        spec.Middleware app |> ignore
-                        app.UseEndpoints(fun endpoints ->
-                            endpoints.DataSources.Add(TestEndpointDataSource(allEndpoints)))
+                        app
+                        |> WebLink.useAppWideLinks spec.LinkProviders
+                        |> spec.BeforeRoutingMiddleware
+                        |> fun app -> app.UseRouting()
+                        |> WebLink.useResourceScopedLinks
+                        |> spec.Middleware
+                        |> fun app ->
+                            app.UseEndpoints(fun endpoints ->
+                                endpoints.DataSources.Add(TestEndpointDataSource(allEndpoints)))
                         |> ignore)
                 |> ignore)
 
@@ -55,11 +59,15 @@ let createRealUseOpenApiWithConfigureTestServer (resources: Resource list) =
                         services.AddRouting() |> ignore
                         spec.Services services |> ignore)
                     .Configure(fun app ->
-                        spec.BeforeRoutingMiddleware app |> ignore
-                        app.UseRouting() |> ignore
-                        spec.Middleware app |> ignore
-                        app.UseEndpoints(fun endpoints ->
-                            endpoints.DataSources.Add(TestEndpointDataSource(allEndpoints)))
+                        app
+                        |> WebLink.useAppWideLinks spec.LinkProviders
+                        |> spec.BeforeRoutingMiddleware
+                        |> fun app -> app.UseRouting()
+                        |> WebLink.useResourceScopedLinks
+                        |> spec.Middleware
+                        |> fun app ->
+                            app.UseEndpoints(fun endpoints ->
+                                endpoints.DataSources.Add(TestEndpointDataSource(allEndpoints)))
                         |> ignore)
                 |> ignore)
 
@@ -87,11 +95,16 @@ let createRealUseOpenApiTestServerWithExceptionHandler (resources: Resource list
                                 ctx.Response.StatusCode <- 500
                                 ctx.Response.WriteAsync("error")))
                         |> ignore
-                        spec.BeforeRoutingMiddleware app |> ignore
-                        app.UseRouting() |> ignore
-                        spec.Middleware app |> ignore
-                        app.UseEndpoints(fun endpoints ->
-                            endpoints.DataSources.Add(TestEndpointDataSource(allEndpoints)))
+
+                        app
+                        |> WebLink.useAppWideLinks spec.LinkProviders
+                        |> spec.BeforeRoutingMiddleware
+                        |> fun app -> app.UseRouting()
+                        |> WebLink.useResourceScopedLinks
+                        |> spec.Middleware
+                        |> fun app ->
+                            app.UseEndpoints(fun endpoints ->
+                                endpoints.DataSources.Add(TestEndpointDataSource(allEndpoints)))
                         |> ignore)
                 |> ignore)
 
