@@ -12,12 +12,12 @@ let private adminOnly =
     builder.RequireRole "admin" |> ignore
     builder.Build()
 
-let private describe rel (metadata: obj list) =
+let private describeMethods rel (methodMetadata: (string * obj list) list) =
     { Rel = rel
       Href = "/" + rel
       IsTemplated = false
       HrefVars = []
-      Methods = [ "GET" ]
+      Methods = methodMetadata |> List.map fst
       Formats = []
       Accepts = []
       AcceptRanges = []
@@ -26,11 +26,15 @@ let private describe rel (metadata: obj list) =
       AuthSchemes = []
       Docs = None
       Status = None
-      Metadata = metadata }
+      Metadata = methodMetadata |> List.collect snd
+      MethodMetadata = methodMetadata }
 
-let private contextFor (roles: string list) =
+let private describe rel (metadata: obj list) =
+    describeMethods rel [ "GET", metadata ]
+
+let private contextForWith (roles: string list) (configurePolicies: AuthorizationOptions -> unit) =
     let services = ServiceCollection()
-    services.AddAuthorization() |> ignore
+    services.AddAuthorization(configurePolicies) |> ignore
     services.AddLogging() |> ignore
 
     let ctx = DefaultHttpContext()
@@ -39,6 +43,8 @@ let private contextFor (roles: string list) =
     let claims = roles |> List.map (fun r -> Claim(ClaimTypes.Role, r))
     ctx.User <- ClaimsPrincipal(ClaimsIdentity(claims, "Test"))
     ctx
+
+let private contextFor (roles: string list) = contextForWith roles ignore
 
 /// No AddAuthorization() -- IAuthorizationPolicyProvider and
 /// IAuthorizationService are deliberately left unregistered, so resolving
@@ -90,4 +96,119 @@ let tests =
                   (result |> List.map (fun (r: ResourceDescription) -> r.Rel))
                   [ "public" ]
                   "Guarded resource denied on evaluation failure"
+          }
+
+          testTask "methods are filtered independently -- a mixed resource keeps only what the principal can reach" {
+              let ctx = contextFor []
+              let mixed = describeMethods "widgets" [ "GET", []; "DELETE", [ AuthorizeAttribute(); adminOnly ] ]
+
+              let! (result: ResourceDescription list) = AuthorizationFilter.apply ctx [ mixed ]
+
+              Expect.hasLength result 1 "Resource still present"
+              Expect.equal result.[0].Methods [ "GET" ] "Only the public method survives"
+          }
+
+          testTask "a resource with every method hidden is dropped entirely" {
+              let ctx = contextFor []
+              let guarded = describeMethods "admin-only" [ "GET", [ AuthorizeAttribute(); adminOnly ] ]
+
+              let! result = AuthorizationFilter.apply ctx [ guarded ]
+
+              Expect.isEmpty result "Resource with zero visible methods does not appear"
+          }
+
+          testTask "AllowAnonymous on one method keeps it visible even when the resource is otherwise restricted" {
+              let ctx = contextFor []
+              let mixed =
+                  describeMethods
+                      "settings"
+                      [ "GET", [ AllowAnonymousAttribute() ]
+                        "PUT", [ AuthorizeAttribute(); adminOnly ] ]
+
+              let! (result: ResourceDescription list) = AuthorizationFilter.apply ctx [ mixed ]
+
+              Expect.hasLength result 1 "Resource still present"
+              Expect.equal result.[0].Methods [ "GET" ] "AllowAnonymous method survives, restricted one doesn't"
+          }
+
+          testTask "Accepts entries are filtered to the methods that remain visible" {
+              let ctx = contextFor []
+              let mixed =
+                  { describeMethods "orders" [ "GET", []; "POST", [ AuthorizeAttribute(); adminOnly ] ] with
+                      Accepts = [ "GET", [ "text/html" ]; "POST", [ "application/json" ] ] }
+
+              let! (result: ResourceDescription list) = AuthorizationFilter.apply ctx [ mixed ]
+
+              Expect.equal result.[0].Methods [ "GET" ] "Only GET remains"
+              Expect.equal result.[0].Accepts [ "GET", [ "text/html" ] ] "POST's accept entry is dropped with it"
+          }
+
+          testTask "Formats is cleared once GET is no longer visible" {
+              let ctx = contextFor []
+              let mixed =
+                  { describeMethods "orders" [ "GET", [ AuthorizeAttribute(); adminOnly ]; "POST", [] ] with
+                      Formats = [ "application/json" ] }
+
+              let! (result: ResourceDescription list) = AuthorizationFilter.apply ctx [ mixed ]
+
+              Expect.equal result.[0].Methods [ "POST" ] "Only POST remains"
+              Expect.isEmpty result.[0].Formats "Formats was derived from the now-hidden GET"
+          }
+
+          testTask "a named policy composed with an explicit AuthorizationPolicy -- satisfying only the explicit one still denies" {
+              // Regression: resolvePolicy used to discard all IAuthorizeData
+              // (including named-policy AuthorizeAttributes) whenever an
+              // explicit AuthorizationPolicy was also present in the same
+              // method's metadata -- exactly the shape requirePolicy
+              // (resource-level) + requireRole (handler-level) produces
+              // together. An admin who fails the named policy's own claim
+              // requirement must still be denied, not waved through on role
+              // alone.
+              let ctx =
+                  contextForWith
+                      [ "admin" ]
+                      (fun options -> options.AddPolicy("CanViewReports", fun p -> p.RequireClaim("scope", "reports:read") |> ignore))
+
+              let guarded =
+                  describeMethods "reports" [ "DELETE", [ AuthorizeAttribute("CanViewReports"); AuthorizeAttribute(); adminOnly ] ]
+
+              let! result = AuthorizationFilter.apply ctx [ guarded ]
+
+              Expect.isEmpty result "Admin who lacks the named policy's claim must still be denied, not allowed on role alone"
+          }
+
+          testTask "a bare AuthorizationPolicy with no IAuthorizeData is still enforced -- the satisfied case" {
+              // Coverage for resolvePolicy's synchronous fast path (no
+              // IAuthorizeData to resolve via the policy provider). Frank.Auth
+              // itself never produces this shape -- every requirement it emits
+              // pairs an AuthorizeAttribute with any policy -- but it's valid
+              // metadata a third-party consumer could attach directly.
+              let ctx = contextFor [ "admin" ]
+              let guarded = describeMethods "raw-policy" [ "GET", [ adminOnly ] ]
+
+              let! (result: ResourceDescription list) = AuthorizationFilter.apply ctx [ guarded ]
+
+              Expect.hasLength result 1 "Admin satisfies the bare policy"
+              Expect.equal result.[0].Methods [ "GET" ] "GET is visible"
+          }
+
+          testTask "a bare AuthorizationPolicy with no IAuthorizeData is still enforced -- the denied case" {
+              let ctx = contextFor []
+              let guarded = describeMethods "raw-policy" [ "GET", [ adminOnly ] ]
+
+              let! result = AuthorizationFilter.apply ctx [ guarded ]
+
+              Expect.isEmpty result "Anonymous caller doesn't satisfy the bare role policy"
+          }
+
+          test "varies is true when any resource declares IAuthorizeData or an explicit AuthorizationPolicy" {
+              let withAttribute = describe "attr-guarded" [ AuthorizeAttribute() ]
+              let withPolicy = describeMethods "policy-guarded" [ "GET", [ adminOnly ] ]
+              let publicOnly = describe "public" []
+
+              Expect.isTrue (AuthorizationFilter.varies [ withAttribute ]) "IAuthorizeData alone makes it vary"
+              Expect.isTrue (AuthorizationFilter.varies [ withPolicy ]) "A bare AuthorizationPolicy alone makes it vary"
+              Expect.isTrue (AuthorizationFilter.varies [ publicOnly; withPolicy ]) "Varies if any resource is guarded"
+              Expect.isFalse (AuthorizationFilter.varies [ publicOnly ]) "No guarded resources -- does not vary"
+              Expect.isFalse (AuthorizationFilter.varies []) "Empty resource list -- does not vary"
           } ]

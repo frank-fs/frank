@@ -16,7 +16,8 @@ type ResourceDescription =
       AuthSchemes: (string * string list) list
       Docs: string option
       Status: ResourceStatus option
-      Metadata: obj list }
+      Metadata: obj list
+      MethodMetadata: (string * obj list) list }
 
 module ApiSurface =
 
@@ -61,7 +62,8 @@ module ApiSurface =
         |> Seq.groupBy (fun d -> d.RelativePath)
         |> Seq.choose (fun (relativePath, group) ->
             let group = List.ofSeq group
-            let metadata = group |> List.collect metadataOf
+            let methodMetadata = group |> List.map (fun d -> d.HttpMethod, metadataOf d)
+            let metadata = methodMetadata |> List.collect snd
 
             match pick<RelMetadata> metadata with
             | None -> None
@@ -104,5 +106,6 @@ module ApiSurface =
                       AuthSchemes = pickAll<AuthSchemeMetadata> metadata |> List.map (fun s -> s.Scheme, s.Realms)
                       Docs = pick<DocsMetadata> metadata |> Option.map (fun d -> d.Uri)
                       Status = pick<StatusMetadata> metadata |> Option.map (fun s -> s.Status)
-                      Metadata = metadata })
+                      Metadata = metadata
+                      MethodMetadata = methodMetadata })
         |> List.ofSeq

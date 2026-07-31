@@ -15,7 +15,7 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 | Package | Description | NuGet |
 |---------|-------------|-------|
 | **Frank** | Core computation expressions for WebHost and routing | [![NuGet](https://img.shields.io/nuget/v/Frank)](https://www.nuget.org/packages/Frank/) |
-| **Frank.Auth** | Resource-level authorization extensions | [![NuGet](https://img.shields.io/nuget/v/Frank.Auth)](https://www.nuget.org/packages/Frank.Auth/) |
+| **Frank.Auth** | Resource- and handler-level authorization extensions | [![NuGet](https://img.shields.io/nuget/v/Frank.Auth)](https://www.nuget.org/packages/Frank.Auth/) |
 | **Frank.OpenApi** | Native OpenAPI document generation with F# type schemas | [![NuGet](https://img.shields.io/nuget/v/Frank.OpenApi)](https://www.nuget.org/packages/Frank.OpenApi/) |
 | **Frank.JsonHome** | JSON Home discovery document, filtered by authorization | [![NuGet](https://img.shields.io/nuget/v/Frank.JsonHome)](https://www.nuget.org/packages/Frank.JsonHome/) |
 | **Frank.Datastar** | Datastar SSE integration for reactive hypermedia | [![NuGet](https://img.shields.io/nuget/v/Frank.Datastar)](https://www.nuget.org/packages/Frank.Datastar/) |
@@ -155,7 +155,7 @@ webHost args {
 
 ## Frank.Auth
 
-Frank.Auth provides resource-level authorization for Frank applications, integrating with ASP.NET Core's built-in authorization infrastructure.
+Frank.Auth provides resource- and handler-level authorization for Frank applications, integrating with ASP.NET Core's built-in authorization infrastructure.
 
 ### Installation
 
@@ -214,6 +214,41 @@ let sensitive =
     }
 ```
 
+### Protecting Individual Methods
+
+Add authorization requirements to a single handler instead of the whole resource, using the `handler { }` computation expression — the resource stays public except for the method that opts in:
+
+```fsharp
+// GET is public, DELETE requires the admin role
+let widgets =
+    resource "/widgets" {
+        name "Widgets"
+        get listWidgets
+        delete (handler {
+            requireRole "admin"
+            handle (fun (ctx: HttpContext) -> ctx.Response.WriteAsync("deleted"))
+        })
+    }
+```
+
+Handler-level requirements compose with resource-level ones (AND semantics) — a resource marked `requireAuth` with a handler that adds `requireRole "admin"` needs both. To let one method opt back out entirely, use `allowAnonymous`:
+
+```fsharp
+// The resource requires authentication, but this one method stays public
+let profile =
+    resource "/profile" {
+        name "Profile"
+        requireAuth
+        get (handler {
+            allowAnonymous
+            handle (fun (ctx: HttpContext) -> ctx.Response.WriteAsync("public summary"))
+        })
+        put updateProfile
+    }
+```
+
+`allowAnonymous` is a full bypass, not a downgrade — via ASP.NET Core's own `IAllowAnonymous` semantics, it skips every authorization requirement on that handler, resource-level and handler-level alike, even ones declared alongside it.
+
 ### Application Wiring
 
 Configure authentication and authorization services using Frank's builder syntax:
@@ -242,6 +277,8 @@ let main args =
 
 ### Authorization Patterns
 
+Every `require*` pattern below works identically at the resource level (`resource { requireRole ... }`) and the handler level (`handler { requireRole ... }`), and composes with AND semantics when used at both levels on the same endpoint.
+
 | Pattern | Operation | Behavior |
 |---------|-----------|----------|
 | Authenticated user | `requireAuth` | 401 if unauthenticated, 200 if authenticated |
@@ -249,6 +286,7 @@ let main args =
 | Claim (multiple values) | `requireClaim "type" ["a"; "b"]` | 200 if user has any listed value (OR) |
 | Role | `requireRole "Admin"` | 403 if user not in role |
 | Named policy | `requirePolicy "PolicyName"` | Delegates to registered policy |
+| Bypass (handler-level only) | `allowAnonymous` | Skips all authorization on that one handler — resource- and handler-level requirements alike |
 | Multiple requirements | Stack multiple `require*` | AND semantics — all must pass |
 | No requirements | (default) | Publicly accessible, zero overhead |
 
@@ -475,7 +513,20 @@ let adminReports =
     }
 ```
 
-An anonymous request's `/.well-known/home.json` omits `tag:example.com,2026:admin-reports` entirely; an authenticated admin's includes it. This also works with a plain ASP.NET Core `[<Authorize>]`-equivalent, without `Frank.Auth` at all. Whenever any resource is guarded, every response carries `Cache-Control: private, no-cache` and `Vary: Authorization`, so a shared cache can never serve one principal's document to another. See `sample/Frank.JsonHome.Sample` for a runnable demonstration, including curl output for both cases.
+An anonymous request's `/.well-known/home.json` omits `tag:example.com,2026:admin-reports` entirely; an authenticated admin's includes it. This also works with a plain ASP.NET Core `[<Authorize>]`-equivalent, without `Frank.Auth` at all.
+
+Filtering is per HTTP method, not per whole resource — a handler-level requirement (see [Protecting Individual Methods](#frankauth)) only hides the method it's on, not the resource:
+
+```fsharp
+let widgets =
+    resource "/widgets" {
+        rel "tag:example.com,2026:widgets"
+        get listWidgets                                    // public
+        delete (handler { requireRole "admin"; handle deleteWidget })
+    }
+```
+
+An anonymous request's `hints.allow` for `tag:example.com,2026:widgets` shows `["GET"]`; an authenticated admin's shows `["GET", "DELETE"]`. A resource left with no visible methods for the current principal is omitted entirely, same as before. Whenever any resource is guarded, every response carries `Cache-Control: private, no-cache` and `Vary: Authorization`, so a shared cache can never serve one principal's document to another. See `sample/Frank.JsonHome.Sample` for a runnable demonstration, including curl output for both cases.
 
 ---
 

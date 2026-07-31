@@ -9,6 +9,10 @@ module AuthorizationFilter =
     /// document varies by principal and must not be cached by a shared cache.
     val varies: resources: ResourceDescription list -> bool
 
-    /// Drops resources the current principal cannot reach. Resources with no
-    /// authorization metadata are always kept; evaluation failures deny.
+    /// Filters each resource's Methods -- and the Accepts/Formats hints
+    /// derived from them -- down to what the current principal can call,
+    /// evaluating authorization per HTTP method rather than per resource. A
+    /// method carrying IAllowAnonymous metadata is always kept. A resource
+    /// left with no visible methods is dropped entirely. Evaluation failures
+    /// deny that method rather than throw or fail open.
     val apply: ctx: HttpContext -> resources: ResourceDescription list -> Task<ResourceDescription list>

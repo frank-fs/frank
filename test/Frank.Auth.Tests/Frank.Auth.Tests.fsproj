@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="EndpointAuthTests.fs" />
     <Compile Include="AuthorizationTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

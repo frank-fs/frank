@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <PackageTags>authorization;auth;security</PackageTags>
-    <Description>Resource-level authorization extensions for Frank web framework</Description>
+    <Description>Resource- and handler-level authorization extensions for Frank web framework</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,6 +13,8 @@
     <Compile Include="AuthConfig.fs" />
     <Compile Include="EndpointAuth.fsi" />
     <Compile Include="EndpointAuth.fs" />
+    <Compile Include="HandlerBuilderExtensions.fsi" />
+    <Compile Include="HandlerBuilderExtensions.fs" />
     <Compile Include="ResourceBuilderExtensions.fsi" />
     <Compile Include="ResourceBuilderExtensions.fs" />
     <Compile Include="WebHostBuilderExtensions.fsi" />

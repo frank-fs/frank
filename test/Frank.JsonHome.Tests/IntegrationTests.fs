@@ -273,4 +273,42 @@ let tests =
               Expect.isTrue
                   (fst (root.GetProperty("resources").TryGetProperty "tag:example.com,2026:products"))
                   "Resource is present at the configured path"
+          }
+
+          testTask "hints.allow reflects only the methods the current principal can call" {
+              let widgets =
+                  resource "/widgets" {
+                      rel "tag:example.com,2026:widgets"
+                      get ok
+                      delete (handler {
+                          requireRole "admin"
+                          handle (fun (ctx: HttpContext) -> ctx.Response.WriteAsync "OK")
+                      })
+                  }
+
+              let client = createServer options [ widgets ]
+              let allowFor (response: HttpResponseMessage) =
+                  task {
+                      let! body = response.Content.ReadAsStringAsync()
+                      let root = JsonDocument.Parse(body).RootElement
+                      let resource = root.GetProperty("resources").GetProperty("tag:example.com,2026:widgets")
+                      let allow = resource.GetProperty("hints").GetProperty("allow")
+                      return [ for e in allow.EnumerateArray() -> e.GetString() ]
+                  }
+
+              let! (anonymous: HttpResponseMessage) = client.GetAsync options.Path
+              let! anonymousAllow = allowFor anonymous
+              Expect.equal anonymousAllow [ "GET" ] "Anonymous request sees only GET"
+
+              let request = new HttpRequestMessage(HttpMethod.Get, options.Path)
+              request.Headers.Add("X-Test-User", "alice")
+              request.Headers.Add("X-Test-Roles", "admin")
+              let! (asAdmin: HttpResponseMessage) = client.SendAsync request
+              let! adminAllow = allowFor asAdmin
+              // Method order here comes from ApiExplorer's ApiDescription grouping
+              // (ApiSurface.ofApiDescriptions, Task 3 -- out of scope for this task),
+              // not from AuthorizationFilter itself, which preserves whatever order
+              // resource.Methods already had. Compare as sets so this test doesn't
+              // couple to that incidental ordering.
+              Expect.equal (Set.ofList adminAllow) (Set.ofList [ "GET"; "DELETE" ]) "Admin request sees both methods"
           } ]

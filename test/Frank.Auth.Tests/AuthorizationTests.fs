@@ -338,3 +338,171 @@ let edgeCaseTests =
             Expect.equal response2.StatusCode HttpStatusCode.OK "User with both scope values should get 200"
         }
     ]
+
+// ===== Handler-Level Authorization (#476) =====
+
+[<Tests>]
+let handlerLevelTests =
+    testList "Handler-Level Authorization" [
+        testTask "resource is public but one handler requires a role -> other methods unaffected" {
+            let r =
+                resource "/widgets" {
+                    name "Widgets"
+                    get simpleHandler
+                    delete (handler {
+                        requireRole "admin"
+                        handle (fun (ctx: HttpContext) -> ctx.Response.WriteAsync("deleted"))
+                    })
+                }
+            let client = createAuthTestServer [ r ] ignore
+
+            let! (getResponse: HttpResponseMessage) = sendRequest client HttpMethod.Get "/widgets" None None None
+            Expect.equal getResponse.StatusCode HttpStatusCode.OK "GET stays public"
+
+            let! (deleteAnon: HttpResponseMessage) = sendRequest client HttpMethod.Delete "/widgets" None None None
+            Expect.equal deleteAnon.StatusCode HttpStatusCode.Unauthorized "Unauthenticated DELETE is rejected"
+
+            let! (deleteWrongRole: HttpResponseMessage) =
+                sendRequest client HttpMethod.Delete "/widgets" (Some "alice") None (Some "user")
+            Expect.equal deleteWrongRole.StatusCode HttpStatusCode.Forbidden "DELETE without admin role is rejected"
+
+            let! (deleteAdmin: HttpResponseMessage) =
+                sendRequest client HttpMethod.Delete "/widgets" (Some "alice") None (Some "admin")
+            Expect.equal deleteAdmin.StatusCode HttpStatusCode.OK "DELETE with admin role succeeds"
+        }
+
+        testTask "resource-level requireAuth composes (AND) with handler-level requireRole" {
+            let r =
+                resource "/reports" {
+                    name "Reports"
+                    requireAuth
+                    get simpleHandler
+                    delete (handler {
+                        requireRole "admin"
+                        handle (fun (ctx: HttpContext) -> ctx.Response.WriteAsync("deleted"))
+                    })
+                }
+            let client = createAuthTestServer [ r ] ignore
+
+            let! (getAnon: HttpResponseMessage) = sendRequest client HttpMethod.Get "/reports" None None None
+            Expect.equal getAnon.StatusCode HttpStatusCode.Unauthorized "GET still requires resource-level auth"
+
+            let! (getAuthed: HttpResponseMessage) = sendRequest client HttpMethod.Get "/reports" (Some "alice") None None
+            Expect.equal getAuthed.StatusCode HttpStatusCode.OK "Authenticated GET succeeds, no role needed"
+
+            let! (deleteAuthedNoRole: HttpResponseMessage) =
+                sendRequest client HttpMethod.Delete "/reports" (Some "alice") None None
+            Expect.equal deleteAuthedNoRole.StatusCode HttpStatusCode.Forbidden "Authenticated but non-admin DELETE is rejected"
+
+            let! (deleteAdmin: HttpResponseMessage) =
+                sendRequest client HttpMethod.Delete "/reports" (Some "alice") None (Some "admin")
+            Expect.equal deleteAdmin.StatusCode HttpStatusCode.OK "Authenticated admin DELETE succeeds"
+        }
+
+        testTask "handler-level allowAnonymous overrides resource-level requireAuth for that method only" {
+            let r =
+                resource "/profile" {
+                    name "Profile"
+                    requireAuth
+                    get (handler {
+                        allowAnonymous
+                        handle (fun (ctx: HttpContext) -> ctx.Response.WriteAsync("public-summary"))
+                    })
+                    put simpleHandler
+                }
+            let client = createAuthTestServer [ r ] ignore
+
+            let! (getAnon: HttpResponseMessage) = sendRequest client HttpMethod.Get "/profile" None None None
+            Expect.equal getAnon.StatusCode HttpStatusCode.OK "allowAnonymous opens GET despite resource-level requireAuth"
+
+            let! (putAnon: HttpResponseMessage) = sendRequest client HttpMethod.Put "/profile" None None None
+            Expect.equal putAnon.StatusCode HttpStatusCode.Unauthorized "PUT still requires resource-level auth"
+        }
+
+        testTask "allowAnonymous wins outright even alongside a handler-level requireRole on the same handler" {
+            // Documents ASP.NET Core's real behavior: IAllowAnonymous
+            // short-circuits before any IAuthorizeData/policy is evaluated,
+            // so a co-declared requireRole never runs. Not a "reset and
+            // reapply" -- a full bypass.
+            let r =
+                resource "/mixed" {
+                    name "Mixed"
+                    get (handler {
+                        allowAnonymous
+                        requireRole "admin"
+                        handle (fun (ctx: HttpContext) -> ctx.Response.WriteAsync("open"))
+                    })
+                }
+            let client = createAuthTestServer [ r ] ignore
+
+            let! (response: HttpResponseMessage) = sendRequest client HttpMethod.Get "/mixed" None None None
+            Expect.equal response.StatusCode HttpStatusCode.OK "AllowAnonymous bypasses the co-declared role requirement"
+        }
+
+        testTask "handler-level requireClaim (single value) restricts just that method" {
+            let r =
+                resource "/tickets" {
+                    name "Tickets"
+                    get simpleHandler
+                    delete (handler {
+                        requireClaim "scope" "admin"
+                        handle (fun (ctx: HttpContext) -> ctx.Response.WriteAsync("deleted"))
+                    })
+                }
+            let client = createAuthTestServer [ r ] ignore
+
+            let! (getResponse: HttpResponseMessage) = sendRequest client HttpMethod.Get "/tickets" None None None
+            Expect.equal getResponse.StatusCode HttpStatusCode.OK "GET stays public"
+
+            let! (deleteWrongClaim: HttpResponseMessage) =
+                sendRequest client HttpMethod.Delete "/tickets" (Some "alice") (Some "scope=read") None
+            Expect.equal deleteWrongClaim.StatusCode HttpStatusCode.Forbidden "DELETE without the required claim value is rejected"
+
+            let! (deleteRightClaim: HttpResponseMessage) =
+                sendRequest client HttpMethod.Delete "/tickets" (Some "alice") (Some "scope=admin") None
+            Expect.equal deleteRightClaim.StatusCode HttpStatusCode.OK "DELETE with the required claim value succeeds"
+        }
+
+        testTask "handler-level requireClaim (multi-value list overload) accepts any listed value" {
+            let r =
+                resource "/data-export" {
+                    name "DataExport"
+                    delete (handler {
+                        requireClaim "scope" [ "read"; "write" ]
+                        handle (fun (ctx: HttpContext) -> ctx.Response.WriteAsync("deleted"))
+                    })
+                }
+            let client = createAuthTestServer [ r ] ignore
+
+            let! (noMatch: HttpResponseMessage) =
+                sendRequest client HttpMethod.Delete "/data-export" (Some "alice") (Some "scope=delete") None
+            Expect.equal noMatch.StatusCode HttpStatusCode.Forbidden "No matching claim value is rejected"
+
+            let! (oneMatch: HttpResponseMessage) =
+                sendRequest client HttpMethod.Delete "/data-export" (Some "alice") (Some "scope=write") None
+            Expect.equal oneMatch.StatusCode HttpStatusCode.OK "Any one matching claim value succeeds"
+        }
+
+        testTask "handler-level requirePolicy delegates to a named application-level policy" {
+            let r =
+                resource "/audit" {
+                    name "Audit"
+                    get (handler {
+                        requirePolicy "CanViewAudit"
+                        handle (fun (ctx: HttpContext) -> ctx.Response.WriteAsync("audit-log"))
+                    })
+                }
+            let client =
+                createAuthTestServer [ r ] (fun services ->
+                    services.AddAuthorization(fun options ->
+                        options.AddPolicy("CanViewAudit", fun policy -> policy.RequireClaim("scope", "audit:read") |> ignore))
+                    |> ignore)
+
+            let! (noClaim: HttpResponseMessage) = sendRequest client HttpMethod.Get "/audit" (Some "alice") None None
+            Expect.equal noClaim.StatusCode HttpStatusCode.Forbidden "User not satisfying the named policy is rejected"
+
+            let! (withClaim: HttpResponseMessage) =
+                sendRequest client HttpMethod.Get "/audit" (Some "alice") (Some "scope=audit:read") None
+            Expect.equal withClaim.StatusCode HttpStatusCode.OK "User satisfying the named policy succeeds"
+        }
+    ]
