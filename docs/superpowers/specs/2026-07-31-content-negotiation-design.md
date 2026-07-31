@@ -100,6 +100,8 @@ type NegotiateBuilder =
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> Async<'a>) -> NegotiateSpec
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> unit) -> NegotiateSpec
     member Accepts: spec: NegotiateSpec * mediaType: string * handlerDef: HandlerDefinition -> NegotiateSpec
+    member Accepts: spec: NegotiateSpec * mediaTypes: string list * handler: (HttpContext -> Task<'a>) -> NegotiateSpec
+    member Accepts: spec: NegotiateSpec * mediaTypes: string list * handler: (HttpContext -> Async<'a>) -> NegotiateSpec
 
 [<AutoOpen>]
 module NegotiateFunctions =
@@ -107,6 +109,17 @@ module NegotiateFunctions =
 ```
 
 The `Accepts` overload set mirrors `ResourceBuilder`'s `Get`/`Post` family: a bare handler function in any of the shapes Frank already accepts, a raw `RequestDelegate`, or a `HandlerDefinition` produced by `handler { }`. It's named `accepts` (not `provides`) to read the same way the HTTP `Accept` request header does — this is the operation that says which representation a request's `Accept` value maps to.
+
+**A value-returning handler (`Task<'a>`/`Async<'a>`) is treated differently from `HandlerBuilder.Handle`'s same-shaped overloads.** `handler { handle (fun ctx -> ...) }` discards a returned `'a` (see `HandlerBuilderTests.fs`: a `Task<'a>`-returning `handle` handler is only ever asserted to set `Handler`, never checked for what happens to the value — it's thrown away). For `negotiate { }`'s `accepts`, that would be a silent bug: the whole point of registering a representation is to produce *something* for that media type. So instead, `accepts "<mediaType>" (handler: HttpContext -> Task<'a>)` automatically pipes the returned value through `ContentNegotiation.viaOutputFormatter mediaType` (see *Bridging to `IOutputFormatter`*) — we already know the exact media type from `accepts`'s own first argument, so there's nothing left for the caller to specify. A handler that writes the response itself and returns nothing meaningful (`RequestDelegate`, `HttpContext -> Task`, `HttpContext -> unit`, `HandlerDefinition`) stays a direct, independent producer, exactly as before. To opt out of the auto-format behavior for a value your handler already knows how to write itself, just give it a non-value-returning shape instead — no separate escape hatch needed.
+
+The `mediaTypes: string list` overloads are sugar for registering the *same* handler under several media types at once — each expands to its own `Representations` entry, and each invocation still calls `viaOutputFormatter` with its own specific matched media type, not the whole list:
+
+```fsharp
+accepts ["application/json"; "application/xml"] getProduct
+// equivalent to:
+//   accepts "application/json" getProduct
+//   accepts "application/xml"  getProduct
+```
 
 `Run` validates that at least one representation was registered, mirroring `HandlerBuilder.Run`'s existing "handler must be set" check:
 
@@ -138,14 +151,30 @@ A top-level `negotiate` operation directly on `ResourceBuilder` was considered a
 
 The `RequestDelegate` `Run` builds does the following, using `Microsoft.Net.Http.Headers.MediaTypeHeaderValue` (shared framework, not MVC):
 
-1. Parse `ctx.Request.Headers.Accept` into a list of `MediaTypeHeaderValue` entries. Entries that fail to parse are dropped rather than treated as fatal; if nothing parses at all (header absent, empty, or entirely malformed), fall through to step 4.
-2. Sort the parsed entries by effective quality (`MediaTypeHeaderValueComparer.QualityComparer`, the same comparer ASP.NET Core's own formatter selection uses internally), highest preference first.
-3. Walk the sorted list; for each entry, find the first registered representation (in registration order) whose media type it matches, using `MediaTypeHeaderValue.MatchesMediaType` (handles exact matches and `type/*`/`*/*` wildcards). The first representation found this way wins — this is also how equal-quality ties resolve, by registration order.
-4. If step 1 yielded nothing to walk (no usable `Accept` information), select the first-registered representation as the default.
-5. If step 3 completes without a match, respond with `406 Not Acceptable` and no body.
-6. Otherwise, set `ctx.Response.ContentType` to the *winning representation's* declared media type (not the client's wildcard/pattern) and invoke only that representation's delegate. No other representation's delegate is ever invoked.
+1. Parse `ctx.Request.Headers.Accept` into a list of `MediaTypeHeaderValue` entries. Entries that fail to parse are dropped rather than treated as fatal. If the header is absent, empty, or nothing in it parses, treat that the same as an implicit single `*/*` entry — there's no separate "default representation" concept; absent/malformed `Accept` and an explicit `Accept: */*` reach the same outcome through the same step below, not two different code paths.
+2. Sort the (real or implicit) entries by effective quality (`MediaTypeHeaderValueComparer.QualityComparer`, the same comparer ASP.NET Core's own formatter selection uses internally), highest preference first.
+3. Walk the sorted list; for each entry, find the first registered representation (in registration order) whose media type it matches, using `MediaTypeHeaderValue.MatchesMediaType`. Wildcards work symmetrically: a client entry like `application/*` or `*/*` (real or implicit) matches any concrete registered representation whose type falls within it — which is exactly why an absent/wildcard `Accept` naturally resolves to the first-registered representation, with no special-case needed — and a *registered* representation itself declared as `"*/*"` or `"type/*"` (see *Registering a wildcard/catch-all representation*) matches any concrete client entry. The first representation found this way wins — this is also how equal-quality ties resolve, by registration order.
+4. If the walk completes without a match, respond with `406 Not Acceptable` and no body.
+5. Otherwise: if the winning representation's *registered* media type is concrete (not a wildcard), set `ctx.Response.ContentType` to it before invoking its delegate. If the winning representation was registered as a wildcard, its `Content-Type` is **not** auto-set — the delegate is responsible for setting it itself (see *Registering a wildcard/catch-all representation* for why). Only the winning representation's delegate is ever invoked; no other representation's delegate runs.
 
-Exact call shapes (`TryParseList` vs. `ParseList`, the comparer's sort direction) are verified against the real API during implementation, the same way the `Frank.Rdf` plan verified each dotNetRDF call against actual documentation — this section fixes the *behavior*, not unverified method signatures.
+Exact call shapes (`TryParseList` vs. `ParseList`, the comparer's sort direction, and whether `MatchesMediaType` already handles a wildcard-on-either-side comparison or needs a small wrapper) are verified against the real API during implementation, the same way the `Frank.Rdf` plan verified each dotNetRDF call against actual documentation — this section fixes the *behavior*, not unverified method signatures.
+
+### Registering a wildcard/catch-all representation
+
+`accepts "*/*" handler` or `accepts "type/*" handler` registers a representation that matches any client `Accept` entry falling within that pattern, instead of one exact media type. This is deliberately just an ordinary entry in the same `Representations` list, matched by the same walk in *Dispatch algorithm* — not a separate fallback mechanism — which has one important consequence: **registration order still governs**, so a wildcard representation registered *before* more specific ones will shadow them for every request, since it matches everything the more specific entries would have too. Wildcard representations should always be registered last. (This is a natural candidate for the same analyzer work as duplicate `accepts` — see *Analyzer coverage for duplicate `accepts`* — but isn't required for v1; documented here as a caveat in the meantime.)
+
+Because the registered pattern isn't a concrete type, `Content-Type` is never auto-set for a wildcard representation (step 5 above) — the handler must set it. This is what makes the wildcard slot general enough to compose with the *existing*, untouched `negotiate`/`ctx.Negotiate` function as its handler, giving a full "delegate whatever's left to every `IOutputFormatter` `AddMvcCore()` has registered" fallback for free, without building that as a separate feature:
+
+```fsharp
+resource "/products/{id}" {
+    get (negotiate {
+        accepts "application/ld+json" getProductJsonLd     // independent producer, handled first
+        accepts "*/*" (fun ctx -> ctx.Negotiate(200, product))  // anything else: full MVC negotiation
+    })
+}
+```
+
+If that broader fallback isn't wanted, `accepts "*/*"` can just as easily be given any other plain handler (or a `viaOutputFormatter` call for one specific type, used as a default) — the wildcard slot is generic; the example above is one composition of it, not a distinct mechanism.
 
 ### OpenAPI / metadata integration
 
@@ -213,17 +242,18 @@ What's actually needed is a check scoped to `negotiate { }` blocks specifically,
 |---|---|
 | `negotiate { }` with no `accepts` calls | `Run` throws, mirroring `HandlerBuilder.Run`'s "handler must be set" validation. |
 | `Accept` matches no registered representation | `406 Not Acceptable`, no body written. |
-| `Accept` absent, or only wildcards (`*/*`) | First-registered representation, treated as the default. |
-| `Accept` present but entirely unparseable | Treated the same as absent — falls back to the first-registered representation, never a `500`. |
+| `Accept` absent, entirely unparseable, or explicitly `*/*` | All three are treated as an implicit `*/*` and resolved by the same wildcard-matching step — first-registered representation wins, never a `500`. |
 | Two or more representations tie on effective quality | Registration order breaks the tie; first-registered of the tied set wins. |
 | A representation not selected for a given request | Its delegate is never invoked — verified by tests asserting non-selected producers don't run. |
 | `viaOutputFormatter mediaType body` called for a `mediaType` with no registered `IOutputFormatter` support | Throws — a server misconfiguration, since `negotiate { }` already matched the client's `Accept` against this exact `accepts` entry; not surfaced as a 406. |
 | Same media type passed to `accepts` twice in one `negotiate { }` block | Today: silently shadowed, second producer is dead code. Target: caught statically — see *Analyzer coverage for duplicate `accepts`*. |
+| A wildcard (`"*/*"`/`"type/*"`) representation registered before more specific ones | Shadows them for every request — the wildcard matches first and wins. Always register wildcards last; see *Registering a wildcard/catch-all representation*. |
+| A `Task<'a>`/`Async<'a>` `accepts` handler's returned value | Automatically piped through `viaOutputFormatter <thisMediaType>` — never silently discarded (unlike `HandlerBuilder.Handle`'s same-shaped overloads). |
 
 ## Implementation order
 
-1. `NegotiateBuilder.fs`/`.fsi`: `NegotiateSpec`, `NegotiateBuilder`, dispatch function, `Run` validation. Unit tests alongside (quality sort, wildcard match, 406, default-on-absent/malformed, invoke-only-the-winner). Update `Frank.fsproj` compile order to insert it after `HandlerBuilder`.
-2. `viaOutputFormatter` added to `ContentNegotiation.fs`/`.fsi`; tests covering a found-formatter case, a missing-formatter throw, and the existing `negotiate`/`ctx.Negotiate` getting the real test coverage the issue asked for (it currently has none either).
+1. `NegotiateBuilder.fs`/`.fsi`: `NegotiateSpec`, `NegotiateBuilder`, dispatch function (including client- and registration-side wildcard matching), `Run` validation. Unit tests alongside (quality sort, wildcard match both directions, wildcard-registered-first shadowing, 406, default-on-absent/malformed, invoke-only-the-winner).
+2. `viaOutputFormatter` added to `ContentNegotiation.fs`/`.fsi`, plus the `Task<'a>`/`Async<'a>` `accepts` overloads' auto-piping into it and the `mediaTypes: string list` `accepts` overloads. Tests covering a found-formatter case, a missing-formatter throw, and the existing `negotiate`/`ctx.Negotiate` getting the real test coverage the issue asked for (it currently has none either). Update `Frank.fsproj` compile order to insert `NegotiateBuilder` after `HandlerBuilder`.
 3. Metadata-merge behavior: a representation registered via `handler { produces ... }` shows up correctly in `HandlerDefinition.Metadata`; spot-check against `Frank.OpenApi`'s generated document.
 4. Fix `getProductNegotiated` in `Frank.OpenApi.Sample`; add a second sample operation demonstrating the `viaOutputFormatter` bridge (JSON via MVC formatter alongside an independent-producer representation) so both paths have a working reference.
 5. Extend `Frank.Analyzers`' `DuplicateHandlerAnalyzer` (or add a sibling analyzer) to catch duplicate `accepts "<media-type>"` registrations within a `negotiate { }` block — see *Analyzer coverage for duplicate `accepts`*.
@@ -243,6 +273,10 @@ New `test/Frank.Tests/NegotiateBuilderTests.fs`, following `HandlerBuilderTests.
 - `viaOutputFormatter "application/json" body` with JSON formatter support registered writes the expected JSON body and content type.
 - `viaOutputFormatter "application/xml" body` with no XML formatter registered throws, rather than returning 406.
 - `viaOutputFormatter` composed inside `negotiate { }` alongside an independent-producer `accepts` entry: each is invoked only when its own media type is selected.
+- An `accepts "<mediaType>" (fun ctx -> ...)` handler returning a value (`Task<'a>`) has that value written via `viaOutputFormatter`, not discarded.
+- `accepts ["application/json"; "application/xml"] handler` expands to two representations, each independently selectable and each calling `viaOutputFormatter` with its own matched type.
+- `accepts "*/*" handler` matches a client `Accept` that doesn't match any more specific representation; registering it *before* a specific representation causes it to shadow that representation (proving the documented footgun, not just asserting it away).
+- `accepts "*/*" (fun ctx -> ctx.Negotiate(200, product))`, registered last alongside one independent-producer representation: the independent producer wins when its exact type is requested; the wildcard/full-MVC-negotiation path wins otherwise.
 
 Existing `negotiate`/`ctx.Negotiate` (the untouched `IOutputFormatter`-based functions) also get their own test file for the first time — multiple registered formatters, `Accept`-based selection including quality precedence, and the 406 no-match case, closing the gap the issue originally raised for whichever mechanism was chosen. Both are chosen, so both get covered.
 
@@ -253,4 +287,4 @@ Existing `negotiate`/`ctx.Negotiate` (the untouched `IOutputFormatter`-based fun
 - `Frank.Rdf`'s `application/ld+json` representation ([#483](https://github.com/frank-fs/frank/issues/483)) is the first real consumer of this mechanism beyond the sample.
 - Thin per-representation metadata sugar (e.g. inferring `produces` for bare-function representations) if a real need for it shows up — not built speculatively now.
 - Additional representation formats (Turtle, RDF/XML, etc.) are Frank.Rdf's concern, not this mechanism's — nothing here is JSON/HTML-specific.
-- A zero-argument `accepts "<mediaType>"` sugar that implicitly defaults to `viaOutputFormatter` against a shared, once-declared value — raised during design, deliberately deferred; see discussion in review notes rather than specified here until there's a concrete need.
+- Static validation that a wildcard `accepts` entry is always registered last (natural extension of the duplicate-`accepts` analyzer work, not required for v1).
