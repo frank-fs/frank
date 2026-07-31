@@ -52,8 +52,10 @@ let private createServer (homeOptions: JsonHomeOptions) (resources: Resource lis
     // Same composition useJsonHome performs: the document is one more
     // resource, dispatched through the same routing/UseEndpoints stage as
     // everything else -- after UseAuthentication/UseAuthorization, not before.
-    let allResources = JsonHome.documentResource homeOptions :: resources
-    let endpoints = allResources |> List.collect (fun r -> List.ofArray r.Endpoints) |> Array.ofList
+    let spec = (webHost [||]).UseJsonHome(WebHostSpec.Empty, fun _ -> homeOptions)
+    let endpoints =
+        (List.ofArray spec.Endpoints @ (resources |> List.collect (fun r -> List.ofArray r.Endpoints)))
+        |> Array.ofList
 
     let host =
         Host
@@ -63,7 +65,7 @@ let private createServer (homeOptions: JsonHomeOptions) (resources: Resource lis
                     .UseTestServer()
                     .ConfigureServices(fun services ->
                         services.AddRouting() |> ignore
-                        services.AddEndpointsApiExplorer() |> ignore
+                        spec.Services services |> ignore
 
                         services
                             .AddAuthentication(TestScheme)
@@ -79,17 +81,16 @@ let private createServer (homeOptions: JsonHomeOptions) (resources: Resource lis
                         // The same middleware useJsonHome installs. WebHostBuilder.Run
                         // builds and blocks, so the pipeline is wired by hand, but the
                         // code under test is the real thing rather than a copy.
-                        let runLinkHeader = JsonHome.linkHeaderMiddleware homeOptions
-
-                        app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
-                            runLinkHeader ctx (fun () -> next.Invoke ctx))
-                        |> ignore
-
                         app
-                            .UseRouting()
-                            .UseAuthentication()
-                            .UseAuthorization()
-                            .UseEndpoints(fun e -> e.DataSources.Add(TestEndpointDataSource endpoints))
+                        |> WebLink.useAppWideLinks spec.LinkProviders
+                        |> spec.BeforeRoutingMiddleware
+                        |> fun app -> app.UseRouting()
+                        |> WebLink.useResourceScopedLinks
+                        |> fun app ->
+                            app
+                                .UseAuthentication()
+                                .UseAuthorization()
+                                .UseEndpoints(fun e -> e.DataSources.Add(TestEndpointDataSource endpoints))
                         |> ignore)
                 |> ignore)
             .Build()
@@ -103,6 +104,8 @@ let private ok: RequestDelegate = RequestDelegate(fun ctx -> ctx.Response.WriteA
 /// middleware, mirroring a standard production setup, and a handler that
 /// always throws.
 let private createFailingServer () =
+    let spec = (webHost [||]).UseJsonHome(WebHostSpec.Empty)
+
     let host =
         Host
             .CreateDefaultBuilder([||])
@@ -116,13 +119,9 @@ let private createFailingServer () =
                                 ctx.Response.WriteAsync "error"))
                         |> ignore
 
-                        let runLinkHeader = JsonHome.linkHeaderMiddleware options
-
-                        app.Use(fun (ctx: HttpContext) (next: RequestDelegate) ->
-                            runLinkHeader ctx (fun () -> next.Invoke ctx))
-                        |> ignore
-
-                        app.Run(fun _ -> failwith "boom") |> ignore)
+                        app
+                        |> WebLink.useAppWideLinks spec.LinkProviders
+                        |> fun app -> app.Run(fun _ -> failwith "boom"))
                 |> ignore)
             .Build()
 
