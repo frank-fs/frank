@@ -94,6 +94,7 @@ type WebHostBuilder(args) =
     member __.Link(spec: WebHostSpec, provider: HttpContext -> WebLink seq) : WebHostSpec =
         { spec with LinkProviders = spec.LinkProviders @ [ provider ] }
 
+    [<CustomOperation("link")>]
     member __.Link(spec: WebHostSpec, target: string, rel: string) : WebHostSpec =
         __.Link(spec, fun (_: HttpContext) -> Seq.singleton { Target = target; Rel = rel; Params = [] })
 

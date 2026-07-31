@@ -44,6 +44,7 @@ type WebHostBuilder =
     [<CustomOperation("link")>]
     member Link: spec: WebHostSpec * provider: (HttpContext -> WebLink seq) -> WebHostSpec
 
+    [<CustomOperation("link")>]
     member Link: spec: WebHostSpec * target: string * rel: string -> WebHostSpec
 
     [<CustomOperation("plug")>]

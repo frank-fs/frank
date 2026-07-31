@@ -186,7 +186,37 @@ let webHostLinkOperationTests =
                 |> fun s -> builder.Link(s, "/y", "y")
             Expect.equal (List.length spec.LinkProviders) 2 "Both providers registered")
 
-        testTask "a response carries a link registered via the webHost CE's link operation" {
+        testCase "webHost CE link keyword resolves for both arities" (fun () ->
+            // WebHostBuilder carries a `Run: WebHostSpec -> unit` member, so any
+            // `webHost [||] { ... }` block is a full computation expression whose
+            // *evaluation* auto-invokes Run -- i.e. calls .Build().Run() and
+            // blocks starting a real host. That means we can't safely evaluate
+            // `webHost [||] { link "/x" "x" }` in a test to pull a WebHostSpec
+            // back out (unlike ResourceBuilder's Run, which just builds a value).
+            // What we *can* verify safely is that the CE keyword syntax
+            // type-checks at both arities -- if `link` carried
+            // [<CustomOperation("link")>] on only one overload, the arity that
+            // lost the attribute would fail to compile with FS3099 ("incorrect
+            // number of arguments"), exactly as it did before this fix. Wrapping
+            // in unexecuted functions proves the CE compiles without ever
+            // invoking Run.
+            let _staticArity: unit -> unit = fun () -> webHost [||] { link "/x" "x" }
+
+            let _providerArity: unit -> unit =
+                fun () ->
+                    webHost [||] {
+                        link (fun (_: HttpContext) -> Seq.singleton { Target = "/y"; Rel = "y"; Params = [] })
+                    }
+
+            Expect.isTrue true "Both `link` CE arities type-check under real webHost {} syntax (see comment above)")
+
+        testTask "a response carries a link registered via WebHostSpec.LinkProviders (Run's pipeline shape)" {
+            // Uses direct WebHostBuilder.Link(...) method calls -- not `webHost {}`
+            // CE syntax -- to build the spec, for the same reason as above: the
+            // CE would auto-invoke the blocking Run. This still exercises the
+            // exact `Link` members the `link` CE keyword dispatches to, and
+            // createFullPipelineTestServer reproduces Run's pipeline composition
+            // by hand.
             let configure (spec: WebHostSpec) = (WebHostBuilder([||])).Link(spec, "/x", "x")
             let client = createFullPipelineTestServer configure []
             let! (response: HttpResponseMessage) = client.GetAsync("/test")
