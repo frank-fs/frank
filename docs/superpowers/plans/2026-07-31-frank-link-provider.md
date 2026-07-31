@@ -792,24 +792,26 @@ Expected: **compile error** — `ResourceBuilder` has no `Link`/`link` member ye
 
 - [ ] **Step 3: Write minimal implementation**
 
-Update `src/Frank/ResourceBuilder.fsi` — add near `AddMetadata`/the other `[<CustomOperation>]` members:
+Update `src/Frank/ResourceBuilder.fsi` — add near `AddMetadata`/the other `[<CustomOperation>]` members. **Both overloads must carry `[<CustomOperation("link")>]`** — Task 3 shipped this bug for `WebHostBuilder.Link` (only the `provider` overload attributed) and a review caught it: an unattributed overload of a *different arity* than the attributed one is not reachable through CE keyword syntax at all (verified empirically; `link "url" "rel"` failed to compile with `FS3099`), it's only callable as a plain method. The fix, confirmed against this codebase's own existing precedent (`useOpenApi` in `src/Frank.OpenApi/WebHostBuilderExtensions.fs:60,73` and `datastar` in `src/Frank.Datastar/Frank.Datastar.fs:38,60`, both of which attribute *every* overload of a multi-arity CE keyword), is to attribute both:
 
 ```fsharp
     [<CustomOperation("link")>]
-    member Link: spec: ResourceSpec * provider: (HttpContext -> WebLink seq) -> ResourceSpec
-
     member Link: spec: ResourceSpec * target: string * rel: string -> ResourceSpec
+
+    [<CustomOperation("link")>]
+    member Link: spec: ResourceSpec * provider: (HttpContext -> WebLink seq) -> ResourceSpec
 ```
 
 Update `src/Frank/ResourceBuilder.fs` — add near `AddMetadata`:
 
 ```fsharp
     [<CustomOperation("link")>]
-    member __.Link(spec: ResourceSpec, provider: HttpContext -> WebLink seq) : ResourceSpec =
-        ResourceBuilder.AddMetadata(spec, fun builder -> builder.Metadata.Add(ResourceLinkProvider provider))
-
     member __.Link(spec: ResourceSpec, target: string, rel: string) : ResourceSpec =
         __.Link(spec, fun (_: HttpContext) -> Seq.singleton { Target = target; Rel = rel; Params = [] })
+
+    [<CustomOperation("link")>]
+    member __.Link(spec: ResourceSpec, provider: HttpContext -> WebLink seq) : ResourceSpec =
+        ResourceBuilder.AddMetadata(spec, fun builder -> builder.Metadata.Add(ResourceLinkProvider provider))
 ```
 
 No changes needed to `ResourceSpec.Build()` — it already runs every `Metadata` convention against `builder` (line `for convention in metadata do convention builder`), which is exactly what adds the `ResourceLinkProvider` to the built endpoint's metadata.
