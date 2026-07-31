@@ -77,14 +77,16 @@ and LinkedNode =
       Properties: (string * LinkedValue list) list } // CURIE -> values; multiple entries = multi-valued property
 ```
 
-Prefixes are declared inside the CE and resolved against dotNetRDF's `INamespaceMapper` when building the graph — CURIEs are just strings at the F# level; there is no compile-time checking of them (unlike ALPS's `rt`, which references descriptor *values*). That asymmetry is deliberate: ALPS vocabulary is a closed, authored set the compiler can check; RDF vocabulary is open by design — grounding external terms like `schema:Game` can't be validated except against the vocabulary's own definition, which Frank doesn't own.
+Prefixes are declared inside the CE via the `ldContext` operation and resolved against dotNetRDF's `INamespaceMapper` when building the graph — CURIEs are just strings at the F# level; there is no compile-time checking of them (unlike ALPS's `rt`, which references descriptor *values*). That asymmetry is deliberate: ALPS vocabulary is a closed, authored set the compiler can check; RDF vocabulary is open by design — grounding external terms like `schema:Game` can't be validated except against the vocabulary's own definition, which Frank doesn't own.
+
+The operation is named `ldContext`, not `context` — Frank handlers universally bind `ctx: HttpContext`, and a bare `context` custom operation next to that convention would read ambiguously. `ldContext` names the JSON-LD concept it's standing in for (`@context`) even though, per the expanded-form decision above, nothing ever serializes a JSON `@context` object — the declared mappings only resolve CURIEs while building the graph.
 
 ### Authoring
 
 ```fsharp
 let gameLinkedData (gameUri: string) =
     linkedData {
-        prefix "schema" "https://schema.org/"
+        ldContext "schema" "https://schema.org/"
         id gameUri
         typ "schema:Game"
         property "schema:name" (LString "Tic-tac-toe")
