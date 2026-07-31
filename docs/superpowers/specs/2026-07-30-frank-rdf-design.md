@@ -52,7 +52,7 @@ PackageReference dotNetRdf.Core 3.5.1
 ```
 
 ```
-RdfTypes.fs   Node, Literal, Value, Doc — all [<RequireQualifiedAccess>] where they're a DU
+RdfTypes.fs   Node, Literal, Value, Doc, Description — all [<RequireQualifiedAccess>] where they're a DU
 Rdf.fs        the `rdf { }` CE, Doc.toGraph, Doc.toJsonLd, Node.blank
 ```
 
@@ -85,6 +85,10 @@ type Value =
 type Doc =
     { Prefixes: (string * string) list
       Statements: (Node * string * Value) list }   // subject, predicate CURIE, object
+
+type Description =
+    { Subject: Node
+      Statements: (string * Value) list }   // predicate CURIE, object -- subject implied
 ```
 
 `Node` is reused for both subject position and reference-valued objects, matching RDF's actual constraint that only IRIs and blank nodes can be subjects (literals can't); `Value` exists only to let a triple's object also be a literal, which nothing in subject position permits. `Node.blank : unit -> Node` mints a fresh `Blank` label for anonymous intermediate nodes (a PROV entity with no natural IRI, say) — nothing in this tic-tac-toe example needs one, since `#players` already has a stable fragment IRI.
@@ -99,9 +103,40 @@ The `ldContext` operation is named that, not `context` — Frank handlers univer
 
 `typ "schema:Game"` is sugar for `property` with the predicate hardcoded to the absolute `rdf:type` IRI (`http://www.w3.org/1999/02/22-rdf-syntax-ns#type`) — not resolved through `ldContext`. It's a universal RDF constant, not app vocabulary, so requiring an `ldContext "rdf" "..."` declaration just to use the CE's single most common operation would be pure ceremony. Calling `typ` more than once on the same subject asserts multiple `rdf:type` triples, which is exactly how RDF expresses multiple types — nothing special has to be built for that; it falls out of `typ` being ordinary repeated statement emission.
 
-### Authoring
+### Authoring, and how `describe`/`about` mirror `handler`/`get`
 
-`property`, `typ`, and `about`'s subject parameter are overloaded to accept plain values directly — `string`, `int`, `bool`, `System.DateTimeOffset`, and `Node` — and wrap them into `Value.Literal`/`Value.Node` internally. This is where the CE earns its keep: the qualified constructors from *Data model* exist for precision in the underlying model, but an author only reaches for them explicitly when actually building a standalone `Node` reference — a `sameAs` target, or a node whose IRI gets reused across more than one `about` block. Everything else reads as plain F# values.
+Frank core already has a two-CE composition pattern, used twice (`handler { }` feeding `resource { }`'s `get`/`post`, and `resource { }` feeding `webHost { }`'s `resource` operation): the inner CE is fully self-contained — `Yield` seeds one accumulator, every custom operation threads that same accumulator, `Run` validates and returns a plain value — and the outer CE's custom operation just takes that **already-evaluated value** as an ordinary parameter. `get (handler { handle myHandler })` is `get` receiving a plain `HandlerDefinition`; nothing implicit is threaded between the two builders. No `Combine`, no `Delay`, needed by either side.
+
+`describe`/`about` follow that exact shape instead of the `Combine`/`Delay` machinery an earlier draft of this design used (documented in git history — self-corrected during review; kept here because the same mistake would have recurred in `Frank.Provenance`, which needs the identical shape for `activity { }`/`entity { }` blocks grouped under a `prov { }` outer CE):
+
+```fsharp
+[<Sealed>]
+type DescribeBuilder(subject: Node) =
+    member _.Yield(_) : Description = { Subject = subject; Statements = [] }
+    member _.Run(d: Description) = d
+
+    [<CustomOperation("typ")>]
+    member _.Typ(d, curie: string) =
+        { d with Statements = d.Statements @ [ RdfTypeIri, Value.Node(Node.Iri curie) ] }
+
+    [<CustomOperation("property")>]
+    member _.Property(d, predicate: string, value: string) =
+        { d with Statements = d.Statements @ [ predicate, Value.Literal(Literal.String value) ] }
+    // + overloads for int / bool / DateTimeOffset / Node
+
+let describe subject = DescribeBuilder(subject)
+```
+
+`describe (Node.Iri gameUri) { typ "schema:Game"; property ... }` runs to completion as an ordinary sub-expression, exactly like `handler { handle ... }` does — and produces a plain `Description`. `rdf { }`'s `about` custom operation takes that value directly, the same way `get` takes a `HandlerDefinition`:
+
+```fsharp
+[<CustomOperation("about")>]
+member _.About(doc: Doc, d: Description) : Doc =
+    { doc with
+        Statements = doc.Statements @ (d.Statements |> List.map (fun (p, v) -> d.Subject, p, v)) }
+```
+
+`property`, `typ`, and `about`'s value parameter are overloaded to accept plain values directly — `string`, `int`, `bool`, `System.DateTimeOffset`, and `Node` — wrapping into `Value.Literal`/`Value.Node` internally. This is where the CE earns its keep: the qualified constructors from *Data model* exist for precision in the underlying model, but an author only reaches for them explicitly when building a standalone `Node` reference — a `sameAs` target, or a node whose IRI gets reused across more than one `describe` block. Everything else reads as plain F# values.
 
 ```fsharp
 let gameLinkedData (gameUri: string) =
@@ -109,50 +144,25 @@ let gameLinkedData (gameUri: string) =
     rdf {
         ldContext "schema" "https://schema.org/"
 
-        about (Node.Iri gameUri) {
+        about (describe (Node.Iri gameUri) {
             typ "schema:Game"
             property "schema:name" "Tic-tac-toe"
             property "schema:description" "A two-player m,n,k (3,3,3) game..."
             property "schema:numberOfPlayers" players
             property "schema:sameAs" (Node.Iri "http://www.wikidata.org/entity/Q210339")
             property "schema:sameAs" (Node.Iri "http://dbpedia.org/resource/Tic-tac-toe")
-        }
+        })
 
-        about players {
+        about (describe players {
             typ "schema:QuantitativeValue"
             property "schema:value" 2
-        }
+        })
     }
 ```
 
-`about subject { ... }` is sugar over repeated `triple subject predicate value` statements — like Turtle's `;` shorthand for not repeating the subject — not containment. `players` is declared and referenced by IRI wherever it's needed; its `about` block could equally have come first, or lived in a different `rdf { }` call merged in later. Nothing here assumes a single root resource, which is what `Frank.Provenance`'s multi-subject PROV graphs (activities, entities, agents, cross-linked) will need next. Raw `triple` is also available directly, without an `about` block, for one-off statements.
+`about (describe subject { ... })` is sugar over repeated `triple subject predicate value` statements — like Turtle's `;` shorthand for not repeating the subject — not containment. `players` is declared and referenced by IRI wherever it's needed; its `describe` block could equally have come first, or lived in a different `rdf { }` call merged in later. Nothing here assumes a single root resource, which is what `Frank.Provenance`'s multi-subject PROV graphs (activities, entities, agents, cross-linked) will need next. Raw `triple subject predicate value` is also available directly on `rdf { }`, without a `describe`/`about` pair, for one-off statements — mirroring how `resource { }` also has plain operations (`name`, `docs`) alongside `get`/`post`.
 
-### `about` is a genuine nested CE, not string sugar
-
-The brace syntax above isn't decorative — `about subject { ... }` really is a second computation expression, distinct from `rdf { }` itself, entered by calling a function that returns a builder instance:
-
-```fsharp
-type AboutBuilder(subject: Node) =
-    member _.Yield(_) : (string * Value) list = []
-    member _.Zero() : (string * Value) list = []
-    member _.Delay(f) = f ()
-    member _.Combine(a, b) : (string * Value) list = a @ b
-
-    [<CustomOperation("typ")>]
-    member _.Typ(stmts, curie: string) = stmts @ [ RdfType, Value.Node(Node.Iri curie) ]
-
-    [<CustomOperation("property")>]
-    member _.Property(stmts, predicate: string, value: string) =
-        stmts @ [ predicate, Value.Literal(Literal.String value) ]
-    // + overloads for int / bool / DateTimeOffset / Node
-
-    member _.Run(stmts) : (Node * string * Value) list =
-        stmts |> List.map (fun (p, v) -> subject, p, v)
-
-let about subject = AboutBuilder(subject)
-```
-
-The outer `RdfBuilder` then has to absorb an `about` block's result — and bare `triple` calls — as ordinary statements with no `yield!` ceremony, which is why it needs `Combine`/`Delay`/`Yield`/`Zero` at all. This is a different CE shape from Frank core's own `ResourceBuilder`: `resource { }` only ever chains custom operations on itself (`Yield` seeds one `ResourceSpec`, and `get`/`post`/`rel` each take and return that same spec — no sub-blocks, so no `Combine` needed). `rdf { }` has to compose a *second* builder's output as if it were its own statement, which is exactly what `Combine`/`Delay` are for — the standard F# mechanism for nesting one CE inside another, the same shape `seq { for x in xs -> nested { ... } }`-style composition relies on. Worth building correctly since it's the same shape `Frank.Provenance`'s `activity { }`/`entity { }` blocks will need later, grouped under a `prov { }` outer CE the same way `about` groups under `rdf { }`.
+`rdf { }` itself stays exactly as simple as `ResourceBuilder`: `Yield` seeds `Doc.Empty` (empty prefixes and statements), and `ldContext`/`about`/`triple` each take and return that same `Doc` — no `Combine`, no `Delay`, here either.
 
 ### Serialization
 
@@ -170,14 +180,14 @@ The outer `RdfBuilder` then has to absorb an `about` block's result — and bare
 |---|---|
 | `property`/`typ`/predicate CURIE uses an undeclared prefix | Throws at `toGraph` time with the unresolved CURIE named in the message. Fail fast rather than emit a garbage IRI. |
 | Same prefix declared twice with different URIs | Throws — ambiguous mapping. |
-| `Node.blank ()` handle reused across `about` blocks | Same underlying blank node — this is how you assert more statements about a node you don't have an IRI for, not an error. |
-| `about` with no statements inside | Omitted — no triples asserted, so no trace of the subject appears in the graph. |
+| `Node.blank ()` handle reused across `describe` blocks | Same underlying blank node — this is how you assert more statements about a node you don't have an IRI for, not an error. |
+| `describe` with no `typ`/`property` calls, passed to `about` | Omitted — no triples asserted, so no trace of the subject appears in the graph. |
 | A `Node.Iri` pointing at a non-existent/unchecked URI | Not validated — Frank has no way to know if it resolves, same as `sameAs` in the current hand-rolled version. |
 
 ## Implementation order
 
 1. **`RdfTypes.fs`** — the model, plus unit tests for construction (no serialization yet).
-2. **`Rdf.fs`: `AboutBuilder` + `RdfBuilder` + `Doc.toGraph`** — `AboutBuilder` first in isolation (`typ`/`property` overloads accumulating into a subject-bound statement list), then `RdfBuilder`'s `Combine`/`Delay`/`Yield`/`Zero` composing multiple `about` blocks and bare `triple` calls together, then prefix resolution and blank node minting in `toGraph`. Unit-tested by inspecting the resulting `Graph`'s triples directly (subject/predicate/object), not through JSON-LD.
+2. **`Rdf.fs`: `DescribeBuilder` + `RdfBuilder` + `Doc.toGraph`** — `DescribeBuilder` first in isolation (`typ`/`property` overloads accumulating into a `Description`), then `RdfBuilder`'s `ldContext`/`about`/`triple` operations threading `Doc` the same way `ResourceBuilder`'s operations thread `ResourceSpec`, then prefix resolution and blank node minting in `toGraph`. Unit-tested by inspecting the resulting `Graph`'s triples directly (subject/predicate/object), not through JSON-LD.
 3. **`Doc.toJsonLd`** — wire up `JsonLdWriter`, expanded-form output.
 4. **tic-tac-toe integration** — replace `gameJsonLd`.
 
@@ -187,7 +197,7 @@ Each stage independently verifiable, matching how `Frank.JsonHome` was staged.
 
 New project `test/Frank.Rdf.Tests`.
 
-- **Unit, no serialization**: CE construction — prefix declarations, overload resolution (literal and `Node` forms of `property`), multi-valued properties, blank node minting. Separately: `AboutBuilder` in isolation (statement list for one subject), and `RdfBuilder` composition specifically — two consecutive `about` blocks, an `about` block followed by a bare `triple`, and an empty `about` — to verify `Combine`/`Delay`/`Zero` merge correctly rather than dropping or duplicating statements. This is the part most likely to have a subtle bug, since it's the one piece of real CE machinery in the package rather than plain data transformation.
+- **Unit, no serialization**: `DescribeBuilder` in isolation — `typ`/`property` overload resolution (literal and `Node` forms), multi-valued properties, producing a plain `Description`. `RdfBuilder` separately — `ldContext` accumulation, `about` absorbing a `Description`, bare `triple`, two consecutive `about` calls, an empty `describe` block. No `Combine`/`Delay` cases to test, since neither builder has any — that's the point of matching `handler`/`get`'s shape instead of inventing composition machinery.
 - **Graph-level**: `toGraph` output asserted by triple count/shape for a representative document (including the two-subject `QuantitativeValue` case), not by string comparison.
 - **Round-trip check** (the JSON-LD equivalent of JsonHome's golden-document test): serialize with `Doc.toJsonLd`, then parse the result back into a graph with dotNetRDF's own JSON-LD reader, and assert the two graphs are isomorphic. This is the strongest available check that the expanded output means what the input graph meant — stronger than diffing against a hand-written expected string, which is exactly the kind of brittleness that made the compact-form attempt fragile.
 - **tic-tac-toe regression**: the existing schema.org fields (`@type`, `name`, `description`, `numberOfPlayers`, `sameAs` to Wikidata/DBpedia) are all present in the new expanded output, via the round-trip graph rather than a literal string comparison against the old compact form.
