@@ -61,6 +61,14 @@ type ResourceBuilder(routeTemplate) =
     [<CustomOperation("name")>]
     member __.Name(spec: ResourceSpec, name: string) = { spec with Name = name }
 
+    [<CustomOperation("link")>]
+    member __.Link(spec: ResourceSpec, target: string, rel: string) : ResourceSpec =
+        __.Link(spec, fun (_: HttpContext) -> Seq.singleton { Target = target; Rel = rel; Params = [] })
+
+    [<CustomOperation("link")>]
+    member __.Link(spec: ResourceSpec, provider: HttpContext -> WebLink seq) : ResourceSpec =
+        ResourceBuilder.AddMetadata(spec, fun builder -> builder.Metadata.Add(ResourceLinkProvider provider))
+
     static member AddMetadata(spec: ResourceSpec, convention: EndpointBuilder -> unit) : ResourceSpec =
         { spec with
             Metadata = spec.Metadata @ [ convention ] }

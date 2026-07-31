@@ -27,6 +27,12 @@ type ResourceBuilder =
     [<CustomOperation("name")>]
     member Name: spec: ResourceSpec * name: string -> ResourceSpec
 
+    [<CustomOperation("link")>]
+    member Link: spec: ResourceSpec * target: string * rel: string -> ResourceSpec
+
+    [<CustomOperation("link")>]
+    member Link: spec: ResourceSpec * provider: (HttpContext -> WebLink seq) -> ResourceSpec
+
     static member AddMetadata: spec: ResourceSpec * convention: (EndpointBuilder -> unit) -> ResourceSpec
 
     /// Scopes a convention to endpoints registered under the given HTTP method, by

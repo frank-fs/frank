@@ -223,3 +223,56 @@ let webHostLinkOperationTests =
             Expect.contains (response.Headers.GetValues "Link" |> List.ofSeq) "</x>; rel=\"x\"" "Link header present with configured value"
         }
     ]
+
+let private ok: RequestDelegate = RequestDelegate(fun ctx -> ctx.Response.WriteAsync "OK")
+
+[<Tests>]
+let resourceScopedLinkTests =
+    testList "ResourceBuilder link operation" [
+        testTask "a resource-scoped link appears only on that resource's responses" {
+            let a =
+                resource "/a" {
+                    link "/alt-a" "alternate"
+                    get ok
+                }
+            let b =
+                resource "/b" {
+                    get ok
+                }
+            let client = createFullPipelineTestServer id [ a; b ]
+
+            let! (respA: HttpResponseMessage) = client.GetAsync("/a")
+            let! (respB: HttpResponseMessage) = client.GetAsync("/b")
+
+            Expect.contains (respA.Headers.GetValues "Link" |> List.ofSeq) "</alt-a>; rel=\"alternate\"" "Resource A carries its own link"
+            Expect.isFalse (respB.Headers.Contains "Link") "Resource B carries no link"
+        }
+
+        testTask "resource-scoped and app-wide links combine on the same response" {
+            let a =
+                resource "/a" {
+                    link "/alt-a" "alternate"
+                    get ok
+                }
+            let configure (spec: WebHostSpec) = (WebHostBuilder([||])).Link(spec, "/home.json", "home")
+            let client = createFullPipelineTestServer configure [ a ]
+
+            let! (resp: HttpResponseMessage) = client.GetAsync("/a")
+            let values = resp.Headers.GetValues "Link" |> List.ofSeq
+
+            Expect.contains values "</alt-a>; rel=\"alternate\"" "Resource-scoped entry present"
+            Expect.contains values "</home.json>; rel=\"home\"" "App-wide entry present"
+        }
+
+        testTask "a resource-scoped link never appears on an unmatched route" {
+            let a =
+                resource "/a" {
+                    link "/alt-a" "alternate"
+                    get ok
+                }
+            let client = createFullPipelineTestServer id [ a ]
+
+            let! (resp: HttpResponseMessage) = client.GetAsync("/nope")
+            Expect.isFalse (resp.Headers.Contains "Link") "404 carries no resource-scoped link"
+        }
+    ]
