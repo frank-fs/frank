@@ -6,8 +6,10 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.FileProviders
 open Microsoft.Extensions.Hosting
 open Expecto
 open Frank.Builder
@@ -111,5 +113,83 @@ let appWideLinkTests =
             let! (response: HttpResponseMessage) = client.GetAsync("/boom")
             Expect.equal (int response.StatusCode) 500 "Exception handler produced the response"
             Expect.isTrue (response.Headers.Contains "Link") "Link header survives Response.Clear()"
+        }
+    ]
+
+type private TestEndpointDataSource(endpoints: Endpoint[]) =
+    inherit EndpointDataSource()
+    override _.Endpoints = endpoints :> _
+    override _.GetChangeToken() = NullChangeToken.Singleton :> _
+
+/// Mirrors WebHostBuilder.Run's pipeline shape exactly (Run blocks, so tests
+/// wire it by hand), letting a test configure the spec via the real CE and
+/// register extra resources the way an app would.
+let private createFullPipelineTestServer (configureSpec: WebHostSpec -> WebHostSpec) (resources: Resource list) =
+    let spec = WebHostSpec.Empty |> configureSpec
+    let testEndpoint =
+        RouteEndpointBuilder(
+            RequestDelegate(fun ctx -> ctx.Response.WriteAsync "OK"),
+            Patterns.RoutePatternFactory.Parse "/test",
+            0)
+            .Build()
+    let allEndpoints =
+        testEndpoint :: (resources |> List.collect (fun r -> List.ofArray r.Endpoints))
+        |> Array.ofList
+
+    let builder =
+        Host.CreateDefaultBuilder([||])
+            .ConfigureWebHost(fun webBuilder ->
+                webBuilder
+                    .UseTestServer()
+                    .ConfigureServices(fun services ->
+                        services.AddRouting() |> ignore
+                        spec.Services services |> ignore)
+                    .Configure(fun app ->
+                        app
+                        |> WebLink.useAppWideLinks spec.LinkProviders
+                        |> spec.BeforeRoutingMiddleware
+                        |> fun app -> app.UseRouting()
+                        |> WebLink.useResourceScopedLinks
+                        |> spec.Middleware
+                        |> fun app ->
+                            app.UseEndpoints(fun endpoints ->
+                                endpoints.DataSources.Add(TestEndpointDataSource(allEndpoints)))
+                        |> ignore)
+                |> ignore)
+
+    let host = builder.Build()
+    host.Start()
+    host.GetTestClient()
+
+[<Tests>]
+let webHostLinkOperationTests =
+    testList "WebHostBuilder link operation" [
+        testCase "link target rel appends a provider that always returns that link" (fun () ->
+            let builder = WebHostBuilder([||])
+            let spec = builder.Link(WebHostSpec.Empty, "/x", "x")
+            Expect.equal (List.length spec.LinkProviders) 1 "One provider registered"
+            let links = spec.LinkProviders.[0] null |> List.ofSeq
+            Expect.equal links [ { Target = "/x"; Rel = "x"; Params = [] } ] "Static provider produces the configured link")
+
+        testCase "link with a general provider appends it as-is" (fun () ->
+            let builder = WebHostBuilder([||])
+            let provider = fun (_: HttpContext) -> Seq.singleton { Target = "/y"; Rel = "y"; Params = [] }
+            let spec = builder.Link(WebHostSpec.Empty, provider)
+            Expect.equal (List.length spec.LinkProviders) 1 "One provider registered"
+            Expect.equal (spec.LinkProviders.[0] null |> List.ofSeq) [ { Target = "/y"; Rel = "y"; Params = [] } ] "Provider unchanged")
+
+        testCase "two link calls accumulate, not overwrite" (fun () ->
+            let builder = WebHostBuilder([||])
+            let spec =
+                WebHostSpec.Empty
+                |> fun s -> builder.Link(s, "/x", "x")
+                |> fun s -> builder.Link(s, "/y", "y")
+            Expect.equal (List.length spec.LinkProviders) 2 "Both providers registered")
+
+        testTask "a response carries a link registered via the webHost CE's link operation" {
+            let configure (spec: WebHostSpec) = (WebHostBuilder([||])).Link(spec, "/x", "x")
+            let client = createFullPipelineTestServer configure []
+            let! (response: HttpResponseMessage) = client.GetAsync("/test")
+            Expect.contains (response.Headers.GetValues "Link" |> List.ofSeq) "</x>; rel=\"x\"" "Link header present with configured value"
         }
     ]

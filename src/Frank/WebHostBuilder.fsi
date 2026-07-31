@@ -12,6 +12,7 @@ type WebHostSpec =
       Middleware: (IApplicationBuilder -> IApplicationBuilder)
       Endpoints: Endpoint[]
       Services: (IServiceCollection -> IServiceCollection)
+      LinkProviders: (HttpContext -> WebLink seq) list
       UseDefaults: bool }
 
     static member Empty: WebHostSpec
@@ -39,6 +40,11 @@ type WebHostBuilder =
     member PlugBeforeRoutingWhenNot:
         spec: WebHostSpec * cond: (IApplicationBuilder -> bool) * f: (IApplicationBuilder -> IApplicationBuilder) ->
             WebHostSpec
+
+    [<CustomOperation("link")>]
+    member Link: spec: WebHostSpec * provider: (HttpContext -> WebLink seq) -> WebHostSpec
+
+    member Link: spec: WebHostSpec * target: string * rel: string -> WebHostSpec
 
     [<CustomOperation("plug")>]
     member Plug: spec: WebHostSpec * f: (IApplicationBuilder -> IApplicationBuilder) -> WebHostSpec

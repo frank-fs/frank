@@ -16,6 +16,7 @@ type WebHostSpec =
       Middleware: (IApplicationBuilder -> IApplicationBuilder)
       Endpoints: Endpoint[]
       Services: (IServiceCollection -> IServiceCollection)
+      LinkProviders: (HttpContext -> WebLink seq) list
       UseDefaults: bool }
 
     static member Empty =
@@ -29,6 +30,7 @@ type WebHostSpec =
                 |> ignore
 
                 services)
+          LinkProviders = []
           UseDefaults = false }
 
 [<Sealed>]
@@ -44,8 +46,10 @@ type WebHostBuilder(args) =
                     .ConfigureServices(spec.Services >> ignore)
                     .Configure(fun app ->
                         app
+                        |> WebLink.useAppWideLinks spec.LinkProviders
                         |> spec.BeforeRoutingMiddleware
                         |> fun app -> app.UseRouting()
+                        |> WebLink.useResourceScopedLinks
                         |> spec.Middleware
                         |> fun app ->
                             app.UseEndpoints(fun endpoints ->
@@ -85,6 +89,13 @@ type WebHostBuilder(args) =
     [<CustomOperation("plugBeforeRoutingWhenNot")>]
     member __.PlugBeforeRoutingWhenNot(spec, cond, f) =
         __.PlugBeforeRoutingWhen(spec, not << cond, f)
+
+    [<CustomOperation("link")>]
+    member __.Link(spec: WebHostSpec, provider: HttpContext -> WebLink seq) : WebHostSpec =
+        { spec with LinkProviders = spec.LinkProviders @ [ provider ] }
+
+    member __.Link(spec: WebHostSpec, target: string, rel: string) : WebHostSpec =
+        __.Link(spec, fun (_: HttpContext) -> Seq.singleton { Target = target; Rel = rel; Params = [] })
 
     [<CustomOperation("plug")>]
     member __.Plug(spec, f) =
