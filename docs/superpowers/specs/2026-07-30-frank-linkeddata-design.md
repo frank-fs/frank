@@ -25,7 +25,7 @@ This design treats that branch as reference only, not a starting point. It keeps
 
 ## Goals
 
-1. Provide a `linkedData { }` CE for hand-authoring an RDF description of a single resource instance, grounded in existing vocabularies (schema.org, FOAF, Dublin Core — e.g. `schema:sameAs` as a plain linking predicate, not an OWL reasoning construct).
+1. Provide an `rdf { }` CE for hand-authoring RDF triples — one or more resources, cross-linked as needed — grounded in existing vocabularies (schema.org, FOAF, Dublin Core — e.g. `schema:sameAs` as a plain linking predicate, not an OWL reasoning construct).
 2. Serialize that description to JSON-LD in **expanded form**.
 3. Replace tic-tac-toe's hand-rolled `gameJsonLd` string with this package, proving it against a real consumer.
 4. Establish a hand-authored target shape that later work (a second protocol sample, then eventually codegen) can build toward.
@@ -35,13 +35,9 @@ This design treats that branch as reference only, not a starting point. It keeps
 - **Compact-form JSON-LD.** A prior failure pattern. Expanded form only, for now — see *Serialization*.
 - **Multi-format content negotiation** (Turtle, RDF/XML). dotNetRDF's writers make this cheap to add later; nothing today needs it, so it isn't built.
 - **SHACL, PROV-JSON, ALPS integration.** Separate sub-projects, in that order, each getting its own design.
-- **OWL / ontology reasoning.** Rejected outright, not deferred — see *Why not OWL* below.
+- **An OWL reasoner / inference engine.** Not built because nothing here needs inference — not because OWL is unwelcome. `rdf { }` is vocabulary-agnostic: OWL terms (`owl:sameAs`, `rdfs:subClassOf`, ...) are just triples like any other, same as the `schema:sameAs` this design already uses. If a consumer wants to author OWL axioms through this CE, or plug a reasoner in over the resulting graph later, nothing here stops that.
 - **Reflection-driven type→vocabulary mapping or build-time codegen** (the old `vocabulary { typeof<T> ... }` / resolver / lock-file pattern). Rejected per [[feedback_outside_in_before_codegen]].
 - **Any dependency on `Frank` core.** Nothing here needs `HandlerDefinition`, `ApiSurface`, or the `resource` CE — see *Package shape*.
-
-### Why not OWL
-
-None of the current use cases need inference. A leaderboard (the motivating case for the next sub-project, `Frank.Provenance`) is aggregation over recorded facts, not something a reasoner needs to derive. Grounding ALPS in schema.org/FOAF/DC is "here are our terms and where they resolve," not ontology work. Where something like validation *is* needed — "this move must target a valid position," "this transition requires this precondition" — that's SHACL's job: closed-world constraint checking, which matches how HTTP APIs reject bad requests. OWL's open-world, monotonic semantics can't express rejection at all. Building an OWL layer now would also repeat the inside-out mistake: investing in the hardest, most speculative layer before any consumer needs what it provides.
 
 ## Package shape
 
@@ -52,8 +48,8 @@ PackageReference dotNetRdf.Core 3.5.1
 ```
 
 ```
-LinkedDataTypes.fs   internal document model: LinkedNode, LinkedValue, prefix map
-LinkedData.fs        the `linkedData { }` CE, toGraph, toJsonLd
+LinkedDataTypes.fs   internal triple model: LNode, LValue, RdfDoc
+LinkedData.fs        the `rdf { }` CE, toGraph, toJsonLd
 ```
 
 Each `.fs` gets a matching `.fsi`, per `CLAUDE.md`. No middleware, no resolver, no generated code.
@@ -62,53 +58,67 @@ Each `.fs` gets a matching `.fsi`, per `CLAUDE.md`. No middleware, no resolver, 
 
 ### Data model
 
+Modeled directly on RDF's own triple shape, not JSON-LD's document shape — a graph is a flat set of `(subject, predicate, object)` statements about however many resources it needs, with no notion of one being "primary" or others being "embedded."
+
 ```fsharp
-type LinkedValue =
+type LNode =
+    | Iri of string      // absolute IRI or a "prefix:local" CURIE
+    | Blank of string     // minted by `blank ()`; never authored literally
+
+type LLiteral =
     | LString of string
     | LInt of int
     | LBool of bool
     | LDateTime of System.DateTimeOffset
-    | LIri of string           // reference to another resource by IRI, e.g. a sameAs target
-    | LNode of LinkedNode       // embedded/nested resource, e.g. schema:QuantitativeValue
 
-and LinkedNode =
-    { Id: string option                          // absolute IRI; None = blank node
-      Types: string list                          // CURIEs, e.g. "schema:Game"
-      Properties: (string * LinkedValue list) list } // CURIE -> values; multiple entries = multi-valued property
+type LValue =
+    | VNode of LNode       // a reference: another resource, by IRI or blank node
+    | VLiteral of LLiteral
+
+type RdfDoc =
+    { Prefixes: (string * string) list
+      Statements: (LNode * string * LValue) list }   // subject, predicate CURIE, object
 ```
+
+`LNode` is reused for both subject position and reference-valued objects, matching RDF's actual constraint that only IRIs and blank nodes can be subjects (literals can't); `LValue` exists only to let a triple's object also be a literal, which nothing in subject position permits. `blank : unit -> LNode` mints a fresh `Blank` label for anonymous intermediate nodes (a PROV entity with no natural IRI, say) — nothing in this tic-tac-toe example needs one, since `#players` already has a stable fragment IRI.
+
+The type is named `RdfDoc`, not `LinkedDataDoc` — the CE builds generic RDF, and JSON-LD (via `LinkedData.toJsonLd`) is one projection of it, not the thing itself. That's also why the CE operation is `rdf { }` rather than `linkedData { }`: it's authoring triples, not a JSON-LD document. The package and module stay named `Frank.LinkedData`/`LinkedData`, because producing linked data (JSON-LD today, Turtle/RDF-XML potentially later) is still what the package is *for* — `rdf { }` is just the honest name for the triple-level building block inside it.
 
 Prefixes are declared inside the CE via the `ldContext` operation and resolved against dotNetRDF's `INamespaceMapper` when building the graph — CURIEs are just strings at the F# level; there is no compile-time checking of them (unlike ALPS's `rt`, which references descriptor *values*). That asymmetry is deliberate: ALPS vocabulary is a closed, authored set the compiler can check; RDF vocabulary is open by design — grounding external terms like `schema:Game` can't be validated except against the vocabulary's own definition, which Frank doesn't own.
 
-The operation is named `ldContext`, not `context` — Frank handlers universally bind `ctx: HttpContext`, and a bare `context` custom operation next to that convention would read ambiguously. `ldContext` names the JSON-LD concept it's standing in for (`@context`) even though, per the expanded-form decision above, nothing ever serializes a JSON `@context` object — the declared mappings only resolve CURIEs while building the graph.
+The `ldContext` operation is named that, not `context` — Frank handlers universally bind `ctx: HttpContext`, and a bare `context` custom operation next to that convention would read ambiguously. `ldContext` names the JSON-LD concept it's standing in for (`@context`) even though, per the expanded-form decision above, nothing ever serializes a JSON `@context` object — the declared mappings only resolve CURIEs while building the graph.
 
 ### Authoring
 
 ```fsharp
 let gameLinkedData (gameUri: string) =
-    linkedData {
+    let players = Iri(gameUri + "#players")
+    rdf {
         ldContext "schema" "https://schema.org/"
-        id gameUri
-        typ "schema:Game"
-        property "schema:name" (LString "Tic-tac-toe")
-        property "schema:description" (LString "A two-player m,n,k (3,3,3) game...")
-        property "schema:numberOfPlayers" (LNode(
-            linkedData {
-                id (gameUri + "#players")
-                typ "schema:QuantitativeValue"
-                property "schema:value" (LInt 2)
-            }))
-        property "schema:sameAs" (LIri "http://www.wikidata.org/entity/Q210339")
-        property "schema:sameAs" (LIri "http://dbpedia.org/resource/Tic-tac-toe")
+
+        about (Iri gameUri) {
+            typ "schema:Game"
+            property "schema:name" (VLiteral(LString "Tic-tac-toe"))
+            property "schema:description" (VLiteral(LString "A two-player m,n,k (3,3,3) game..."))
+            property "schema:numberOfPlayers" (VNode players)
+            property "schema:sameAs" (VNode(Iri "http://www.wikidata.org/entity/Q210339"))
+            property "schema:sameAs" (VNode(Iri "http://dbpedia.org/resource/Tic-tac-toe"))
+        }
+
+        about players {
+            typ "schema:QuantitativeValue"
+            property "schema:value" (VLiteral(LInt 2))
+        }
     }
 ```
 
-Nesting reuses the same CE — `LNode` just wraps another `linkedData { }` result — so there's one builder to learn, not a separate embedded-object mini-language.
+`about subject { ... }` is sugar over repeated `triple subject predicate value` statements — like Turtle's `;` shorthand for not repeating the subject — not containment. `players` is declared and referenced by IRI wherever it's needed; its `about` block could equally have come first, or lived in a different `rdf { }` call merged in later. Nothing here assumes a single root resource, which is what `Frank.Provenance`'s multi-subject PROV graphs (activities, entities, agents, cross-linked) will need next. Raw `triple` is also available directly, without an `about` block, for one-off statements.
 
 ### Serialization
 
-`LinkedData.toGraph : LinkedNode -> Graph` populates a `VDS.RDF.Graph`: registers declared prefixes on the namespace map, mints a blank node when `Id` is `None`, asserts a `rdf:type` triple per entry in `Types`, and asserts one triple per `(predicate, value)` pair — recursing into `toGraph` for `LNode` values and linking via the nested node's own subject.
+`LinkedData.toGraph : RdfDoc -> Graph` populates a `VDS.RDF.Graph`: registers declared prefixes on the namespace map, resolves each `Iri` (absolute or CURIE) and mints one real blank node per distinct `Blank` label via `graph.CreateBlankNode()`, then asserts one triple per statement. Flat fold, no recursion — nesting was the old model's problem, not this one's.
 
-`LinkedData.toJsonLd : LinkedNode -> string` runs dotNetRDF's `JsonLdWriter` over that graph and returns **expanded form** — no `@context`, every predicate and type fully expanded to its absolute IRI. This is a real, visible change from today's hand-rolled compact output in `Discovery.fs`; it trades human readability for not repeating the compact-form failure pattern, and expanded form is valid input to any conformant JSON-LD processor regardless. Revisiting compaction is future work, not blocked on anything here, but not attempted now.
+`LinkedData.toJsonLd : RdfDoc -> string` runs dotNetRDF's `JsonLdWriter` over that graph and returns **expanded form**: an array with one node-object per distinct subject, no `@context`, every predicate and type fully expanded to its absolute IRI. This is a real, visible change from today's hand-rolled compact output in `Discovery.fs`; it trades human readability for not repeating the compact-form failure pattern, and expanded form is valid input to any conformant JSON-LD processor regardless. Revisiting compaction is future work, not blocked on anything here, but not attempted now.
 
 ### Integration point
 
@@ -118,11 +128,11 @@ Nesting reuses the same CE — `LNode` just wraps another `linkedData { }` resul
 
 | Situation | Behaviour |
 |---|---|
-| `property`/`typ` CURIE uses an undeclared prefix | Throws at `toGraph` time with the unresolved CURIE named in the message. Fail fast rather than emit a garbage IRI. |
+| `property`/`typ`/predicate CURIE uses an undeclared prefix | Throws at `toGraph` time with the unresolved CURIE named in the message. Fail fast rather than emit a garbage IRI. |
 | Same prefix declared twice with different URIs | Throws — ambiguous mapping. |
-| `id` omitted | Node serializes as a blank node (`_:b0`, ...). |
-| `property` called with no values for a key | Omitted from output, mirroring JSON Home's "optional, omit rather than emit empty." |
-| `LIri` pointing at a non-existent/unchecked URI | Not validated — Frank has no way to know if it resolves, same as `sameAs` in the current hand-rolled version. |
+| `blank ()` handle reused across `about` blocks | Same underlying blank node — this is how you assert more statements about a node you don't have an IRI for, not an error. |
+| `about` with no statements inside | Omitted — no triples asserted, so no trace of the subject appears in the graph. |
+| An `Iri` pointing at a non-existent/unchecked URI | Not validated — Frank has no way to know if it resolves, same as `sameAs` in the current hand-rolled version. |
 
 ## Implementation order
 
@@ -144,7 +154,8 @@ New project `test/Frank.LinkedData.Tests`.
 
 ## Future work (separate)
 
-- **`Frank.Provenance`** — PROV-JSON, built on this package, motivated by the tic-tac-toe leaderboard query. Next sub-project.
+- **`Frank.Provenance`** and **`Frank.Validation`** (SHACL) both take a `ProjectReference` to this package and build their graphs through `RdfDoc`/`Graph`/`LinkedData.toGraph` rather than re-wiring dotNetRDF from scratch — that's this package's foundation role. Neither reuses the `rdf { }` CE's vocabulary directly, though: PROV wants `activity`/`entity`/`agent`/`used`/`wasGeneratedBy`, SHACL wants `shape`/`targetClass`/`minCount`/`pattern` — different enough shapes (a SHACL shape isn't "a resource with properties," it's a constraint description) that each gets its own purpose-built CE producing an `RdfDoc`, not `about`/`property` pressed into service for a vocabulary they weren't designed for.
+- **`Frank.Provenance`** — PROV-JSON, motivated by the tic-tac-toe leaderboard query. Next sub-project.
 - **`Frank.Validation`** (SHACL) — deferred behind Provenance.
 - **ALPS-as-Discovery** — deferred furthest; joins the existing [ALPS/protocol design](2026-07-28-frank-alps-protocol-design.md).
 - **A second protocol sample** with meaningfully different role dynamics, to pressure-test this shape before generalizing it.
