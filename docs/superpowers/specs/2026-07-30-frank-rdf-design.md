@@ -204,6 +204,16 @@ rdf {
 
 `Discovery.fs`'s `gameJsonLd` string template is replaced by a call to `gameLinkedData` above, piped through `Doc.toJsonLd`. The handler sets `Content-Type: application/ld+json` itself, same as it does today — this package has no opinion on response plumbing.
 
+### Serving it over HTTP: an independent resource, not content negotiation
+
+Not decided anywhere earlier in this design, and worth being explicit about now rather than leaving it implicit: the JSON-LD representation lives at its **own resource** (e.g. `/games/{id}/linked-data`), advertised from the main resource via a `Link: rel="alternate"` header — not served from the same URL as the main representation via `Accept`-based content negotiation.
+
+Two reasons. First, precedent: every existing "here's another machine-readable representation" case in Frank — `Frank.JsonHome`'s `home` link, `Frank.OpenApi`'s `service-desc` link, the deferred ALPS `profile` link — already uses exactly this shape: a separate resource, advertised by a `Link` header appended via `Response.OnStarting`. Frank.JsonHome's own `linkHeaderMiddleware` (`JsonHome.fs`) is the concrete pattern to copy: build the RFC 8288 field value once, append (not assign) it in `OnStarting` so it survives exception-handler-regenerated responses.
+
+Second, `Frank`'s `ContentNegotiation.fs` doesn't actually fit this job: it negotiates among registered ASP.NET Core MVC `IOutputFormatter`s for a strongly-typed `.NET` object (`OutputFormatterSelector.SelectFormatter`), not between two already-built strings based on `Accept`. Routing JSON-LD through it would mean writing and registering a custom `TextOutputFormatter` — ceremony nothing else in Frank takes on for this.
+
+This needs no new code in `Frank.Rdf` or Frank core — a second `resource { get ... }` block calling `Doc.toJsonLd`, plus a few lines of `Link`-header-appending middleware copied from `Frank.JsonHome`'s pattern, both live entirely in the consuming app. It's called out here so the tic-tac-toe follow-on plan (see the implementation plan's "Out of scope" section) doesn't have to rediscover it.
+
 ## Error handling and edge cases
 
 | Situation | Behaviour |
