@@ -206,7 +206,7 @@ rdf {
 
 ### Integration point
 
-`Discovery.fs`'s `gameJsonLd` string template is replaced by a call to `gameLinkedData` above, piped through `Doc.toJsonLd`. The handler sets `Content-Type: application/ld+json` itself, same as it does today — this package has no opinion on response plumbing.
+`Discovery.fs`'s `gameJsonLd` string template is replaced by a call to `gameLinkedData` above. The handler sets `Content-Type: application/ld+json` and writes the response through `Doc.writeJsonLd`, not `Doc.toJsonLd` — see *Serialization* for why `writeJsonLd` is the one to reach for whenever a writer is available (which a response handler always has), and *Serving it over HTTP* below for where that handler actually lives. `toJsonLd` exists for the cases that genuinely need a `string` (tests, mainly), not as the default path. This package still has no opinion on response plumbing beyond that — it exposes both functions and lets the caller pick.
 
 ### Serving it over HTTP: an independent resource, not content negotiation
 
