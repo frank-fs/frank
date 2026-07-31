@@ -170,7 +170,11 @@ let gameLinkedData (gameUri: string) =
 
 `Doc.toGraph : Doc -> Graph` populates a `VDS.RDF.Graph`: registers declared prefixes on the namespace map, resolves each `Node.Iri` (absolute or CURIE) and mints one real blank node per distinct `Node.Blank` label via `graph.CreateBlankNode()`, then asserts one triple per statement. Flat fold, no recursion — nesting was the old model's problem, not this one's.
 
-`Doc.toJsonLd : Doc -> string` runs dotNetRDF's `JsonLdWriter` over that graph and returns **expanded form**: an array with one node-object per distinct subject, no `@context`, every predicate and type fully expanded to its absolute IRI. This is a real, visible change from today's hand-rolled compact output in `Discovery.fs`; it trades human readability for not repeating the compact-form failure pattern, and expanded form is valid input to any conformant JSON-LD processor regardless. Revisiting compaction is future work, not blocked on anything here, but not attempted now.
+`Doc.writeJsonLd : Doc -> System.IO.TextWriter -> unit` is the actual primitive: wraps the graph in a `TripleStore` and calls dotNetRDF's `JsonLdWriter.Save` directly against whatever `TextWriter` the caller supplies. `Doc.toJsonLd : Doc -> string` is a thin convenience wrapper over it using an internal `StringWriter` — kept because the round-trip tests (and any caller that genuinely needs the whole string) still need one, but it isn't the path a response handler should use.
+
+The reason for the split: `JsonLdWriter.Save` doesn't care what `TextWriter` it's given, so a handler can pass one wrapping `HttpResponse.Body` directly (e.g. `new StreamWriter(ctx.Response.Body, Encoding.UTF8, leaveOpen = true)`) and skip materializing the whole document as a `string` before `WriteAsync`-ing it — one fewer full copy at the app/response boundary. That's a real, worthwhile saving, but not a claim of streaming all the way down: dotNetRDF's `JsonLdWriter` itself builds its output via Newtonsoft's LINQ-to-JSON (`JObject`/`JArray`), meaning it materializes the whole in-memory JSON tree internally regardless of what `TextWriter` it's handed. Eliminating that would mean replacing dotNetRDF's writer with a hand-rolled streaming one — reversing the earlier decision to keep dotNetRDF as the serialization engine, not something worth doing for this.
+
+Output is **expanded form**: an array with one node-object per distinct subject, no `@context`, every predicate and type fully expanded to its absolute IRI. This is a real, visible change from today's hand-rolled compact output in `Discovery.fs`; it trades human readability for not repeating the compact-form failure pattern, and expanded form is valid input to any conformant JSON-LD processor regardless. Revisiting compaction is future work, not blocked on anything here, but not attempted now.
 
 ### Merging documents
 
@@ -212,7 +216,7 @@ Two reasons. First, precedent: every existing "here's another machine-readable r
 
 Second, `Frank`'s `ContentNegotiation.fs` doesn't actually fit this job: it negotiates among registered ASP.NET Core MVC `IOutputFormatter`s for a strongly-typed `.NET` object (`OutputFormatterSelector.SelectFormatter`), not between two already-built strings based on `Accept`. Routing JSON-LD through it would mean writing and registering a custom `TextOutputFormatter` — ceremony nothing else in Frank takes on for this.
 
-This needs no new code in `Frank.Rdf` or Frank core — a second `resource { get ... }` block calling `Doc.toJsonLd`, plus a few lines of `Link`-header-appending middleware copied from `Frank.JsonHome`'s pattern, both live entirely in the consuming app. It's called out here so the tic-tac-toe follow-on plan (see the implementation plan's "Out of scope" section) doesn't have to rediscover it.
+This needs no new code in `Frank.Rdf` or Frank core — a second `resource { get ... }` block calling `Doc.writeJsonLd` directly against a writer over `ctx.Response.Body` (see *Serialization*), plus a few lines of `Link`-header-appending middleware copied from `Frank.JsonHome`'s pattern, both live entirely in the consuming app. It's called out here so the tic-tac-toe follow-on plan (see the implementation plan's "Out of scope" section) doesn't have to rediscover it.
 
 ## Error handling and edge cases
 
