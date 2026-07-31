@@ -53,7 +53,7 @@ PackageReference dotNetRdf.Core 3.5.1
 
 ```
 RdfTypes.fs   Node, Literal, Value, Doc, Description — all [<RequireQualifiedAccess>] where they're a DU
-Rdf.fs        the `rdf { }` CE, Doc.toGraph, Doc.toJsonLd, Node.blank
+Rdf.fs        the `rdf { }` CE, Doc.toGraph, Doc.toJsonLd, Doc.merge, Node.blank
 ```
 
 Each `.fs` gets a matching `.fsi`, per `CLAUDE.md`. No middleware, no resolver, no generated code.
@@ -93,15 +93,17 @@ type Description =
 
 `Node` is reused for both subject position and reference-valued objects, matching RDF's actual constraint that only IRIs and blank nodes can be subjects (literals can't); `Value` exists only to let a triple's object also be a literal, which nothing in subject position permits. `Node.blank : unit -> Node` mints a fresh `Blank` label for anonymous intermediate nodes (a PROV entity with no natural IRI, say) — nothing in this tic-tac-toe example needs one, since `#players` already has a stable fragment IRI.
 
+The label is a fresh `System.Guid`, not a per-`Doc` counter (`"b0"`, `"b1"`, ...). A counter would make two *independently built* `Doc`s collide the moment both happen to mint their first blank node — silently unifying two unrelated anonymous entities into one node wherever those docs are later merged (see *Merging documents*). GUIDs make that structurally impossible, for the same implementation cost as a counter.
+
 Every DU here is `[<RequireQualifiedAccess>]`. Bare `Iri`, `String`, `Node` (the case) would either collide with each other (`Value.Node` the case vs. `Node` the type; `Literal.DateTime` vs. `System.DateTime`) or just be too generic to read unambiguously out of context. Qualification fixes that at the compiler level — `Node.Iri`, `Literal.String`, `Value.Node` are always unambiguous — without inventing an artificial prefix scheme (the earlier `RdfNode`/`VNode`/`LString` naming this replaced) that stutters everywhere and still didn't disambiguate cases from each other, only types.
 
 That would make hand-authoring `Value.Literal(Literal.String "...")` for every field, though, which is the opposite of what this CE is for. The CE closes that gap — see *Authoring*.
 
-Prefixes are declared inside the CE via the `ldContext` operation and resolved against dotNetRDF's `INamespaceMapper` when building the graph — CURIEs are just strings at the F# level; there is no compile-time checking of them (unlike ALPS's `rt`, which references descriptor *values*). That asymmetry is deliberate: ALPS vocabulary is a closed, authored set the compiler can check; RDF vocabulary is open by design — grounding external terms like `schema:Game` can't be validated except against the vocabulary's own definition, which Frank doesn't own.
+Prefixes are declared inside the CE via the `prefix` operation and resolved against dotNetRDF's `INamespaceMapper` when building the graph — CURIEs are just strings at the F# level; there is no compile-time checking of them (unlike ALPS's `rt`, which references descriptor *values*). That asymmetry is deliberate: ALPS vocabulary is a closed, authored set the compiler can check; RDF vocabulary is open by design — grounding external terms like `schema:Game` can't be validated except against the vocabulary's own definition, which Frank doesn't own.
 
-The `ldContext` operation is named that, not `context` — Frank handlers universally bind `ctx: HttpContext`, and a bare `context` custom operation next to that convention would read ambiguously. `ldContext` names the JSON-LD concept it's standing in for (`@context`) even though, per the expanded-form decision above, nothing ever serializes a JSON `@context` object — the declared mappings only resolve CURIEs while building the graph.
+The operation is named `prefix`, not `context` or `ldContext` (an earlier draft's name for it, changed during review) — `prefix` is Turtle's and SPARQL's own term for exactly this concept (`@prefix`/`PREFIX`), consistent with the rest of the CE's Turtle-flavored vocabulary (`describe`, `about`, `triple`), where `ldContext` was the one JSON-LD-specific name left over from when the package was still called `Frank.LinkedData`. It also sidesteps `context` colliding with `ctx: HttpContext`, which every Frank handler binds — a real, verified collision, unlike the RDF-vocabulary-collision concerns raised earlier in this design that turned out to be unfounded (see `Node`/`Literal`/`Value` above). Routing prefix declarations through JSON-LD's `@context` was never accurate anyway: nothing here ever serializes a JSON `@context` object, since output is expanded-form only — the declared mappings only resolve CURIEs while building the graph.
 
-`typ "schema:Game"` is sugar for `property` with the predicate hardcoded to the absolute `rdf:type` IRI (`http://www.w3.org/1999/02/22-rdf-syntax-ns#type`) — not resolved through `ldContext`. It's a universal RDF constant, not app vocabulary, so requiring an `ldContext "rdf" "..."` declaration just to use the CE's single most common operation would be pure ceremony. Calling `typ` more than once on the same subject asserts multiple `rdf:type` triples, which is exactly how RDF expresses multiple types — nothing special has to be built for that; it falls out of `typ` being ordinary repeated statement emission.
+`typ "schema:Game"` is sugar for `property` with the predicate hardcoded to the absolute `rdf:type` IRI (`http://www.w3.org/1999/02/22-rdf-syntax-ns#type`) — not resolved through `prefix`. It's a universal RDF constant, not app vocabulary, so requiring a `prefix "rdf" "..."` declaration just to use the CE's single most common operation would be pure ceremony. Calling `typ` more than once on the same subject asserts multiple `rdf:type` triples, which is exactly how RDF expresses multiple types — nothing special has to be built for that; it falls out of `typ` being ordinary repeated statement emission.
 
 ### Authoring, and how `describe`/`about` mirror `handler`/`get`
 
@@ -142,7 +144,7 @@ member _.About(doc: Doc, d: Description) : Doc =
 let gameLinkedData (gameUri: string) =
     let players = Node.Iri(gameUri + "#players")
     rdf {
-        ldContext "schema" "https://schema.org/"
+        prefix "schema" "https://schema.org/"
 
         about (describe (Node.Iri gameUri) {
             typ "schema:Game"
@@ -162,13 +164,41 @@ let gameLinkedData (gameUri: string) =
 
 `about (describe subject { ... })` is sugar over repeated `triple subject predicate value` statements — like Turtle's `;` shorthand for not repeating the subject — not containment. `players` is declared and referenced by IRI wherever it's needed; its `describe` block could equally have come first, or lived in a different `rdf { }` call merged in later. Nothing here assumes a single root resource, which is what `Frank.Provenance`'s multi-subject PROV graphs (activities, entities, agents, cross-linked) will need next. Raw `triple subject predicate value` is also available directly on `rdf { }`, without a `describe`/`about` pair, for one-off statements — mirroring how `resource { }` also has plain operations (`name`, `docs`) alongside `get`/`post`.
 
-`rdf { }` itself stays exactly as simple as `ResourceBuilder`: `Yield` seeds `Doc.Empty` (empty prefixes and statements), and `ldContext`/`about`/`triple` each take and return that same `Doc` — no `Combine`, no `Delay`, here either.
+`rdf { }` itself stays exactly as simple as `ResourceBuilder`: `Yield` seeds `Doc.Empty` (empty prefixes and statements), and `prefix`/`about`/`triple` each take and return that same `Doc` — no `Combine`, no `Delay`, here either.
 
 ### Serialization
 
 `Doc.toGraph : Doc -> Graph` populates a `VDS.RDF.Graph`: registers declared prefixes on the namespace map, resolves each `Node.Iri` (absolute or CURIE) and mints one real blank node per distinct `Node.Blank` label via `graph.CreateBlankNode()`, then asserts one triple per statement. Flat fold, no recursion — nesting was the old model's problem, not this one's.
 
 `Doc.toJsonLd : Doc -> string` runs dotNetRDF's `JsonLdWriter` over that graph and returns **expanded form**: an array with one node-object per distinct subject, no `@context`, every predicate and type fully expanded to its absolute IRI. This is a real, visible change from today's hand-rolled compact output in `Discovery.fs`; it trades human readability for not repeating the compact-form failure pattern, and expanded form is valid input to any conformant JSON-LD processor regardless. Revisiting compaction is future work, not blocked on anything here, but not attempted now.
+
+### Merging documents
+
+`Doc.merge : Doc -> Doc -> Doc` combines two independently-built documents — concatenate `Prefixes`, concatenate `Statements`, nothing more:
+
+```fsharp
+module Doc =
+    let merge (a: Doc) (b: Doc) : Doc =
+        { Prefixes = a.Prefixes @ b.Prefixes
+          Statements = a.Statements @ b.Statements }
+```
+
+That it's this simple isn't an oversight — the two things that look like they'd need special-case handling are already covered elsewhere. A prefix declared with two different URIs across the two docs is caught by the existing conflict check in *Data model*, which runs at `toGraph` time over the merged `Prefixes` list regardless of provenance — merge needs no validation of its own. An identical statement asserted by both docs is harmless: `VDS.RDF.Graph.Assert` has set semantics, so a duplicate tuple in `Doc.Statements` collapses to one triple in the built graph, not two. The one thing that *does* need a real decision is blank node identity across documents built independently of each other, which is why `Node.blank` mints a GUID rather than a per-`Doc` counter (see *Data model*) — with that in place, two docs that each minted their own blank nodes can never collide when merged.
+
+`rdf { }` exposes this as `include`, taking an already-built `Doc` the same way `about` takes an already-built `Description`:
+
+```fsharp
+[<CustomOperation("include")>]
+member _.Include(doc: Doc, other: Doc) : Doc = Doc.merge doc other
+```
+
+```fsharp
+rdf {
+    prefix "schema" "https://schema.org/"
+    about (describe (Node.Iri gameUri) { typ "schema:Game"; property "schema:name" "Tic-tac-toe" })
+    include otherDoc   // e.g. facts about the same gameUri built by a different function
+}
+```
 
 ### Integration point
 
@@ -187,9 +217,10 @@ let gameLinkedData (gameUri: string) =
 ## Implementation order
 
 1. **`RdfTypes.fs`** — the model, plus unit tests for construction (no serialization yet).
-2. **`Rdf.fs`: `DescribeBuilder` + `RdfBuilder` + `Doc.toGraph`** — `DescribeBuilder` first in isolation (`typ`/`property` overloads accumulating into a `Description`), then `RdfBuilder`'s `ldContext`/`about`/`triple` operations threading `Doc` the same way `ResourceBuilder`'s operations thread `ResourceSpec`, then prefix resolution and blank node minting in `toGraph`. Unit-tested by inspecting the resulting `Graph`'s triples directly (subject/predicate/object), not through JSON-LD.
+2. **`Rdf.fs`: `DescribeBuilder` + `RdfBuilder` + `Doc.toGraph`** — `DescribeBuilder` first in isolation (`typ`/`property` overloads accumulating into a `Description`), then `RdfBuilder`'s `prefix`/`about`/`triple` operations threading `Doc` the same way `ResourceBuilder`'s operations thread `ResourceSpec`, then prefix resolution and blank node minting in `toGraph`. Unit-tested by inspecting the resulting `Graph`'s triples directly (subject/predicate/object), not through JSON-LD.
 3. **`Doc.toJsonLd`** — wire up `JsonLdWriter`, expanded-form output.
-4. **tic-tac-toe integration** — replace `gameJsonLd`.
+4. **`Doc.merge` + `include`** — trivial once `Node.blank` is GUID-based from step 1; covered by tests proving cross-document blank nodes don't collide.
+5. **tic-tac-toe integration** — replace `gameJsonLd`.
 
 Each stage independently verifiable, matching how `Frank.JsonHome` was staged.
 
@@ -197,9 +228,10 @@ Each stage independently verifiable, matching how `Frank.JsonHome` was staged.
 
 New project `test/Frank.Rdf.Tests`.
 
-- **Unit, no serialization**: `DescribeBuilder` in isolation — `typ`/`property` overload resolution (literal and `Node` forms), multi-valued properties, producing a plain `Description`. `RdfBuilder` separately — `ldContext` accumulation, `about` absorbing a `Description`, bare `triple`, two consecutive `about` calls, an empty `describe` block. No `Combine`/`Delay` cases to test, since neither builder has any — that's the point of matching `handler`/`get`'s shape instead of inventing composition machinery.
+- **Unit, no serialization**: `DescribeBuilder` in isolation — `typ`/`property` overload resolution (literal and `Node` forms), multi-valued properties, producing a plain `Description`. `RdfBuilder` separately — `prefix` accumulation, `about` absorbing a `Description`, bare `triple`, two consecutive `about` calls, an empty `describe` block. No `Combine`/`Delay` cases to test, since neither builder has any — that's the point of matching `handler`/`get`'s shape instead of inventing composition machinery.
 - **Graph-level**: `toGraph` output asserted by triple count/shape for a representative document (including the two-subject `QuantitativeValue` case), not by string comparison.
 - **Round-trip check** (the JSON-LD equivalent of JsonHome's golden-document test): serialize with `Doc.toJsonLd`, then parse the result back into a graph with dotNetRDF's own JSON-LD reader, and assert the two graphs are isomorphic. This is the strongest available check that the expanded output means what the input graph meant — stronger than diffing against a hand-written expected string, which is exactly the kind of brittleness that made the compact-form attempt fragile.
+- **Merge**: two independently-built `Doc`s (built by two separate `rdf { }` calls, each minting its own blank node) combined via `Doc.merge`/`include`, asserting the merged graph contains the union of both and that the two blank nodes remain distinct — the concrete proof that GUID-based `Node.blank` actually prevents the collision described in *Data model*. A second case merging two docs that legitimately share a prefix (same name, same URI) to confirm that's a no-op, not a spurious conflict.
 - **tic-tac-toe regression**: the existing schema.org fields (`@type`, `name`, `description`, `numberOfPlayers`, `sameAs` to Wikidata/DBpedia) are all present in the new expanded output, via the round-trip graph rather than a literal string comparison against the old compact form.
 
 ## Future work (separate)
