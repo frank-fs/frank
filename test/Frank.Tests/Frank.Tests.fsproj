@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="WebLinkTests.fs" />
     <Compile Include="HandlerBuilderTests.fs" />
     <Compile Include="ResourceBuilderMetadataTests.fs" />
     <Compile Include="MiddlewareOrderingTests.fs" />
