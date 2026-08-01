@@ -229,6 +229,28 @@ let private ok: RequestDelegate = RequestDelegate(fun ctx -> ctx.Response.WriteA
 [<Tests>]
 let resourceScopedLinkTests =
     testList "ResourceBuilder link operation" [
+        testTask "resource CE link keyword resolves for the general-provider arity and reaches the response" {
+            // Unlike WebHostBuilder.Run, ResourceBuilder.Run just builds a
+            // Resource value -- it doesn't block -- so this can go all the way
+            // to a real end-to-end HTTP assertion instead of only type-checking
+            // the CE syntax. The other resource-scoped tests below already cover
+            // the static-sugar arity (`link "/alt-a" "alternate"`); this covers
+            // the general-provider arity (`link (fun ctx -> ...)`) through real
+            // `resource { }` CE syntax.
+            let c =
+                resource "/c" {
+                    link (fun (_: HttpContext) -> Seq.singleton { Target = "/alt-c"; Rel = "alternate"; Params = [] })
+                    get ok
+                }
+            let client = createFullPipelineTestServer id [ c ]
+
+            let! (resp: HttpResponseMessage) = client.GetAsync("/c")
+            Expect.contains
+                (resp.Headers.GetValues "Link" |> List.ofSeq)
+                "</alt-c>; rel=\"alternate\""
+                "General-provider link registered via CE syntax appears on the resource's response"
+        }
+
         testTask "a resource-scoped link appears only on that resource's responses" {
             let a =
                 resource "/a" {
