@@ -442,4 +442,37 @@ let tests =
                   }
 
               let produces = HandlerDefinition.findAll<Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata> def
-              Expect.hasLength produces 2 "Different response types sharing a status code must stay separate -- documented remaining limitation" ]
+              Expect.hasLength produces 2 "Different response types sharing a status code must stay separate -- documented remaining limitation"
+
+          testCase "produces metadata with no colliding status/type survives negotiate by reference, not rebuilt"
+          <| fun () ->
+              // HandlerDefinition.Metadata is documented as an open extension point --
+              // some other IProducesResponseTypeMetadata implementation could carry data
+              // beyond StatusCode/Type/ContentTypes. When a representation's metadata has
+              // nothing to merge with (its (status, type) pair is unique among the
+              // representations), mergeProducesMetadata must pass the ORIGINAL object
+              // through unchanged rather than rebuilding it as a bare
+              // ProducesResponseTypeMetadata -- proven here via reference identity.
+              let handlerDef =
+                  handler {
+                      produces typeof<Product> 200
+                      handle (writeText "json")
+                  }
+
+              let original =
+                  HandlerDefinition.findAll<Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata> handlerDef
+                  |> List.exactlyOne
+
+              let def =
+                  negotiate {
+                      accepts "application/json" handlerDef
+                      accepts "text/html" (writeText "html")
+                  }
+
+              let merged =
+                  HandlerDefinition.findAll<Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata> def
+                  |> List.exactlyOne
+
+              Expect.isTrue
+                  (System.Object.ReferenceEquals(original, merged))
+                  "A non-colliding representation's metadata object should pass through negotiate unchanged, not be rebuilt" ]

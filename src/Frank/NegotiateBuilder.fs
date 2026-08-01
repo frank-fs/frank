@@ -139,6 +139,15 @@ module internal Negotiation =
     /// document (verified: this reproduces with a bare ASP.NET Core minimal API, zero Frank
     /// code involved -- it's inherent framework behavior, not something Frank broke).
     ///
+    /// A status/type group of exactly one is left untouched -- the original object is
+    /// passed through by reference, not rebuilt as a bare `ProducesResponseTypeMetadata`.
+    /// `HandlerDefinition.Metadata` is documented as an open extension point: some other
+    /// `IProducesResponseTypeMetadata` implementation (from an extension library, or
+    /// attached directly via `HandlerDefinition.addMetadata`) may carry data or interfaces
+    /// beyond `StatusCode`/`Type`/`ContentTypes`, and nothing needs merging when it's the
+    /// only entry for its status/type pair -- rebuilding it anyway would silently downgrade
+    /// it to the bare three-field shape for no reason.
+    ///
     /// Representations sharing a status code but declaring DIFFERENT response types are
     /// left as separate metadata objects -- Microsoft.AspNetCore.OpenApi's last-wins
     /// behavior still applies to that narrower case. A documented, accepted limitation, not
@@ -152,13 +161,16 @@ module internal Negotiation =
             |> List.map (fun m -> m :?> IProducesResponseTypeMetadata)
             |> List.groupBy (fun m -> m.StatusCode, m.Type)
             |> List.map (fun ((statusCode, responseType), group) ->
-                let contentTypes =
-                    group
-                    |> List.collect (fun m -> m.ContentTypes |> List.ofSeq)
-                    |> List.distinct
-                    |> Array.ofList
+                match group with
+                | [ single ] -> box single
+                | _ ->
+                    let contentTypes =
+                        group
+                        |> List.collect (fun m -> m.ContentTypes |> List.ofSeq)
+                        |> List.distinct
+                        |> Array.ofList
 
-                ProducesResponseTypeMetadata(statusCode, responseType, contentTypes) :> obj)
+                    ProducesResponseTypeMetadata(statusCode, responseType, contentTypes) :> obj)
 
         other @ merged
 
