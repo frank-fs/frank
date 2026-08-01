@@ -24,6 +24,12 @@ let getResponseBody (ctx: HttpContext) =
 let writeText (text: string) (ctx: HttpContext) : Task =
     task { do! ctx.Response.WriteAsync(text) }
 
+// CLIMutable: XmlSerializer (used by AddXmlSerializerFormatters) requires a public
+// parameterless constructor and settable properties, which an F# anonymous record
+// (used elsewhere in this file for JSON-only cases) doesn't have.
+[<CLIMutable>]
+type Widget = { Name: string }
+
 [<Tests>]
 let tests =
     testList
@@ -345,4 +351,43 @@ let tests =
               def.Handler.Invoke(ctx).Wait()
 
               Expect.isFalse jsonRan "application/json must not be selected for an Accept: application/ld+json request"
-              Expect.equal (getResponseBody ctx) "jsonld" "application/ld+json should have been selected, matching registration order this time too" ]
+              Expect.equal (getResponseBody ctx) "jsonld" "application/ld+json should have been selected, matching registration order this time too"
+
+          testCase "accepts [mediaTypes] handler registers one representation per media type"
+          <| fun () ->
+              let services = Microsoft.Extensions.DependencyInjection.ServiceCollection()
+              services.AddLogging() |> ignore
+              services.AddMvcCore().AddXmlSerializerFormatters() |> ignore
+              let provider = services.BuildServiceProvider()
+
+              let widgetHandler =
+                  fun (_: HttpContext) -> task { return { Name = "Widget" } }
+
+              // `negotiate { }` always runs Run at the end, producing a HandlerDefinition
+              // (Handler + Metadata only) -- Representations lives on the intermediate
+              // NegotiateSpec, which only exists before Run. Call the builder's own Accepts
+              // member directly to inspect that intermediate value.
+              let spec =
+                  NegotiateBuilder().Accepts(NegotiateSpec.Empty, [ "application/json"; "application/xml" ], widgetHandler)
+
+              Expect.hasLength spec.Representations 2 "Should expand to two representations"
+
+              let def =
+                  negotiate {
+                      accepts [ "application/json"; "application/xml" ] widgetHandler
+                  }
+
+              let jsonCtx = createMockContext ()
+              jsonCtx.RequestServices <- provider
+              setAccept jsonCtx "application/json"
+              def.Handler.Invoke(jsonCtx).Wait()
+              // The output formatter's own WriteAsync appends a charset to the Content-Type
+              // it sets, overriding the plain media type assigned beforehand (mirrors the
+              // "Task<'a>-returning accepts handler" test above) -- hence a prefix match.
+              Expect.stringStarts jsonCtx.Response.ContentType "application/json" "JSON entry should format as JSON"
+
+              let xmlCtx = createMockContext ()
+              xmlCtx.RequestServices <- provider
+              setAccept xmlCtx "application/xml"
+              def.Handler.Invoke(xmlCtx).Wait()
+              Expect.stringStarts xmlCtx.Response.ContentType "application/xml" "XML entry should format as XML, not the whole list" ]

@@ -178,6 +178,14 @@ type NegotiateBuilder() =
 
         { spec with Representations = spec.Representations @ [ mediaType, producer ] }
 
+    [<CustomOperation("accepts")>]
+    member this.Accepts(spec: NegotiateSpec, mediaTypes: string list, handler: HttpContext -> Task<'a>) =
+        mediaTypes |> List.fold (fun s mt -> this.Accepts(s, mt, handler)) spec
+
+    [<CustomOperation("accepts")>]
+    member this.Accepts(spec: NegotiateSpec, mediaTypes: string list, handler: HttpContext -> Async<'a>) =
+        mediaTypes |> List.fold (fun s mt -> this.Accepts(s, mt, handler)) spec
+
 [<AutoOpen>]
 module NegotiateFunctions =
     let negotiate = NegotiateBuilder()
