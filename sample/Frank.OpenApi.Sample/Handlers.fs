@@ -176,7 +176,8 @@ let getProductNegotiated =
         })
     }
 
-/// Wire-friendly shape for `getProductBridged`'s JSON/XML representations.
+/// Wire-friendly shape for `getProductBridged`'s JSON/XML representations -- both the
+/// found and not-found outcomes, in a single flat record.
 ///
 /// `Product` itself can't go through `viaOutputFormatter` as-is: `Category` is a plain
 /// discriminated union with no built-in System.Text.Json support (throws
@@ -184,36 +185,65 @@ let getProductNegotiated =
 /// `AddXmlSerializerFormatters()`'s `XmlSerializer`, which also can't introspect the DU
 /// or `Set<string>` fields (silently emits an empty element instead of throwing).
 /// `Domain.fs` is out of scope for this change, so this DTO -- flattening `Category` to
-/// its case name and `Tags` to a plain array -- exists solely to make the bridge
-/// representation genuinely round-trip through both formatters.
+/// its case name and `Tags` to a plain array -- exists to make the bridge representation
+/// genuinely round-trip through both formatters.
+///
+/// The found/not-found halves are folded into ONE type, not two, because
+/// `accepts [...] (handler: HttpContext -> Task<'a>)` requires exactly one 'a across both
+/// branches, and every alternative that tried to vary the *shape* per branch failed
+/// against `XmlSerializerOutputFormatter` specifically (`SystemTextJsonOutputFormatter`
+/// tolerated all of them):
+///   - `ProductWire option` -- `FSharpOption<T>`'s own shape confuses `XmlSerializer`
+///     (silently emits an empty element for `Some`/`None` alike, no error).
+///   - declaring the producer's result as plain `obj` (relying on ASP.NET Core's
+///     `ObjectType == typeof(object) -> body.GetType()` substitution, the mechanism
+///     `SystemTextJsonOutputFormatter` genuinely does use) -- verified empirically that
+///     `XmlSerializerOutputFormatter` does NOT do the same substitution: it builds
+///     `XmlSerializer(typeof<obj>)` from the *declared* type and throws "The type ...
+///     was not expected. Use the XmlInclude ... attribute" for any boxed value, found or
+///     not-found alike.
+///   - a `ProductWire | ErrorWire`-style discriminated union hits the same wall: its
+///     compiler-generated case subclasses need `XmlInclude`/known-type wiring
+///     `XmlSerializer` doesn't get here.
+/// A single always-the-same-shape record sidesteps all of that: `Found` distinguishes
+/// the two outcomes, and whichever half doesn't apply is left at its default.
 [<CLIMutable>]
 type ProductWire =
-    { Id: Guid
+    { Found: bool
+      Id: Guid
       Name: string
       Description: string
       Price: decimal
       Category: string
       Tags: string[]
-      InStock: bool }
+      InStock: bool
+      ErrorCode: string
+      ErrorMessage: string }
 
 module ProductWire =
     let ofProduct (p: Product) : ProductWire =
-        { Id = p.Id
+        { Found = true
+          Id = p.Id
           Name = p.Name
           Description = p.Description |> Option.toObj
           Price = p.Price
           Category = string p.Category
           Tags = p.Tags |> Set.toArray
-          InStock = p.InStock }
+          InStock = p.InStock
+          ErrorCode = null
+          ErrorMessage = null }
 
     let notFound (id: Guid) : ProductWire =
-        { Id = id
+        { Found = false
+          Id = id
           Name = null
           Description = null
           Price = 0m
           Category = null
           Tags = [||]
-          InStock = false }
+          InStock = false
+          ErrorCode = "NOT_FOUND"
+          ErrorMessage = $"Product with ID {id} not found" }
 
 /// Content negotiation with the IOutputFormatter bridge -- JSON and XML reuse MVC's
 /// formatter registry (requires AddMvcCore().AddXmlSerializerFormatters(), wired up in
