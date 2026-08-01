@@ -39,4 +39,7 @@ module WebLink =
     /// links the same way useAppWideLinks does. A request matching no
     /// endpoint contributes nothing. Splice this in after UseRouting runs
     /// and before Middleware runs, since it needs the matched endpoint.
+    /// This runs before authorization middleware, so a resource-scoped Link
+    /// entry may appear on responses to unauthorized requests for that
+    /// resource -- the same as the resource's other metadata.
     val useResourceScopedLinks: app: IApplicationBuilder -> IApplicationBuilder
