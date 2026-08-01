@@ -176,87 +176,80 @@ let getProductNegotiated =
         })
     }
 
-/// Wire-friendly shape for `getProductBridged`'s JSON/XML representations -- both the
-/// found and not-found outcomes, in a single flat record.
+/// Wire-friendly shape for `getProductBridged`'s found-product JSON/XML representation.
 ///
 /// `Product` itself can't go through `viaOutputFormatter` as-is: `Category` is a plain
-/// discriminated union with no built-in System.Text.Json support (throws
-/// System.NotSupportedException), and `Product` isn't `[<CLIMutable>]` -- required by
+/// discriminated union with no built-in `System.Text.Json` support (throws
+/// `System.NotSupportedException`), and `Product` isn't `[<CLIMutable>]` -- required by
 /// `AddXmlSerializerFormatters()`'s `XmlSerializer`, which also can't introspect the DU
-/// or `Set<string>` fields (silently emits an empty element instead of throwing).
-/// `Domain.fs` is out of scope for this change, so this DTO -- converting `Category` to
-/// its case name and `Tags` to a plain array -- exists to make the bridge representation
-/// genuinely round-trip through both formatters.
-///
-/// The found/not-found halves are folded into ONE type, not two, because
-/// `accepts [...] (handler: HttpContext -> Task<'a>)` requires exactly one 'a across both
-/// branches, and every alternative that tried to vary the *shape* per branch failed
-/// against `XmlSerializerOutputFormatter` specifically (`SystemTextJsonOutputFormatter`
-/// tolerated all of them):
-///   - `ProductWire option` -- `FSharpOption<T>`'s own shape confuses `XmlSerializer`
-///     (silently emits an empty element for `Some`/`None` alike, no error).
-///   - declaring the producer's result as plain `obj` (relying on ASP.NET Core's
-///     `ObjectType == typeof(object) -> body.GetType()` substitution, the mechanism
-///     `SystemTextJsonOutputFormatter` genuinely does use) -- verified empirically that
-///     `XmlSerializerOutputFormatter` does NOT do the same substitution: it builds
-///     `XmlSerializer(typeof<obj>)` from the *declared* type and throws "The type ...
-///     was not expected. Use the XmlInclude ... attribute" for any boxed value, found or
-///     not-found alike.
-///   - a `ProductWire | ErrorWire`-style discriminated union hits the same wall: its
-///     compiler-generated case subclasses need `XmlInclude`/known-type wiring
-///     `XmlSerializer` doesn't get here.
-/// A single always-the-same-shape record sidesteps all of that: `Found` distinguishes
-/// the two outcomes, and whichever half doesn't apply is left at its default.
+/// or `Set<string>` fields on its own. `XmlSerializer` has no built-in support for F#
+/// discriminated unions, `option`, or `Set<'T>` -- a real .NET interop limitation, not
+/// something Frank's content negotiation caused, and not something worth papering over
+/// here. `Domain.fs` is out of scope for this change, so this DTO -- `Category` as its
+/// case name, `Tags` as a plain array -- exists purely to give the *found* case a shape
+/// both formatters can actually handle. It stays an honest, single-purpose DTO for a
+/// product; the not-found case below deliberately does NOT go through it (or through
+/// `viaOutputFormatter` at all) -- see `getProductBridged`.
 [<CLIMutable>]
 type ProductWire =
-    { Found: bool
-      Id: Guid
+    { Id: Guid
       Name: string
       Description: string
       Price: decimal
       Category: string
       Tags: string[]
-      InStock: bool
-      ErrorCode: string
-      ErrorMessage: string }
+      InStock: bool }
 
 module ProductWire =
     let ofProduct (p: Product) : ProductWire =
-        { Found = true
-          Id = p.Id
+        { Id = p.Id
           Name = p.Name
           Description = p.Description |> Option.toObj
           Price = p.Price
           Category = string p.Category
           Tags = p.Tags |> Set.toArray
-          InStock = p.InStock
-          ErrorCode = null
-          ErrorMessage = null }
+          InStock = p.InStock }
 
-    let notFound (id: Guid) : ProductWire =
-        { Found = false
-          Id = id
-          Name = null
-          Description = null
-          Price = 0m
-          Category = null
-          Tags = [||]
-          InStock = false
-          ErrorCode = "NOT_FOUND"
-          ErrorMessage = $"Product with ID {id} not found" }
-
-/// Content negotiation with the IOutputFormatter bridge -- JSON and XML reuse MVC's
+/// Content negotiation with the IOutputFormatter bridge -- JSON and XML each reuse MVC's
 /// formatter registry (requires AddMvcCore().AddXmlSerializerFormatters(), wired up in
-/// Program.fs), while an independent producer still handles HTML.
+/// Program.fs) for the found case, calling `ContentNegotiation.viaOutputFormatter`
+/// directly on a plain `ProductWire`. JSON and XML are two separate `accepts` entries
+/// here, not one shared `accepts [ "application/json"; "application/xml" ]` handler --
+/// Task 4's batch-registration sugar is for one handler that genuinely applies to
+/// multiple types, and here it doesn't: the not-found case needs a body PER content
+/// type, written directly rather than forced through `viaOutputFormatter` (which would
+/// mean padding `ProductWire` with error-only fields nobody wants on the success path,
+/// just to give both content types one shared serializable shape). Writing the 404 body
+/// directly instead matches how every other 404 in this file already works (`getProduct`,
+/// `getProductNegotiated`, `updateProduct`, `deleteProduct` all write JSON directly for
+/// their error case, not via `IOutputFormatter`), and how the `text/html` representation
+/// below already hand-writes its own markup -- so this is actually more consistent with
+/// the rest of the file, not less.
 let getProductBridged =
     negotiate {
-        accepts [ "application/json"; "application/xml" ] (fun (ctx: HttpContext) -> task {
+        accepts "application/json" (fun (ctx: HttpContext) -> task {
             let id = ctx.Request.RouteValues.["id"] |> string |> Guid.Parse
             match ProductStore.getById id with
-            | Some product -> return ProductWire.ofProduct product
+            | Some product ->
+                do! Frank.ContentNegotiation.viaOutputFormatter "application/json" (ProductWire.ofProduct product) ctx
             | None ->
                 ctx.Response.StatusCode <- 404
-                return ProductWire.notFound id
+                do! ctx.Response.WriteAsJsonAsync({
+                    Code = "NOT_FOUND"
+                    Message = $"Product with ID {id} not found"
+                    Details = None
+                })
+        })
+        accepts "application/xml" (fun (ctx: HttpContext) -> task {
+            let id = ctx.Request.RouteValues.["id"] |> string |> Guid.Parse
+            match ProductStore.getById id with
+            | Some product ->
+                do! Frank.ContentNegotiation.viaOutputFormatter "application/xml" (ProductWire.ofProduct product) ctx
+            | None ->
+                ctx.Response.StatusCode <- 404
+                ctx.Response.ContentType <- "application/xml"
+                do! ctx.Response.WriteAsync(
+                    $"""<?xml version="1.0" encoding="utf-8"?><Error><Code>NOT_FOUND</Code><Message>Product with ID {id} not found</Message></Error>""")
         })
         accepts "text/html" (fun (ctx: HttpContext) -> task {
             let id = ctx.Request.RouteValues.["id"] |> string |> Guid.Parse
