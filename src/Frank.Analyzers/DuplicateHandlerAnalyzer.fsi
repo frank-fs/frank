@@ -36,7 +36,8 @@ val analyzeFile: parseTree: ParsedInput -> Message list
 val name: string = "DuplicateHandlerAnalyzer"
 
 [<Literal>]
-val shortDescription: string = "Detects duplicate HTTP method handlers in Frank resource definitions"
+val shortDescription: string =
+    "Detects duplicate HTTP method handlers in Frank resource definitions (FRANK001) and duplicate 'accepts' media types in negotiate blocks (FRANK002)"
 
 [<Literal>]
 val helpUri: string = "https://github.com/frank-fs/frank/issues/59"

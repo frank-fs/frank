@@ -294,7 +294,7 @@ let name = "DuplicateHandlerAnalyzer"
 
 [<Literal>]
 let shortDescription =
-    "Detects duplicate HTTP method handlers in Frank resource definitions"
+    "Detects duplicate HTTP method handlers in Frank resource definitions (FRANK001) and duplicate 'accepts' media types in negotiate blocks (FRANK002)"
 
 [<Literal>]
 let helpUri = "https://github.com/frank-fs/frank/issues/59"

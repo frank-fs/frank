@@ -108,7 +108,7 @@ echo "========================================="
 if [[ $FAILED -gt 0 ]]; then
     echo ""
     echo "Analyzer output for debugging:"
-    echo "$ANALYZER_OUTPUT" | grep -E "(FRANK001|Running analyzers)" || true
+    echo "$ANALYZER_OUTPUT" | grep -E "(FRANK00[12]|Running analyzers)" || true
     exit 1
 fi
 
