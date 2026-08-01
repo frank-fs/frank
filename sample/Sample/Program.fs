@@ -1,6 +1,7 @@
 ﻿module Sample.Program
 
 open System.IO
+open System.Runtime.Serialization
 open System.Text
 open System.Text.Json
 open Microsoft.AspNetCore.Builder
@@ -13,13 +14,33 @@ open Frank
 open Frank.Builder
 open Sample.Extensions
 
-// Deliberately a plain record, no [<CLIMutable>]: empirically, `DataContractSerializer`
-// serializes this without it (no 500, no empty element -- unlike `XmlSerializer`,
-// which needs a public parameterless constructor `DataContractSerializer` doesn't
-// require). The XML element name it emits is mangled (`Message_x0040_`, from the
-// record's compiled backing field) either with or without `[<CLIMutable>]`, so
-// `CLIMutable` buys nothing here and is intentionally omitted.
-type Greeting = { Message: string }
+// Without any DataContract attributes, `DataContractSerializer` still serializes this
+// record fine (no 500, no empty element -- unlike `XmlSerializer`, it doesn't need a
+// public parameterless constructor), but the XML element name comes out mangled as
+// `Message_x0040_` -- the record's compiled backing-field name -- instead of `Message`.
+// `[<CLIMutable>]` alone does NOT fix this (verified empirically: identical mangled
+// output with or without it), since it only adds a public parameterless constructor
+// and property setters, it doesn't change what name `DataContractSerializer` picks.
+//
+// The actual fix is `[<DataContract>]` on the type plus a field-targeted `DataMember`:
+//
+//   [<field: DataMember(Name = "Message")>]
+//
+// The `field:` target matters. Putting `[<DataMember(Name = "Message")>]` directly on
+// the record field with no target attaches it to the compiler-generated property
+// *getter*, which for an immutable F# record has no setter --
+// `DataContractSerializer` throws `InvalidDataContractException: No set method for
+// property 'Message'` at serialize time (worse than the mangled-name bug this
+// replaces). Targeting the backing field instead sidesteps the missing setter
+// entirely, so this works without `[<CLIMutable>]`. (An untargeted `DataMember` does
+// work if the type also has `[<CLIMutable>]`, since that adds the missing setter --
+// either combination is valid; this one keeps the type immutable.)
+//
+// Also note: `[<DataContract>]` with no `[<DataMember>]` anywhere is a different trap
+// -- it switches `DataContractSerializer` to opt-in mode, and since nothing would be
+// opted in, it silently produces an empty `<Greeting/>`.
+[<DataContract>]
+type Greeting = { [<field: DataMember(Name = "Message")>] Message: string }
 
 // System.Text.Json.JsonSerializer.Deserialize is case-sensitive by default, and F#
 // record property names are PascalCase (`Message`) while this demo's example
