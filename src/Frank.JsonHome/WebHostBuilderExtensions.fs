@@ -1,6 +1,5 @@
 namespace Frank.JsonHome
 
-open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.DependencyInjection
 open Frank.Builder
