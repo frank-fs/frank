@@ -13,6 +13,24 @@ open Frank
 open Frank.Builder
 open Sample.Extensions
 
+// Deliberately a plain record, no [<CLIMutable>]: empirically, `DataContractSerializer`
+// serializes this without it (no 500, no empty element -- unlike `XmlSerializer`,
+// which needs a public parameterless constructor `DataContractSerializer` doesn't
+// require). The XML element name it emits is mangled (`Message_x0040_`, from the
+// record's compiled backing field) either with or without `[<CLIMutable>]`, so
+// `CLIMutable` buys nothing here and is intentionally omitted.
+type Greeting = { Message: string }
+
+// System.Text.Json.JsonSerializer.Deserialize is case-sensitive by default, and F#
+// record property names are PascalCase (`Message`) while this demo's example
+// requests use lowercase JSON keys (`"message"`, matching the camelCase convention
+// ASP.NET Core's own JSON output uses). Without this, deserializing
+// `{"message": "..."}` into `Greeting` silently leaves `Message` as `null` --
+// no exception, just a swallowed field -- which is easy to miss since it's not
+// a crash. This is unrelated to `JsonFSharpConverter` (registered separately, only
+// on `Mvc.JsonOptions` for the *output* formatter, not this manual *input* parse).
+let private caseInsensitiveJsonOptions = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
+
 let home =
     resource "/" {
         name "Home"
@@ -66,27 +84,17 @@ let hello =
                     ctx.Request.Body.Seek(0L, System.IO.SeekOrigin.Begin) |> ignore
                     use reader = new System.IO.StreamReader(ctx.Request.Body)
                     let! input = reader.ReadToEndAsync()
-                    let json = JsonSerializer.Deserialize input
-                    // NOT migrated to `negotiate { }` -- attempted and reverted. Giving `json`
-                    // an explicit `JsonElement` type argument (required for `accepts`' generic
-                    // inference; the original bare `Deserialize input` infers `obj`) and routing
-                    // both representations through `negotiate { accepts [...] }` works for
-                    // "application/json", but "application/xml" via
-                    // `AddXmlDataContractSerializerFormatters()` writes an empty `<JsonElement />`
-                    // element -- no actual data -- because `JsonElement`'s public shape doesn't
-                    // expose its underlying data as DataContract-visible members. That's a
-                    // genuine, empirically-verified `DataContractSerializer`/`JsonElement`
-                    // limitation, not a Frank bug. (For context: the untouched code below,
-                    // calling `ContentNegotiation.negotiate` with `json` inferred as `obj`, is
-                    // WORSE for this same Accept header -- it throws a 500, since
-                    // `DataContractSerializer` requires the declared type to match the runtime
-                    // type for polymorphic values, and `obj` isn't a known type for
-                    // `JsonElement`. So `application/xml` was already broken here before this
-                    // task; not fixed now, since a correct fix needs a hand-authored wire DTO,
-                    // which is exactly the "contorted fit to force migration" this task says not
-                    // to do for this branch. `application/json` -- the case that actually
-                    // matters for this echo demo -- works correctly either way.)
-                    do! ContentNegotiation.negotiate 201 json ctx
+                    let greeting = JsonSerializer.Deserialize<Greeting>(input, caseInsensitiveJsonOptions)
+
+                    let negotiated =
+                        negotiate {
+                            accepts [ "application/json"; "application/xml" ] (fun (ctx: HttpContext) -> task {
+                                ctx.Response.StatusCode <- 201
+                                return greeting
+                            })
+                        }
+
+                    do! negotiated.Handler.Invoke(ctx)
                 else
                     ctx.Response.StatusCode <- 500
                     do! ctx.Response.WriteAsync("Could not seek")
