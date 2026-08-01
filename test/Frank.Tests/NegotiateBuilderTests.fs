@@ -30,6 +30,8 @@ let writeText (text: string) (ctx: HttpContext) : Task =
 [<CLIMutable>]
 type Widget = { Name: string }
 
+type Product = { Name: string; Price: decimal }
+
 [<Tests>]
 let tests =
     testList
@@ -390,4 +392,54 @@ let tests =
               xmlCtx.RequestServices <- provider
               setAccept xmlCtx "application/xml"
               def.Handler.Invoke(xmlCtx).Wait()
-              Expect.stringStarts xmlCtx.Response.ContentType "application/xml" "XML entry should format as XML, not the whole list" ]
+              Expect.stringStarts xmlCtx.Response.ContentType "application/xml" "XML entry should format as XML, not the whole list"
+
+          testCase "produces metadata from a single representation is unaffected by the merge"
+          <| fun () ->
+              let def =
+                  negotiate {
+                      accepts "application/json" (handler {
+                          produces typeof<Product> 200
+                          handle (writeText "json")
+                      })
+                      accepts "text/html" (writeText "html")
+                  }
+
+              let produces = HandlerDefinition.findAll<Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata> def
+              Expect.hasLength produces 1 "One representation's metadata should pass through unmerged"
+              Expect.sequenceEqual produces.[0].ContentTypes [ "application/json" ] "Content types unchanged for a single representation"
+
+          testCase "produces metadata from two representations sharing status code and type is merged into one"
+          <| fun () ->
+              let def =
+                  negotiate {
+                      accepts "text/html" (handler {
+                          produces typeof<Product> 200 [ "text/html" ]
+                          handle (writeText "html")
+                      })
+                      accepts "application/json" (handler {
+                          produces typeof<Product> 200 [ "application/json" ]
+                          handle (writeText "json")
+                      })
+                  }
+
+              let produces = HandlerDefinition.findAll<Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata> def
+              Expect.hasLength produces 1 "Same status code + same type should merge into one metadata object"
+              Expect.containsAll produces.[0].ContentTypes [ "text/html"; "application/json" ] "Merged entry should carry both content types"
+
+          testCase "produces metadata from two representations sharing status code but different types is NOT merged"
+          <| fun () ->
+              let def =
+                  negotiate {
+                      accepts "application/json" (handler {
+                          produces typeof<Product> 200
+                          handle (writeText "json")
+                      })
+                      accepts "application/xml" (handler {
+                          produces typeof<string> 200 [ "application/xml" ]
+                          handle (writeText "xml")
+                      })
+                  }
+
+              let produces = HandlerDefinition.findAll<Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata> def
+              Expect.hasLength produces 2 "Different response types sharing a status code must stay separate -- documented remaining limitation" ]

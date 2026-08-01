@@ -2,6 +2,7 @@ namespace Frank.Builder
 
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Http.Metadata
 open Microsoft.Net.Http.Headers
 
 type NegotiateSpec =
@@ -125,6 +126,42 @@ module internal Negotiation =
                 ctx.Response.StatusCode <- StatusCodes.Status406NotAcceptable
                 Task.CompletedTask)
 
+    /// Merges `IProducesResponseTypeMetadata` entries that share both the same status code
+    /// and the same response `Type` into one, unioning their content types -- the exact
+    /// shape (one metadata object, several content types) that already reaches the
+    /// generated OpenAPI document correctly (see `OpenApiDocumentTests.fs`'s "HandlerDefinition
+    /// with custom content types for content negotiation" test). Without this, two
+    /// `handler { produces ... }` representations sharing a status code (the common
+    /// `negotiate { }` case: the same response type serialized as e.g. both
+    /// `application/json` and `application/xml`) would emit two SEPARATE metadata objects
+    /// for that status code -- and Microsoft.AspNetCore.OpenApi's own document generator
+    /// keeps only the last-registered one, silently dropping the other from the generated
+    /// document (verified: this reproduces with a bare ASP.NET Core minimal API, zero Frank
+    /// code involved -- it's inherent framework behavior, not something Frank broke).
+    ///
+    /// Representations sharing a status code but declaring DIFFERENT response types are
+    /// left as separate metadata objects -- Microsoft.AspNetCore.OpenApi's last-wins
+    /// behavior still applies to that narrower case. A documented, accepted limitation, not
+    /// fixed here.
+    let mergeProducesMetadata (metadata: obj list) : obj list =
+        let produces, other =
+            metadata |> List.partition (fun m -> m :? IProducesResponseTypeMetadata)
+
+        let merged =
+            produces
+            |> List.map (fun m -> m :?> IProducesResponseTypeMetadata)
+            |> List.groupBy (fun m -> m.StatusCode, m.Type)
+            |> List.map (fun ((statusCode, responseType), group) ->
+                let contentTypes =
+                    group
+                    |> List.collect (fun m -> m.ContentTypes |> List.ofSeq)
+                    |> List.distinct
+                    |> Array.ofList
+
+                ProducesResponseTypeMetadata(statusCode, responseType, contentTypes) :> obj)
+
+        other @ merged
+
 [<Sealed>]
 type NegotiateBuilder() =
 
@@ -135,7 +172,7 @@ type NegotiateBuilder() =
             failwith "At least one representation must be registered using the 'accepts' operation"
 
         { Handler = Negotiation.dispatch spec.Representations
-          Metadata = spec.Metadata }
+          Metadata = Negotiation.mergeProducesMetadata spec.Metadata }
 
     [<CustomOperation("accepts")>]
     member _.Accepts(spec: NegotiateSpec, mediaType: string, handler: RequestDelegate) =
