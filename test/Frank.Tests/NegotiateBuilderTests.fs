@@ -237,4 +237,17 @@ let tests =
               def.Handler.Invoke(ctx).Wait()
 
               Expect.equal ctx.Response.StatusCode 406 "The */*;q=0.5 entry doesn't name text/html, and the text/html;q=0 entry explicitly excludes it"
-              Expect.equal (getResponseBody ctx) "" "No body should be written" ]
+              Expect.equal (getResponseBody ctx) "" "No body should be written"
+
+          testCase "Accept: */*;q=0, text/html;q=0.8 selects text/html -- the more specific positive entry overrides the broader rejection"
+          <| fun () ->
+              let ctx = createMockContext ()
+              setAccept ctx "*/*;q=0, text/html;q=0.8"
+
+              let def =
+                  negotiate { accepts "text/html" (writeText "html") }
+
+              def.Handler.Invoke(ctx).Wait()
+
+              Expect.equal ctx.Response.StatusCode 200 "The more specific text/html;q=0.8 entry governs, not the broader */*;q=0"
+              Expect.equal (getResponseBody ctx) "html" "text/html should have been selected and served" ]

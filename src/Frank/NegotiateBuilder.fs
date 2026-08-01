@@ -29,21 +29,42 @@ module internal Negotiation =
         let registeredValue = MediaTypeHeaderValue.Parse(registered)
         candidate.MatchesMediaType(registeredValue.MediaType) || registeredValue.MatchesMediaType(candidate.MediaType)
 
-    /// RFC 9110 §12.5.1: a quality value of exactly 0 means the client explicitly
-    /// does NOT want this media type -- it must never be selected, unlike a merely
-    /// low (but nonzero) quality value which is just deprioritized.
-    let isExplicitlyRejected (entry: MediaTypeHeaderValue) : bool =
-        entry.Quality.HasValue && entry.Quality.Value = 0.0
+    /// Specificity rank of an Accept entry, most specific first: an entry with
+    /// neither type nor subtype wildcarded (e.g. "text/html") outranks one with only
+    /// the subtype wildcarded ("text/*"), which outranks "*/*". This -- not quality
+    /// -- is what RFC 9110 §12.5.1 says determines which entry governs a given
+    /// representation when more than one entry matches it.
+    let specificity (entry: MediaTypeHeaderValue) : int =
+        (if entry.MatchesAllTypes then 0 else 1) + (if entry.MatchesAllSubTypes then 0 else 1)
+
+    /// The effective quality of `mt` under this Accept header: the Quality (defaulting
+    /// to 1.0 when unspecified) of the MOST SPECIFIC parsed entry that matches `mt`,
+    /// per RFC 9110 §12.5.1 -- not simply the best quality among all matching entries.
+    /// This is what lets a narrow "text/html;q=0.8" override a broader "*/*;q=0" (the
+    /// narrow entry wins and the representation is served), and equally lets a narrow
+    /// "text/html;q=0" override a broader "*/*;q=0.5" (the narrow entry wins and the
+    /// representation is rejected) -- both directions of precedence fall out of the
+    /// same rule. None means no parsed entry matches `mt` at all.
+    let effectiveQuality (parsed: MediaTypeHeaderValue list) (mt: string) : float option =
+        parsed
+        |> List.filter (fun entry -> matches entry mt)
+        |> List.fold
+            (fun best entry ->
+                match best with
+                | Some(bestEntry: MediaTypeHeaderValue) when specificity bestEntry >= specificity entry -> best
+                | _ -> Some entry)
+            None
+        |> Option.map (fun entry -> if entry.Quality.HasValue then entry.Quality.Value else 1.0)
 
     /// Selects the index of the representation that should serve this request, given
     /// the raw Accept header values and the registered media types, in registration
     /// order. An absent, empty, or entirely unparseable Accept is treated as an
     /// implicit "*/*" -- there is no separate "default representation" concept, it
-    /// falls out of ordinary wildcard matching. Returns None when nothing registered
-    /// matches any (non-rejected) entry, or when the Accept header named entries but
-    /// every one of them was excluded by an explicit q=0 -- that case must NOT fall
-    /// back to the "*/*" default, since the client did express a preference, it just
-    /// rejected everything on offer.
+    /// falls out of ordinary wildcard matching. Once the Accept header does parse,
+    /// each representation's effective quality (see `effectiveQuality`) is compared;
+    /// the highest wins, ties broken by registration order; a representation whose
+    /// effective quality is 0, or that no entry matches at all, is never a candidate.
+    /// Returns None when no representation has a positive effective quality.
     let selectRepresentation (acceptValues: string seq) (mediaTypes: string list) : int option =
         if List.isEmpty mediaTypes then
             None
@@ -63,31 +84,22 @@ module internal Negotiation =
                 let defaultEntry = MediaTypeHeaderValue.Parse("*/*")
                 mediaTypes |> List.tryFindIndex (matches defaultEntry)
             else
-                let indexedMediaTypes = mediaTypes |> List.indexed
+                let candidates =
+                    mediaTypes
+                    |> List.indexed
+                    |> List.choose (fun (idx, mt) ->
+                        effectiveQuality parsed mt
+                        |> Option.filter (fun q -> q > 0.0)
+                        |> Option.map (fun q -> idx, q))
 
-                // A representation matched by an explicit q=0 entry is excluded outright,
-                // even if a broader entry (e.g. "*/*;q=0.5") also matches it with positive
-                // quality -- an explicit rejection takes precedence over a less specific
-                // positive match, it is not merely outranked by it.
-                let rejectedIndices =
-                    parsed
-                    |> List.filter isExplicitlyRejected
-                    |> List.collect (fun entry ->
-                        indexedMediaTypes
-                        |> List.filter (fun (_, mt) -> matches entry mt)
-                        |> List.map fst)
-                    |> Set.ofList
-
-                let acceptedEntries =
-                    parsed
-                    |> List.filter (isExplicitlyRejected >> not)
-                    |> List.sortWith (fun a b -> MediaTypeHeaderValueComparer.QualityComparer.Compare(b, a))
-
-                acceptedEntries
-                |> List.tryPick (fun entry ->
-                    indexedMediaTypes
-                    |> List.tryFind (fun (idx, mt) -> not (Set.contains idx rejectedIndices) && matches entry mt)
-                    |> Option.map fst)
+                match candidates with
+                | [] -> None
+                | first :: rest ->
+                    // Highest effective quality wins; a strict ">" comparison keeps the
+                    // earliest (lowest-index, i.e. first-registered) candidate on a tie.
+                    rest |> List.fold (fun (bestIdx, bestQ) (idx, q) -> if q > bestQ then idx, q else bestIdx, bestQ) first
+                    |> fst
+                    |> Some
 
     let dispatch (representations: (string * RequestDelegate) list) : RequestDelegate =
         RequestDelegate(fun ctx ->
