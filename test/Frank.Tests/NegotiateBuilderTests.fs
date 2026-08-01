@@ -305,12 +305,37 @@ let tests =
               ctx.RequestServices <- services.BuildServiceProvider()
               let mutable jsonRan = false
 
-              // Registration order matters here: Microsoft.Net.Http.Headers' MatchesMediaType
-              // treats a "+json" structured-syntax suffix as matching the plain "json"
-              // subtype (RFC 6839), so "application/json" and "application/ld+json" both
-              // match an Accept: application/ld+json with equal effective quality -- ties are
-              // broken by registration order (documented elsewhere in this file), so the
-              // independent-producer entry must be registered first for it to win here.
+              let def =
+                  negotiate {
+                      accepts "application/json" (fun (_: HttpContext) -> jsonRan <- true; task { return {| Name = "Widget" |} })
+                      accepts "application/ld+json" (writeText "jsonld")
+                  }
+
+              def.Handler.Invoke(ctx).Wait()
+
+              Expect.isFalse jsonRan "The value-returning representation should not run when a different one is selected"
+              Expect.equal (getResponseBody ctx) "jsonld" "The independent producer should have run instead"
+
+          testCase "Accept: application/ld+json never matches a concrete application/json registration, regardless of registration order"
+          <| fun () ->
+              // Regression test for a real defect in Negotiation.matches: the reverse-direction
+              // MatchesMediaType clause (needed so a wildcard-*registered* representation like
+              // `accepts "*/*"` can match a concrete Accept entry) was previously applied
+              // unconditionally, which let a concrete registered "application/json" be treated
+              // as if it were itself a wildcard pattern -- via the BCL's own leniency, an Accept
+              // of "application/ld+json" would tie-match a registered "application/json", and
+              // whichever was registered first won. That's exactly backwards: a client asking
+              // for JSON-LD should never silently receive plain JSON. This test registers
+              // "application/ld+json" FIRST -- the opposite order from the test above -- to
+              // prove the fix is order-independent, not merely "reverted to the lucky order".
+              let ctx = createMockContext ()
+              setAccept ctx "application/ld+json"
+              let services = Microsoft.Extensions.DependencyInjection.ServiceCollection()
+              services.AddLogging() |> ignore
+              services.AddMvcCore() |> ignore
+              ctx.RequestServices <- services.BuildServiceProvider()
+              let mutable jsonRan = false
+
               let def =
                   negotiate {
                       accepts "application/ld+json" (writeText "jsonld")
@@ -319,5 +344,5 @@ let tests =
 
               def.Handler.Invoke(ctx).Wait()
 
-              Expect.isFalse jsonRan "The value-returning representation should not run when a different one is selected"
-              Expect.equal (getResponseBody ctx) "jsonld" "The independent producer should have run instead" ]
+              Expect.isFalse jsonRan "application/json must not be selected for an Accept: application/ld+json request"
+              Expect.equal (getResponseBody ctx) "jsonld" "application/ld+json should have been selected, matching registration order this time too" ]

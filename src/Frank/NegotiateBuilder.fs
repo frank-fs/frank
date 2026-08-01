@@ -14,20 +14,28 @@ type NegotiateSpec =
 
 module internal Negotiation =
 
-    let isWildcard (mediaType: string) =
-        mediaType = "*/*" || mediaType.EndsWith("/*")
+    let isWildcard (mediaType: string) = mediaType.Contains "*"
 
     /// True if `candidate` (one entry from the client's Accept header) and
-    /// `registered` (one representation's declared media type) match, honoring a
-    /// wildcard on either side -- a wildcard client entry matching a concrete
-    /// representation is the common case; a wildcard *registered* representation
-    /// matching a concrete client entry is what makes a catch-all `accepts "*/*"`
-    /// work. MatchesMediaType only interprets wildcards on the receiver, not its
-    /// StringSegment argument, so checking both directions is what makes the match
-    /// symmetric.
+    /// `registered` (one representation's declared media type) match. The first
+    /// clause handles a wildcard (or structured-suffix-lenient) *client* entry
+    /// matching a concrete representation -- the common case. The second clause
+    /// exists only so a wildcard-*registered* representation (e.g. a catch-all
+    /// `accepts "*/*"`) can match a concrete client entry; it is gated on
+    /// `registered` actually being a wildcard pattern. Without that gate, a
+    /// concrete registered type would be treated as if it were itself a pattern
+    /// via MatchesMediaType's own leniency (e.g. it would let a concrete
+    /// "application/json" registration match an Accept of "application/ld+json",
+    /// even though "application/json" was never meant to act as a catch-all) --
+    /// that was a real defect this gate fixes; MatchesMediaType's leniency in the
+    /// *other* direction (a client Accept of "application/json" matching a
+    /// registered "application/ld+json") is intentional BCL behavior for RFC 6839
+    /// structured-syntax suffixes and is left alone.
     let matches (candidate: MediaTypeHeaderValue) (registered: string) : bool =
         let registeredValue = MediaTypeHeaderValue.Parse(registered)
-        candidate.MatchesMediaType(registeredValue.MediaType) || registeredValue.MatchesMediaType(candidate.MediaType)
+
+        candidate.MatchesMediaType(registeredValue.MediaType)
+        || (isWildcard registered && registeredValue.MatchesMediaType(candidate.MediaType))
 
     /// Specificity rank of an Accept entry, most specific first: an entry with
     /// neither type nor subtype wildcarded (e.g. "text/html") outranks one with only
