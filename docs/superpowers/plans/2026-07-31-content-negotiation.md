@@ -36,6 +36,9 @@
 | `test/Frank.Analyzers.Tests/fixtures/*.fs` | New | Fixtures for the new analyzer check |
 | `test/Frank.Analyzers.Tests/Frank.Analyzers.Tests.fsproj` | Modified | Add new fixture compile entries |
 | `test/Frank.Analyzers.Tests/run-analyzer-tests.sh` | Modified | Add `check_test` calls for the new fixtures |
+| `src/Frank/NegotiateBuilder.fsi` / `.fs` | Modified (Task 8) | `Run` merges same-`(StatusCode, Type)` `IProducesResponseTypeMetadata` entries into one before building the final `HandlerDefinition` |
+
+**Task 8 addendum (added after Task 5 ran):** Task 5's own verification found that its central claim doesn't hold for the common case — see the addendum after Task 7 below for the full story and the fix.
 
 ---
 
@@ -1524,6 +1527,181 @@ Part of #482."
 
 ---
 
+## Task 8: Merge same-status-code metadata so it survives OpenAPI generation
+
+**Added after Task 5 ran.** Task 5 was written as a verification-only task — confirm that a `negotiate { }` representation's `handler{}`-declared metadata reaches the generated OpenAPI document via the existing pipeline, with zero `Frank.OpenApi` changes. It did its job: it found that claim is **false** for the common case where two representations share a status code (e.g. both `200`).
+
+Root cause, isolated by Task 5's implementer with a bare ASP.NET Core minimal-API sanity test (zero Frank code involved — `.Produces<T>(200, "text/html").Produces<T>(200, "application/json")` on a plain `MapGet`, generated document keeps only `application/json`): `Microsoft.AspNetCore.OpenApi`'s document generator does **last-registered-wins**, not merge, when it sees multiple *separate* `IProducesResponseTypeMetadata` objects targeting the same status code. Frank's own pipeline (`NegotiateBuilder`'s metadata merge from Tasks 1–4, `HandlerDefinition`, `ResourceBuilder`) was verified correct all the way to `Endpoint.Metadata` — both representations' metadata genuinely arrive there. The loss happens strictly inside `Microsoft.AspNetCore.OpenApi`'s own generation step, which Task 5 was correctly scoped not to touch.
+
+There is already a *proven-working* shape for this: the existing `OpenApiDocumentTests.fs` test "HandlerDefinition with custom content types for content negotiation" uses **one** `produces typeof<Product> 200 [ "application/xml"; "application/json" ]` call — one metadata object, multiple content types in its `ContentTypes` array — and that merges into the document correctly. The fix is to make `negotiate { }` itself never hand `Microsoft.AspNetCore.OpenApi` two separate metadata objects for the same `(status code, response type)` in the first place — merge them into that already-working one-object-many-content-types shape before they ever leave `NegotiateBuilder`. This keeps the fix inside `Frank` core, touches **no** `Frank.OpenApi` file, and doesn't need custom OpenAPI schema synthesis.
+
+**Scope note:** this fixes the case where multiple representations share a status code **and** a response type (e.g. `Product` returned as both `application/json` and `application/xml` — the common shape when several `accepts` entries wrap the same underlying object). It does **not** fix the narrower case of representations sharing a status code with **different** response types (e.g. JSON returns `Product`, a `handler{}`-wrapped alternate representation returns some other type) — `Microsoft.AspNetCore.OpenApi`'s last-wins behavior still applies there. That's a documented, accepted remaining limitation, not something this task chases (see *Future work* in the design doc addendum below).
+
+**Files:**
+- Modify: `src/Frank/NegotiateBuilder.fs`
+- Modify: `test/Frank.OpenApi.Tests/NegotiateMetadataTests.fs` (already exists from Task 5 — currently a genuinely-red test; no changes needed to it, it's the acceptance test for this fix)
+
+**Interfaces:**
+- Consumes: `Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata`/`ProducesResponseTypeMetadata` — the same interface/class `HandlerBuilder.fs` already constructs (`StatusCode: int`, `Type: System.Type`, `ContentTypes: IEnumerable<string>`).
+- Produces: nothing new consumed by later tasks — `NegotiateBuilder.Run`'s signature (`NegotiateSpec -> HandlerDefinition`) is unchanged; this only changes what `Metadata` list it builds internally. No `.fsi` change needed.
+
+- [ ] **Step 1: Confirm the existing test still fails, for the documented reason**
+
+Run: `dotnet test test/Frank.OpenApi.Tests/Frank.OpenApi.Tests.fsproj`
+Expected: FAIL — the `NegotiateMetadataTests` test (added in Task 5) fails because only one of the two content types appears in the generated document's `200.content`. This is the RED state this task turns GREEN — do not modify the test itself, it already asserts the correct thing.
+
+- [ ] **Step 2: Add the merge function to `NegotiateBuilder.fs`**
+
+Modify `src/Frank/NegotiateBuilder.fs`. Add `open Microsoft.AspNetCore.Http.Metadata` to the top-of-file opens (alongside the existing `open System.Threading.Tasks`, `open Microsoft.AspNetCore.Http`, `open Microsoft.Net.Http.Headers`), then add this function above the `NegotiateBuilder` type definition (after the `Negotiation` module, before `[<Sealed>] type NegotiateBuilder`):
+
+```fsharp
+/// Merges `IProducesResponseTypeMetadata` entries that share both the same status code
+/// and the same response `Type` into one, unioning their content types -- the exact
+/// shape (one metadata object, several content types) that already reaches the
+/// generated OpenAPI document correctly (see `OpenApiDocumentTests.fs`'s "HandlerDefinition
+/// with custom content types for content negotiation" test). Without this, two
+/// `handler { produces ... }` representations sharing a status code (the common
+/// `negotiate { }` case: the same response type serialized as e.g. both
+/// `application/json` and `application/xml`) would emit two SEPARATE metadata objects
+/// for that status code -- and Microsoft.AspNetCore.OpenApi's own document generator
+/// keeps only the last-registered one, silently dropping the other from the generated
+/// document (verified: this reproduces with a bare ASP.NET Core minimal API, zero Frank
+/// code involved -- it's inherent framework behavior, not something Frank broke).
+///
+/// Representations sharing a status code but declaring DIFFERENT response types are
+/// left as separate metadata objects -- Microsoft.AspNetCore.OpenApi's last-wins
+/// behavior still applies to that narrower case. A documented, accepted limitation, not
+/// fixed here.
+let private mergeProducesMetadata (metadata: obj list) : obj list =
+    let produces, other =
+        metadata |> List.partition (fun m -> m :? IProducesResponseTypeMetadata)
+
+    let merged =
+        produces
+        |> List.map (fun m -> m :?> IProducesResponseTypeMetadata)
+        |> List.groupBy (fun m -> m.StatusCode, m.Type)
+        |> List.map (fun ((statusCode, responseType), group) ->
+            let contentTypes =
+                group
+                |> List.collect (fun m -> m.ContentTypes |> List.ofSeq)
+                |> List.distinct
+                |> Array.ofList
+
+            ProducesResponseTypeMetadata(statusCode, responseType, contentTypes) :> obj)
+
+    other @ merged
+```
+
+- [ ] **Step 3: Use it in `Run`**
+
+Modify `NegotiateBuilder.fs`'s `NegotiateBuilder.Run` member:
+
+```fsharp
+    member _.Run(spec: NegotiateSpec) : HandlerDefinition =
+        if List.isEmpty spec.Representations then
+            failwith "At least one representation must be registered using the 'accepts' operation"
+
+        { Handler = Negotiation.dispatch spec.Representations
+          Metadata = mergeProducesMetadata spec.Metadata }
+```
+
+- [ ] **Step 4: Build across all target frameworks**
+
+Run: `dotnet build src/Frank/Frank.fsproj`
+Expected: Builds `net8.0`, `net9.0`, `net10.0` without errors.
+
+- [ ] **Step 5: Run the OpenAPI test to verify it now passes**
+
+Run: `dotnet test test/Frank.OpenApi.Tests/Frank.OpenApi.Tests.fsproj`
+Expected: PASS — the `NegotiateMetadataTests` test from Task 5 now shows both `application/json` and `text/html` under the `200` response's `content`.
+
+- [ ] **Step 6: Run the full `Frank.Tests` suite to confirm no regression**
+
+Run: `dotnet test test/Frank.Tests/Frank.Tests.fsproj`
+Expected: PASS — in particular, `NegotiateBuilderTests.fs`'s "a representation registered via `handler { produces ... }` contributes its metadata" test (a single-representation case, `mergeProducesMetadata` should be a no-op for it: one entry in, one entry out) and any other `def.Metadata` assertions from Tasks 1–4 must still hold. If any test asserted an EXACT metadata list order that this merge changes (produces-metadata entries move to the end of the list, after non-produces metadata like name/tags — see the doc comment above), update that assertion to check membership/count rather than exact position; do not weaken it to check nothing.
+
+- [ ] **Step 7: Add a regression test for the no-merge (single representation) and different-types (not merged) cases**
+
+Add to `test/Frank.Tests/NegotiateBuilderTests.fs`'s test list:
+
+```fsharp
+          testCase "produces metadata from a single representation is unaffected by the merge"
+          <| fun () ->
+              let def =
+                  negotiate {
+                      accepts "application/json" (handler {
+                          produces typeof<Product> 200
+                          handle (writeText "json")
+                      })
+                      accepts "text/html" (writeText "html")
+                  }
+
+              let produces = HandlerDefinition.findAll<Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata> def
+              Expect.hasLength produces 1 "One representation's metadata should pass through unmerged"
+              Expect.sequenceEqual produces.[0].ContentTypes [ "application/json" ] "Content types unchanged for a single representation"
+
+          testCase "produces metadata from two representations sharing status code and type is merged into one"
+          <| fun () ->
+              let def =
+                  negotiate {
+                      accepts "text/html" (handler {
+                          produces typeof<Product> 200 [ "text/html" ]
+                          handle (writeText "html")
+                      })
+                      accepts "application/json" (handler {
+                          produces typeof<Product> 200 [ "application/json" ]
+                          handle (writeText "json")
+                      })
+                  }
+
+              let produces = HandlerDefinition.findAll<Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata> def
+              Expect.hasLength produces 1 "Same status code + same type should merge into one metadata object"
+              Expect.containsAll produces.[0].ContentTypes [ "text/html"; "application/json" ] "Merged entry should carry both content types"
+
+          testCase "produces metadata from two representations sharing status code but different types is NOT merged"
+          <| fun () ->
+              let def =
+                  negotiate {
+                      accepts "application/json" (handler {
+                          produces typeof<Product> 200
+                          handle (writeText "json")
+                      })
+                      accepts "application/xml" (handler {
+                          produces typeof<string> 200 [ "application/xml" ]
+                          handle (writeText "xml")
+                      })
+                  }
+
+              let produces = HandlerDefinition.findAll<Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata> def
+              Expect.hasLength produces 2 "Different response types sharing a status code must stay separate -- documented remaining limitation"
+```
+
+Re-run: `dotnet test test/Frank.Tests/Frank.Tests.fsproj` — expect PASS, full suite.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/Frank/NegotiateBuilder.fs test/Frank.Tests/NegotiateBuilderTests.fs
+git commit -m "fix(frank): merge negotiate { } metadata sharing status code and type
+
+Task 5 found that Microsoft.AspNetCore.OpenApi's document generator
+keeps only the last-registered IProducesResponseTypeMetadata per
+status code, silently dropping sibling representations' content
+types from the generated document -- confirmed as inherent framework
+behavior (reproduces with a bare minimal API, zero Frank code
+involved), not a Frank defect. Fixes it by merging negotiate { }
+representations that share both status code and response type into
+one metadata object with a unioned content-types list before they
+ever leave NegotiateBuilder -- the exact one-object-many-content-types
+shape already proven to reach the document correctly. Representations
+sharing a status code with genuinely different response types are a
+documented remaining limitation, not fixed here.
+
+Fixes the gap found in and closes out #482."
+```
+
+---
+
 ## Self-Review
 
 **1. Spec coverage** (against `docs/superpowers/specs/2026-07-31-content-negotiation-design.md`):
@@ -1531,7 +1709,7 @@ Part of #482."
 - Goal 2 (independent producers per media type) → Task 1 (direct producers), Task 3 (value-returning producers still independent per representation).
 - Goal 3 (tested `Accept` selection incl. quality, 406) → Task 1's tests.
 - Goal 4 (working sample) → Task 6.
-- Goal 5 (free OpenAPI integration) → Task 5.
+- Goal 5 (free OpenAPI integration) → Task 5 verified this claim was only partially true; Task 8 (added after Task 5 ran) closes the gap for the common same-status-code-same-type case, with a documented remaining limitation for the different-types case.
 - Goal 6 (keep `IOutputFormatter`, real-tested) → Task 2.
 - Goal 7 (analyzer gap) → Task 7.
 - *Registering a wildcard/catch-all representation* (shadowing caveat, Content-Type not auto-set, composes with `ctx.Negotiate`) → Task 1's tests.
