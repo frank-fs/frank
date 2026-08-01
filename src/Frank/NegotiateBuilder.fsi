@@ -37,4 +37,15 @@ type NegotiateBuilder =
 
 [<AutoOpen>]
 module NegotiateFunctions =
+    /// The `negotiate { }` computation expression: registers one representation per
+    /// `accepts` operation and dispatches to whichever the client's Accept header
+    /// selects.
+    ///
+    /// NAME COLLISION: this shares the identifier `negotiate` with the unrelated
+    /// function `Frank.ContentNegotiation.negotiate` (`statusCode -> body -> ctx -> Task`,
+    /// which delegates to MVC's IOutputFormatter registry). With both `open Frank.Builder`
+    /// and `open Frank.ContentNegotiation` in scope, F#'s normal shadowing rules apply and
+    /// the LAST `open` wins. If you need both in the same file, qualify at least one of
+    /// them (`Frank.ContentNegotiation.negotiate 200 body ctx`, or `ctx.Negotiate(200, body)`
+    /// via the HttpContext extension, which never collides).
     val negotiate: NegotiateBuilder

@@ -17,25 +17,52 @@ module internal Negotiation =
 
     let isWildcard (mediaType: string) = mediaType.Contains "*"
 
+    /// Guards the value-returning `accepts` overloads (`HttpContext -> Task<'a>` and
+    /// `HttpContext -> Async<'a>`), which auto-format their returned value through
+    /// `viaOutputFormatter mediaType`. Those overloads bypass `dispatch`'s own
+    /// `isWildcard` guard on `ctx.Response.ContentType`, because `viaOutputFormatter`
+    /// sets Content-Type itself, unconditionally, to whatever media type it is given --
+    /// so a wildcard entry would emit an invalid `Content-Type: */*`. There is also no
+    /// concrete type to hand MVC's formatter selector. Fails at registration time (when
+    /// the `negotiate { }` block is built) rather than waiting for a request that
+    /// happens to select the wildcard representation.
+    let rejectWildcardAutoFormat (mediaType: string) =
+        if isWildcard mediaType then
+            failwithf
+                "accepts \"%s\" cannot auto-format a value-returning handler via viaOutputFormatter -- wildcard media types have no concrete type for the formatter selector, and would emit an invalid Content-Type. Use a RequestDelegate or HttpContext -> unit handler instead."
+                mediaType
+
     /// True if `candidate` (one entry from the client's Accept header) and
-    /// `registered` (one representation's declared media type) match. The first
-    /// clause handles a wildcard (or structured-suffix-lenient) *client* entry
-    /// matching a concrete representation -- the common case. The second clause
-    /// exists only so a wildcard-*registered* representation (e.g. a catch-all
-    /// `accepts "*/*"`) can match a concrete client entry; it is gated on
-    /// `registered` actually being a wildcard pattern. Without that gate, a
-    /// concrete registered type would be treated as if it were itself a pattern
-    /// via MatchesMediaType's own leniency (e.g. it would let a concrete
-    /// "application/json" registration match an Accept of "application/ld+json",
-    /// even though "application/json" was never meant to act as a catch-all) --
-    /// that was a real defect this gate fixes; MatchesMediaType's leniency in the
-    /// *other* direction (a client Accept of "application/json" matching a
-    /// registered "application/ld+json") is intentional BCL behavior for RFC 6839
-    /// structured-syntax suffixes and is left alone.
+    /// `registered` (one representation's declared media type) match.
+    ///
+    /// Both directions of `MatchesMediaType` leniency are gated on the *pattern*
+    /// side actually being a wildcard, because `MediaTypeHeaderValue.MatchesMediaType`
+    /// is lenient about RFC 6839 structured-syntax suffixes in BOTH directions and
+    /// that leniency is wrong for concrete-vs-concrete comparisons here:
+    ///
+    /// - First clause (wildcard *client* entry, e.g. `application/*` or `*/*`,
+    ///   matching a concrete registered type) -- the common case for an absent or
+    ///   catch-all Accept.
+    /// - Second clause -- a concrete client entry matches a concrete registered type
+    ///   only on exact (case-insensitive) equality. Without this restriction, an
+    ///   Accept of `application/json` would match a registered `application/ld+json`
+    ///   via suffix leniency, which silently INVERTS an explicit client preference:
+    ///   `Accept: application/json;q=1, application/ld+json;q=0.5` against a block
+    ///   registering only `application/ld+json` would serve JSON-LD at effective
+    ///   quality 1.0 instead of 0.5, even though the client ranked JSON-LD lower.
+    /// - Third clause -- gated on `registered` being a wildcard pattern, so a
+    ///   catch-all `accepts "*/*"` still matches any concrete client entry. Without
+    ///   that gate a concrete registered `application/json` would act as if it were
+    ///   itself a pattern and match an Accept of `application/ld+json`.
     let matches (candidate: MediaTypeHeaderValue) (registered: string) : bool =
         let registeredValue = MediaTypeHeaderValue.Parse(registered)
+        // MediaTypeHeaderValue.MediaType is a StringSegment, not a string -- render both
+        // sides to plain strings so `isWildcard` and the equality check are unambiguous.
+        let candidateMediaType = candidate.MediaType.ToString()
+        let registeredMediaType = registeredValue.MediaType.ToString()
 
-        candidate.MatchesMediaType(registeredValue.MediaType)
+        (isWildcard candidateMediaType && candidate.MatchesMediaType(registeredValue.MediaType))
+        || System.String.Equals(candidateMediaType, registeredMediaType, System.StringComparison.OrdinalIgnoreCase)
         || (isWildcard registered && registeredValue.MatchesMediaType(candidate.MediaType))
 
     /// Specificity rank of an Accept entry, most specific first: an entry with
@@ -112,6 +139,12 @@ module internal Negotiation =
 
     let dispatch (representations: (string * RequestDelegate) list) : RequestDelegate =
         RequestDelegate(fun ctx ->
+            // RFC 9110 12.5.5: every response from a `negotiate { }` block varies by
+            // Accept -- including the 406 -- so a shared cache must not reuse one
+            // client's representation for another. Set before the match so it lands on
+            // both the selected-representation and the 406 branch.
+            ctx.Response.Headers.Append("Vary", "Accept")
+
             let mediaTypes = representations |> List.map fst
 
             match selectRepresentation ctx.Request.Headers.Accept mediaTypes with
@@ -207,6 +240,8 @@ type NegotiateBuilder() =
 
     [<CustomOperation("accepts")>]
     member _.Accepts(spec: NegotiateSpec, mediaType: string, handler: HttpContext -> Task<'a>) =
+        Negotiation.rejectWildcardAutoFormat mediaType
+
         let producer =
             RequestDelegate(fun ctx ->
                 task {
@@ -218,6 +253,8 @@ type NegotiateBuilder() =
 
     [<CustomOperation("accepts")>]
     member _.Accepts(spec: NegotiateSpec, mediaType: string, handler: HttpContext -> Async<'a>) =
+        Negotiation.rejectWildcardAutoFormat mediaType
+
         let producer =
             RequestDelegate(fun ctx ->
                 task {

@@ -24,6 +24,16 @@ let getResponseBody (ctx: HttpContext) =
 let writeText (text: string) (ctx: HttpContext) : Task =
     task { do! ctx.Response.WriteAsync(text) }
 
+/// Runs `build` and returns the message of the exception it must raise, so a test can
+/// assert on WHICH failure occurred rather than merely that something threw.
+let messageOfThrow (build: unit -> unit) : string =
+    try
+        build ()
+        failtest "Expected an exception, but none was raised"
+    with
+    | :? Expecto.FailedException -> reraise ()
+    | ex -> ex.Message
+
 // CLIMutable: XmlSerializer (used by AddXmlSerializerFormatters) requires a public
 // parameterless constructor and settable properties, which an F# anonymous record
 // (used elsewhere in this file for JSON-only cases) doesn't have.
@@ -354,6 +364,185 @@ let tests =
 
               Expect.isFalse jsonRan "application/json must not be selected for an Accept: application/ld+json request"
               Expect.equal (getResponseBody ctx) "jsonld" "application/ld+json should have been selected, matching registration order this time too"
+
+          testCase "Accept: application/json never matches a registered application/ld+json via suffix leniency"
+          <| fun () ->
+              // Critical regression test: MediaTypeHeaderValue.MatchesMediaType is lenient
+              // about RFC 6839 structured-syntax suffixes in the *client entry -> registered
+              // type* direction too, so a plain "application/json" Accept used to match a
+              // registered "application/ld+json". A client that asked only for plain JSON
+              // must not silently receive JSON-LD; with nothing else registered that means
+              // 406, not a JSON-LD body.
+              let ctx = createMockContext ()
+              setAccept ctx "application/json"
+
+              let def =
+                  negotiate { accepts "application/ld+json" (writeText "jsonld") }
+
+              def.Handler.Invoke(ctx).Wait()
+
+              Expect.equal ctx.Response.StatusCode 406 "application/json must not match a registered application/ld+json"
+              Expect.equal (getResponseBody ctx) "" "No body should be written"
+
+          testCase "a JSON-LD-only block still serves a client that ranked JSON-LD below JSON"
+          <| fun () ->
+              // The companion boundary to the case above: "application/ld+json;q=0.5" is a
+              // positive quality, so the client DOES accept JSON-LD -- just less than plain
+              // JSON. With no plain-JSON representation registered there is nothing better to
+              // serve, and RFC 9110 says a q>0 entry naming the representation makes it
+              // acceptable. What the leniency fix changes here is the JSON-LD entry's
+              // EFFECTIVE quality (0.5, its own -- not 1.0 borrowed from the plain-JSON
+              // entry), which is what makes the next test's comparison come out right.
+              let ctx = createMockContext ()
+              setAccept ctx "application/json;q=1, application/ld+json;q=0.5"
+
+              let def =
+                  negotiate { accepts "application/ld+json" (writeText "jsonld") }
+
+              def.Handler.Invoke(ctx).Wait()
+
+              Expect.equal ctx.Response.StatusCode 200 "The client listed application/ld+json at q=0.5 -- it is acceptable"
+              Expect.equal (getResponseBody ctx) "jsonld" "The only registered representation is served"
+
+          testCase "with both JSON and JSON-LD registered, the higher-quality JSON entry wins"
+          <| fun () ->
+              // The companion to the case above: once a genuine plain-JSON representation
+              // exists, quality-based selection must pick it over the lower-ranked JSON-LD
+              // one -- and must do so regardless of registration order, so JSON-LD is
+              // deliberately registered FIRST here.
+              let ctx = createMockContext ()
+              setAccept ctx "application/json;q=1, application/ld+json;q=0.5"
+
+              let def =
+                  negotiate {
+                      accepts "application/ld+json" (writeText "jsonld")
+                      accepts "application/json" (writeText "json")
+                  }
+
+              def.Handler.Invoke(ctx).Wait()
+
+              Expect.equal ctx.Response.ContentType "application/json" "The q=1 entry's representation should be selected"
+              Expect.equal (getResponseBody ctx) "json" "Plain JSON outranks JSON-LD at q=0.5"
+
+          testCase "a successful dispatch sends Vary: Accept"
+          <| fun () ->
+              let ctx = createMockContext ()
+              setAccept ctx "application/json"
+
+              let def =
+                  negotiate {
+                      accepts "application/json" (writeText "json")
+                      accepts "text/html" (writeText "html")
+                  }
+
+              def.Handler.Invoke(ctx).Wait()
+
+              Expect.stringContains
+                  (ctx.Response.Headers.["Vary"].ToString())
+                  "Accept"
+                  "RFC 9110 12.5.5: a negotiated response must advertise that it varies by Accept"
+
+          testCase "a 406 response also sends Vary: Accept"
+          <| fun () ->
+              let ctx = createMockContext ()
+              setAccept ctx "application/xml"
+
+              let def =
+                  negotiate { accepts "application/json" (writeText "json") }
+
+              def.Handler.Invoke(ctx).Wait()
+
+              Expect.equal ctx.Response.StatusCode 406 "Nothing matches application/xml"
+
+              Expect.stringContains
+                  (ctx.Response.Headers.["Vary"].ToString())
+                  "Accept"
+                  "The 406 varies by Accept too -- a cache must not replay it for a different client"
+
+          testCase "a wildcard representation can delegate to ctx.Negotiate for full MVC negotiation"
+          <| fun () ->
+              // The headline composition from the design doc: an independent producer for one
+              // exact type, plus a "*/*" catch-all that hands everything else to the existing
+              // Frank.ContentNegotiation.negotiate / ctx.Negotiate function. The wildcard entry
+              // sets no Content-Type of its own -- ctx.Negotiate's chosen IOutputFormatter does.
+              let services = ServiceCollection()
+              services.AddLogging() |> ignore
+              services.AddMvcCore().AddXmlSerializerFormatters() |> ignore
+              let provider = services.BuildServiceProvider()
+
+              let widget = { Name = "Widget" }
+
+              let def =
+                  negotiate {
+                      accepts "application/ld+json" (writeText "jsonld")
+                      accepts "*/*" (fun (ctx: HttpContext) ->
+                          Frank.ContentNegotiation.negotiate 200 widget ctx)
+                  }
+
+              // Exact type -> the independent producer, not the catch-all.
+              let jsonLdCtx = createMockContext ()
+              jsonLdCtx.RequestServices <- provider
+              setAccept jsonLdCtx "application/ld+json"
+              def.Handler.Invoke(jsonLdCtx).Wait()
+
+              Expect.equal jsonLdCtx.Response.ContentType "application/ld+json" "The concrete entry sets its own Content-Type"
+              Expect.equal (getResponseBody jsonLdCtx) "jsonld" "The independent producer ran"
+
+              // Anything else -> the catch-all, negotiated by MVC's formatter registry.
+              let xmlCtx = createMockContext ()
+              xmlCtx.RequestServices <- provider
+              setAccept xmlCtx "application/xml"
+              def.Handler.Invoke(xmlCtx).Wait()
+
+              Expect.equal xmlCtx.Response.StatusCode 200 "The wildcard entry caught the otherwise-unmatched Accept"
+
+              Expect.stringStarts
+                  xmlCtx.Response.ContentType
+                  "application/xml"
+                  "ctx.Negotiate's selected formatter sets Content-Type -- dispatch must NOT set it to \"*/*\""
+
+              Expect.stringContains (getResponseBody xmlCtx) "Widget" "The MVC XML formatter wrote the body"
+
+          testCase "accepts \"*/*\" with a Task<'a>-returning handler throws rather than emitting Content-Type: */*"
+          <| fun () ->
+              // viaOutputFormatter sets ctx.Response.ContentType unconditionally to whatever
+              // media type it is handed, bypassing dispatch's own isWildcard guard -- so this
+              // combination would emit a literally invalid `Content-Type: */*`. It also has no
+              // concrete type to give MVC's formatter selector. Rejected at registration time.
+              let message =
+                  messageOfThrow (fun () ->
+                      negotiate { accepts "*/*" (fun (_: HttpContext) -> task { return { Name = "Widget" } }) }
+                      |> ignore)
+
+              Expect.stringContains message "*/*" "The message should name the offending media type"
+
+              Expect.stringContains
+                  message
+                  "viaOutputFormatter"
+                  "The message should explain that auto-formatting is what can't accept a wildcard"
+
+          testCase "accepts \"*/*\" with an Async<'a>-returning handler throws rather than emitting Content-Type: */*"
+          <| fun () ->
+              let message =
+                  messageOfThrow (fun () ->
+                      negotiate { accepts "*/*" (fun (_: HttpContext) -> async { return { Name = "Widget" } }) }
+                      |> ignore)
+
+              Expect.stringContains message "viaOutputFormatter" "The Async overload must carry the same guard"
+
+          testCase "accepts \"application/*\" with a value-returning handler throws too"
+          <| fun () ->
+              let message =
+                  messageOfThrow (fun () ->
+                      negotiate {
+                          accepts "application/*" (fun (_: HttpContext) -> task { return { Name = "Widget" } })
+                      }
+                      |> ignore)
+
+              Expect.stringContains
+                  message
+                  "application/*"
+                  "A subtype wildcard is just as unusable for the formatter selector as \"*/*\""
 
           testCase "accepts [mediaTypes] handler registers one representation per media type"
           <| fun () ->

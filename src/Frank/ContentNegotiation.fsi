@@ -9,6 +9,17 @@ module ContentNegotiation =
 
     val notAcceptable: ctx: HttpContext -> Task
 
+    /// Writes `body` at `statusCode` using whichever registered IOutputFormatter MVC's
+    /// own OutputFormatterSelector picks for the request's Accept header, or 406 if none
+    /// matches.
+    ///
+    /// NAME COLLISION: this shares the identifier `negotiate` with the unrelated
+    /// `negotiate { }` computation expression `Frank.Builder.negotiate` (a
+    /// `NegotiateBuilder` value, auto-opened from `Frank.Builder`). With both
+    /// `open Frank.Builder` and `open Frank.ContentNegotiation` in scope, F#'s normal
+    /// shadowing rules apply and the LAST `open` wins. If you need both in the same
+    /// file, qualify at least one of them -- or use the `ctx.Negotiate(statusCode, body)`
+    /// extension member below, which never collides.
     val negotiate: statusCode: int -> body: 'a -> ctx: HttpContext -> Task
 
     /// Delegates to ASP.NET Core MVC's registered IOutputFormatters to write `body` as
