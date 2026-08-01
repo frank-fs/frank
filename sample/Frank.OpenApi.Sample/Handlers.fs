@@ -184,7 +184,7 @@ let getProductNegotiated =
 /// System.NotSupportedException), and `Product` isn't `[<CLIMutable>]` -- required by
 /// `AddXmlSerializerFormatters()`'s `XmlSerializer`, which also can't introspect the DU
 /// or `Set<string>` fields (silently emits an empty element instead of throwing).
-/// `Domain.fs` is out of scope for this change, so this DTO -- flattening `Category` to
+/// `Domain.fs` is out of scope for this change, so this DTO -- converting `Category` to
 /// its case name and `Tags` to a plain array -- exists to make the bridge representation
 /// genuinely round-trip through both formatters.
 ///
