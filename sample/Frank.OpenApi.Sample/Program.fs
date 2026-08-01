@@ -19,6 +19,16 @@ open Sample.OpenApi.Handlers
 /// pre-existing listProducts/getProduct/etc. handlers) needs this converter registered
 /// for `WriteAsJsonAsync` to work at all. `getProductBridged`'s viaOutputFormatter path
 /// sidesteps this instead, by mapping to a wire-friendly DTO in Handlers.fs.
+///
+/// This hand-rolled converter is a scoped, minimal fix, not the recommended long-term
+/// one: the proper fix is registering `FSharp.SystemTextJson`'s `JsonFSharpConverter`
+/// (which handles DUs, options, and records generically) plus `[<CLIMutable>]` on
+/// `Product`, in `Domain.fs`. That's also the more consistent choice: `Frank.OpenApi`
+/// already depends on `FSharp.Data.JsonSchema.OpenApi` for schema generation, which
+/// assumes `FSharp.SystemTextJson`-style serialization conventions when describing F#
+/// types -- so a hand-written converter risks the generated OpenAPI schema not matching
+/// what this sample's endpoints actually put on the wire, even though both currently
+/// agree for `Category`'s specific (simple, no-payload) shape.
 type private CategoryJsonConverter() =
     inherit JsonConverter<Category>()
 
