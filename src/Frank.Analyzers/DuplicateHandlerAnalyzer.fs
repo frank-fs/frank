@@ -80,16 +80,39 @@ let createDuplicateMessage (methodName: string) (duplicateRange: range) (firstRa
       Range = duplicateRange
       Fixes = [] }
 
+/// Create a message for a duplicate `accepts` media-type registration inside one
+/// `negotiate { }` block
+let createDuplicateMediaTypeMessage (mediaType: string) (duplicateRange: range) (firstRange: range) : Message =
+    { Type = "Duplicate accepts media type"
+      Message =
+        sprintf
+            "Media type '%s' is already registered in this negotiate block at line %d. The earlier registration always wins, making this one dead code."
+            mediaType
+            firstRange.StartLine
+      Code = "FRANK002"
+      Severity = Severity.Warning
+      Range = duplicateRange
+      Fixes = [] }
+
 /// Analyze a parsed F# file for duplicate HTTP handlers
 let analyzeFile (parseTree: ParsedInput) : Message list =
     let messages = ResizeArray<Message>()
 
-    // Use a mutable stack to track context per CE block
+    // Use a mutable stack to track context per CE block. Each level tracks HTTP
+    // method operations (get/post/...) and negotiate { } accepts media types
+    // separately, since they're unrelated checks that both key on "the same name
+    // registered twice inside one CE block".
     let contextStack =
-        ResizeArray<System.Collections.Generic.Dictionary<string, range>>()
+        ResizeArray<
+            {| Methods: System.Collections.Generic.Dictionary<string, range>
+               MediaTypes: System.Collections.Generic.Dictionary<string, range> |}
+         >()
 
     let pushContext () =
-        contextStack.Add(System.Collections.Generic.Dictionary<string, range>())
+        contextStack.Add(
+            {| Methods = System.Collections.Generic.Dictionary<string, range>()
+               MediaTypes = System.Collections.Generic.Dictionary<string, range>() |}
+        )
 
     let popContext () =
         if contextStack.Count > 0 then
@@ -97,7 +120,7 @@ let analyzeFile (parseTree: ParsedInput) : Message list =
 
     let tryRegisterMethod (methodName: string) (r: range) =
         if contextStack.Count > 0 then
-            let current = contextStack.[contextStack.Count - 1]
+            let current = contextStack.[contextStack.Count - 1].Methods
 
             if current.ContainsKey(methodName) then
                 // Duplicate found
@@ -105,6 +128,17 @@ let analyzeFile (parseTree: ParsedInput) : Message list =
             else
                 // Register this method
                 current.[methodName] <- r
+
+    let tryRegisterMediaType (mediaType: string) (r: range) =
+        if contextStack.Count > 0 then
+            let current = contextStack.[contextStack.Count - 1].MediaTypes
+
+            if current.ContainsKey(mediaType) then
+                // Duplicate found
+                messages.Add(createDuplicateMediaTypeMessage mediaType r current.[mediaType])
+            else
+                // Register this media type
+                current.[mediaType] <- r
 
     // Walk the tree ourselves for CE detection using named field patterns
     let rec walkExprForCE (expr: SynExpr) =
@@ -133,6 +167,13 @@ let analyzeFile (parseTree: ParsedInput) : Message list =
                         match tryGetDatastarMethodFromArg argExpr with
                         | Some explicitMethod -> tryRegisterMethod explicitMethod r
                         | None -> tryRegisterMethod "GET" r
+
+                | SynExpr.App(funcExpr = SynExpr.Ident acceptsIdent; argExpr = mediaTypeArg) when
+                    acceptsIdent.idText.ToLowerInvariant() = "accepts"
+                    ->
+                    match mediaTypeArg with
+                    | SynExpr.Const(constant = SynConst.String(text = mediaType)) -> tryRegisterMediaType mediaType r
+                    | _ -> () // e.g. HandlerBuilder's `accepts typeof<X>` -- not a media-type literal, not our concern
 
                 | SynExpr.App(funcExpr = innerFunc; argExpr = methodArg) ->
                     match innerFunc with
@@ -253,7 +294,7 @@ let name = "DuplicateHandlerAnalyzer"
 
 [<Literal>]
 let shortDescription =
-    "Detects duplicate HTTP method handlers in Frank resource definitions"
+    "Detects duplicate HTTP method handlers in Frank resource definitions (FRANK001) and duplicate 'accepts' media types in negotiate blocks (FRANK002)"
 
 [<Literal>]
 let helpUri = "https://github.com/frank-fs/frank/issues/59"

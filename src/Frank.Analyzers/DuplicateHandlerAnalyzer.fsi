@@ -25,6 +25,10 @@ val tryGetDatastarMethodFromArg: argExpr: SynExpr -> string option
 /// Create a message for a duplicate HTTP handler
 val createDuplicateMessage: methodName: string -> duplicateRange: range -> firstRange: range -> Message
 
+/// Create a message for a duplicate `accepts` media-type registration inside one
+/// `negotiate { }` block
+val createDuplicateMediaTypeMessage: mediaType: string -> duplicateRange: range -> firstRange: range -> Message
+
 /// Analyze a parsed F# file for duplicate HTTP handlers
 val analyzeFile: parseTree: ParsedInput -> Message list
 
@@ -32,7 +36,8 @@ val analyzeFile: parseTree: ParsedInput -> Message list
 val name: string = "DuplicateHandlerAnalyzer"
 
 [<Literal>]
-val shortDescription: string = "Detects duplicate HTTP method handlers in Frank resource definitions"
+val shortDescription: string =
+    "Detects duplicate HTTP method handlers in Frank resource definitions (FRANK001) and duplicate 'accepts' media types in negotiate blocks (FRANK002)"
 
 [<Literal>]
 val helpUri: string = "https://github.com/frank-fs/frank/issues/59"

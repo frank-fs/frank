@@ -407,6 +407,49 @@ handler {
 }
 ```
 
+These operations only *describe* the content types in the generated OpenAPI document — they
+don't dispatch on `Accept` at runtime. For that, use the `negotiate { }` CE below.
+
+### The `negotiate { }` Computation Expression
+
+`negotiate { }` lives in Frank core (`Frank.Builder`) — no Frank.OpenApi needed — and performs
+real per-media-type dispatch: each `accepts` registers an independent representation, and the
+one matching the request's `Accept` header (by RFC 9110 quality and specificity rules) is the
+only one whose handler runs. Nothing matching means `406 Not Acceptable`, and every response
+carries `Vary: Accept`.
+
+```fsharp
+resource "/products/{id}" {
+    get (negotiate {
+        accepts "application/json" (fun ctx -> task {
+            do! ctx.Response.WriteAsJsonAsync(product)
+        })
+        accepts "text/html" (fun ctx -> task {
+            do! ctx.Response.WriteAsync($"<h1>{product.Name}</h1>")
+        })
+    })
+}
+```
+
+`accepts` also takes a `handler { }` definition (whose `produces` metadata flows into the
+OpenAPI document), a media-type *list* to register one representation per type
+(`accepts [ "application/json"; "application/xml" ] getProduct`), and a wildcard catch-all
+(`accepts "*/*" ...` or `accepts "type/*" ...`). Register wildcards **last** — registration
+order breaks ties, so a wildcard registered first shadows everything after it. A wildcard
+representation must set its own `Content-Type`; Frank won't set an invalid wildcard one.
+
+For representations that should reuse ASP.NET Core MVC's existing `IOutputFormatter` registry
+(`AddMvcCore()`, `AddXmlSerializerFormatters()`, …) instead of a hand-written producer, use the
+`Frank.ContentNegotiation.viaOutputFormatter` bridge — or just return a value from the handler
+(`accepts "application/json" (fun ctx -> task { return product })`), which pipes through it
+automatically.
+
+> **Name collision:** `Frank.Builder.negotiate` (this CE) and the older
+> `Frank.ContentNegotiation.negotiate` function (`statusCode -> body -> ctx -> Task`, which
+> delegates the whole response to MVC's formatter registry) share the identifier `negotiate`.
+> With both modules opened, F#'s ordinary shadowing rules apply and the last `open` wins.
+> Qualify one of them, or use the non-colliding `ctx.Negotiate(200, body)` extension member.
+
 ### Backward Compatibility
 
 Frank.OpenApi is fully backward compatible with existing Frank applications. You can:
@@ -610,6 +653,22 @@ resource "/example" {
     name "Example"
     get (fun ctx -> ctx.Response.WriteAsync("First"))   // Warning: FRANK001
     get (fun ctx -> ctx.Response.WriteAsync("Second"))  // This one takes effect
+}
+```
+
+#### FRANK002: Duplicate Accepts Media Type
+
+Detects when the same media type is registered more than once inside a single `negotiate { }`
+block. Only the first registration can ever be selected — later ones for the same media type
+are unreachable — so this is almost always a mistake.
+
+```fsharp
+// This will produce a warning:
+resource "/test" {
+    get (negotiate {
+        accepts "application/json" jsonHandler
+        accepts "application/json" anotherJsonHandler  // Warning: FRANK002 (unreachable)
+    })
 }
 ```
 

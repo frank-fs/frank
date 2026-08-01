@@ -54,18 +54,19 @@ check_test() {
     local fixture=$1
     local expect_warning=$2
     local description=$3
+    local code=${4:-FRANK001}
 
     if [[ "$expect_warning" == "true" ]]; then
-        if echo "$ANALYZER_OUTPUT" | grep -q "$fixture.fs.*FRANK001"; then
+        if echo "$ANALYZER_OUTPUT" | grep -q "$fixture.fs.*$code"; then
             echo -e "${GREEN}PASS${NC}: $fixture - $description"
             PASSED=$((PASSED + 1))
         else
-            echo -e "${RED}FAIL${NC}: $fixture - Expected FRANK001 warning ($description)"
+            echo -e "${RED}FAIL${NC}: $fixture - Expected $code warning ($description)"
             FAILED=$((FAILED + 1))
         fi
     else
-        if echo "$ANALYZER_OUTPUT" | grep -q "$fixture.fs.*FRANK001"; then
-            echo -e "${RED}FAIL${NC}: $fixture - Unexpected warning ($description)"
+        if echo "$ANALYZER_OUTPUT" | grep -q "$fixture.fs.*$code"; then
+            echo -e "${RED}FAIL${NC}: $fixture - Unexpected $code warning ($description)"
             FAILED=$((FAILED + 1))
         else
             echo -e "${GREEN}PASS${NC}: $fixture - $description"
@@ -95,6 +96,10 @@ check_test "DatastarConflict" true "Datastar + GET conflict"
 check_test "DatastarWithPost" true "Datastar POST + POST conflict"
 check_test "DatastarNoConflict" false "Datastar + POST (no conflict)"
 
+# Duplicate accepts media-type detection
+check_test "DuplicateAccepts" true "Duplicate accepts media type detection" "FRANK002"
+check_test "DistinctAccepts" false "Distinct accepts media types (no warning)" "FRANK002"
+
 echo ""
 echo "========================================="
 echo -e "Total: $((PASSED + FAILED)) | ${GREEN}Passed: $PASSED${NC} | ${RED}Failed: $FAILED${NC}"
@@ -103,7 +108,7 @@ echo "========================================="
 if [[ $FAILED -gt 0 ]]; then
     echo ""
     echo "Analyzer output for debugging:"
-    echo "$ANALYZER_OUTPUT" | grep -E "(FRANK001|Running analyzers)" || true
+    echo "$ANALYZER_OUTPUT" | grep -E "(FRANK00[12]|Running analyzers)" || true
     exit 1
 fi
 
