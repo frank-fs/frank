@@ -68,7 +68,11 @@ let tests =
                   |> Async.AwaitTask
                   |> Async.RunSynchronously
 
-              Expect.throws callIt "No XML formatter is registered -- this is a server misconfiguration, not a 406"
+              Expect.throwsC callIt (fun ex ->
+                  Expect.stringContains
+                      ex.Message
+                      "application/xml"
+                      "Exception message should name the unsupported media type, proving this is the no-formatter-found path and not some other failure")
 
           testCase "viaOutputFormatter writes XML once AddXmlSerializerFormatters is registered"
           <| fun () ->
@@ -82,6 +86,25 @@ let tests =
               Expect.stringStarts ctx.Response.ContentType "application/xml" "Content-Type should be set"
               Expect.stringContains (getResponseBody ctx) "Widget" "Body should contain the serialized product"
 
+          testCase "viaOutputFormatter still honors the requested media type when the request's own Accept header names the same concrete type"
+          <| fun () ->
+              // This is the realistic Task 3 usage: negotiate { } dispatches to
+              // viaOutputFormatter "application/xml" for the exact accepts entry that
+              // already matched the request's Accept header, so a real request in this
+              // codepath always carries a concrete, matching Accept header -- unlike the
+              // other viaOutputFormatter tests above, which use a bare DefaultHttpContext
+              // with no Accept header at all.
+              let ctx = createMockContext (servicesWithJsonAndXml ())
+              ctx.Request.Headers.Accept <- Microsoft.Extensions.Primitives.StringValues("application/xml")
+              let product = { Name = "Widget"; Price = 9.99m }
+
+              ContentNegotiation.viaOutputFormatter "application/xml" product ctx
+              |> Async.AwaitTask
+              |> Async.RunSynchronously
+
+              Expect.stringStarts ctx.Response.ContentType "application/xml" "Content-Type should be set"
+              Expect.stringContains (getResponseBody ctx) "<Name>" "Body should be XML-shaped"
+
           testCase "negotiate (the existing IOutputFormatter mechanism) selects by Accept across formatters"
           <| fun () ->
               let ctx = createMockContext (servicesWithJsonAndXml ())
@@ -91,7 +114,13 @@ let tests =
               ctx.Negotiate(200, product) |> Async.AwaitTask |> Async.RunSynchronously
 
               Expect.equal ctx.Response.StatusCode 200 "Status code should be as requested"
-              Expect.stringContains (getResponseBody ctx) "Widget" "Body should contain the serialized product"
+              // Pin the actual selected format -- both JSON ({"name":"Widget",...}) and XML
+              // (<Name>Widget</Name>) bodies contain "Widget", so that alone wouldn't rule out
+              // negotiate ignoring Accept and always picking the first (JSON) formatter.
+              Expect.stringStarts ctx.Response.ContentType "application/xml" "Accept: application/xml should select the XML formatter, not JSON"
+              let body = getResponseBody ctx
+              Expect.stringContains body "<Name>" "Body should be XML-shaped, not JSON"
+              Expect.stringContains body "Widget" "Body should contain the serialized product"
 
           testCase "negotiate responds 406 when Accept matches no registered formatter"
           <| fun () ->
