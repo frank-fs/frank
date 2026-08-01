@@ -286,7 +286,9 @@ type NegotiateBuilder =
 
     [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: RequestDelegate -> NegotiateSpec
+    [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> unit) -> NegotiateSpec
+    [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handlerDef: HandlerDefinition -> NegotiateSpec
 
 [<AutoOpen>]
@@ -332,27 +334,44 @@ module internal Negotiation =
     /// the raw Accept header values and the registered media types, in registration
     /// order. An absent, empty, or entirely unparseable Accept is treated as an
     /// implicit "*/*" -- there is no separate "default representation" concept, it
-    /// falls out of ordinary wildcard matching. Returns None only when nothing
-    /// registered matches any entry.
+    /// falls out of ordinary wildcard matching. Per RFC 9110 12.5.1, a q=0 entry is an
+    /// explicit rejection of that media type, not merely a low-priority one -- it is
+    /// excluded before matching, and if every entry the client sent is q=0 (nothing
+    /// left to match against), the result is None (406), not a fall-through to the
+    /// "*/*" absent-header default. Returns None when nothing registered matches any
+    /// (non-rejected) entry.
     let selectRepresentation (acceptValues: string seq) (mediaTypes: string list) : int option =
         if List.isEmpty mediaTypes then
             None
         else
-            let parsed =
-                acceptValues
-                |> Seq.choose (fun raw ->
-                    match MediaTypeHeaderValue.TryParse(raw) with
-                    | true, v -> Some v
-                    | false, _ -> None)
-                |> List.ofSeq
+            // ctx.Request.Headers.Accept can deliver a single comma-joined value
+            // (e.g. "text/html;q=0.3, application/json;q=0.8") rather than one value
+            // per media range -- TryParseList (not per-value TryParse) is required to
+            // split and parse each range correctly; TryParse on the whole joined
+            // string fails and silently degrades every multi-entry Accept header to
+            // "nothing parsed", which is indistinguishable from an absent header.
+            let acceptedButNotRejected =
+                match MediaTypeHeaderValue.TryParseList(ResizeArray(acceptValues)) with
+                | true, parsed -> parsed |> Seq.filter (fun v -> v.Quality.GetValueOrDefault(1.0) > 0.0) |> List.ofSeq
+                | false, _ -> []
 
-            let entries =
-                if List.isEmpty parsed then
-                    [ MediaTypeHeaderValue.Parse("*/*") ]
-                else
-                    parsed |> List.sortWith (fun a b -> MediaTypeHeaderValueComparer.QualityComparer.Compare(b, a))
+            let allEntriesWereExplicitlyRejected =
+                not (Seq.isEmpty acceptValues)
+                && (match MediaTypeHeaderValue.TryParseList(ResizeArray(acceptValues)) with
+                    | true, parsed -> not (Seq.isEmpty parsed) && List.isEmpty acceptedButNotRejected
+                    | false, _ -> false)
 
-            entries |> List.tryPick (fun entry -> mediaTypes |> List.tryFindIndex (matches entry))
+            if allEntriesWereExplicitlyRejected then
+                None
+            else
+                let entries =
+                    if List.isEmpty acceptedButNotRejected then
+                        [ MediaTypeHeaderValue.Parse("*/*") ]
+                    else
+                        acceptedButNotRejected
+                        |> List.sortWith (fun a b -> MediaTypeHeaderValueComparer.QualityComparer.Compare(b, a))
+
+                entries |> List.tryPick (fun entry -> mediaTypes |> List.tryFindIndex (matches entry))
 
     let dispatch (representations: (string * RequestDelegate) list) : RequestDelegate =
         RequestDelegate(fun ctx ->
@@ -817,13 +836,19 @@ Modify `src/Frank/NegotiateBuilder.fsi`, adding two lines to the `Accepts` group
 ```fsharp
     [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: RequestDelegate -> NegotiateSpec
+    [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> unit) -> NegotiateSpec
+    [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handlerDef: HandlerDefinition -> NegotiateSpec
+    [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> Task<'a>) -> NegotiateSpec
+    [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> Async<'a>) -> NegotiateSpec
 ```
 
 Also add `open System.Threading.Tasks` at the top of the file (needed for `Task<'a>`).
+
+**Note:** the `.fsi` for Task 1 was originally written with the `[<CustomOperation>]` attribute on only the first overload (matching `ResourceBuilder.fsi`'s convention). Task 1's review found this contradicts `HandlerBuilder.fsi`'s convention (repeats the attribute on every overload), which is the correct one to follow here since `NegotiateBuilder` is the same kind of accumulating CE as `HandlerBuilder`. If Task 1 has already been fixed by the time you read this, your starting file will already have the attribute repeated on the first three lines below — just add it to your two new lines too, consistent with the rest.
 
 - [ ] **Step 4: Add the two overloads to `NegotiateBuilder.fs`**
 
@@ -932,7 +957,9 @@ Expected: FAIL to compile — no `Accepts` overload takes a `string list` yet.
 Modify `src/Frank/NegotiateBuilder.fsi`, adding two more lines to the `Accepts` group:
 
 ```fsharp
+    [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaTypes: string list * handler: (HttpContext -> Task<'a>) -> NegotiateSpec
+    [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaTypes: string list * handler: (HttpContext -> Async<'a>) -> NegotiateSpec
 ```
 
