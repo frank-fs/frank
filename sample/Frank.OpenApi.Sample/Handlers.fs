@@ -258,6 +258,41 @@ let getProductBridged =
         })
     }
 
+/// Demonstrates the two `accepts` conveniences the blocks above don't use:
+///
+/// 1. The `mediaTypes: string list` batch form -- ONE handler registered for several media
+///    types at once. Each media type still becomes its own independent representation; the
+///    handler's returned value is auto-formatted as whichever one was selected, via
+///    `viaOutputFormatter`. This works here (unlike `getProductBridged`) precisely because
+///    the collection case has no per-content-type 404 body to write.
+/// 2. A `"*/*"` catch-all, registered LAST. Registration order breaks ties, so a wildcard
+///    registered any earlier would shadow every entry after it. Frank does not auto-set
+///    `Content-Type` for a wildcard entry -- the handler owns it, which is what lets the
+///    slot compose with the pre-existing `Frank.ContentNegotiation.negotiate` function and
+///    hand anything else off to MVC's full formatter registry.
+///
+/// That last call is deliberately written fully qualified: `Frank.ContentNegotiation` also
+/// exports a `negotiate`, so `open`ing it here would shadow the `negotiate { }` CE this very
+/// block is built with. (`ctx.Negotiate(200, body)` is the non-colliding alternative, but it
+/// needs that same `open` to bring the extension member into scope.)
+let listProductsNegotiated =
+    let asWire () =
+        ProductStore.getAll () |> List.map ProductWire.ofProduct |> Array.ofList
+
+    negotiate {
+        accepts [ "application/json"; "application/xml" ] (fun (_: HttpContext) -> task { return asWire () })
+        accepts "text/html" (fun (ctx: HttpContext) -> task {
+            let items =
+                ProductStore.getAll ()
+                |> List.map (fun p -> $"<li>{p.Name} -- ${p.Price}</li>")
+                |> String.concat ""
+
+            do! ctx.Response.WriteAsync($"<html><body><ul>{items}</ul></body></html>")
+        })
+        accepts "*/*" (fun (ctx: HttpContext) ->
+            Frank.ContentNegotiation.negotiate 200 (asWire ()) ctx)
+    }
+
 /// Health check endpoint (plain handler, not using HandlerDefinition)
 let healthCheck (ctx: HttpContext) =
     task {

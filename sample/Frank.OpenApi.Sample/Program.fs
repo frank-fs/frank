@@ -77,6 +77,12 @@ let contentNegotiationBridgedResource =
         get getProductBridged
     }
 
+let contentNegotiationListResource =
+    resource "/api/products/negotiate-list" {
+        name "ProductListContentNegotiation"
+        get listProductsNegotiated
+    }
+
 // Health check using plain handler (mixed with HandlerDefinition)
 let healthResource =
     resource "/health" {
@@ -138,6 +144,7 @@ let main args =
         resource searchResource
         resource contentNegotiationResource
         resource contentNegotiationBridgedResource
+        resource contentNegotiationListResource
     }
 
     0
