@@ -1,5 +1,6 @@
 namespace Frank.Builder
 
+open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 
 /// One representation: a media type (an exact type, or a "*/*"/"type/*" wildcard
@@ -25,6 +26,10 @@ type NegotiateBuilder =
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> unit) -> NegotiateSpec
     [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handlerDef: HandlerDefinition -> NegotiateSpec
+    [<CustomOperation("accepts")>]
+    member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> Task<'a>) -> NegotiateSpec
+    [<CustomOperation("accepts")>]
+    member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> Async<'a>) -> NegotiateSpec
 
 [<AutoOpen>]
 module NegotiateFunctions =

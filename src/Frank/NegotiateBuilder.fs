@@ -148,6 +148,28 @@ type NegotiateBuilder() =
             Representations = spec.Representations @ [ mediaType, handlerDef.Handler ]
             Metadata = spec.Metadata @ handlerDef.Metadata }
 
+    [<CustomOperation("accepts")>]
+    member _.Accepts(spec: NegotiateSpec, mediaType: string, handler: HttpContext -> Task<'a>) =
+        let producer =
+            RequestDelegate(fun ctx ->
+                task {
+                    let! value = handler ctx
+                    return! Frank.ContentNegotiation.viaOutputFormatter mediaType value ctx
+                })
+
+        { spec with Representations = spec.Representations @ [ mediaType, producer ] }
+
+    [<CustomOperation("accepts")>]
+    member _.Accepts(spec: NegotiateSpec, mediaType: string, handler: HttpContext -> Async<'a>) =
+        let producer =
+            RequestDelegate(fun ctx ->
+                task {
+                    let! value = Async.StartAsTask(handler ctx)
+                    return! Frank.ContentNegotiation.viaOutputFormatter mediaType value ctx
+                })
+
+        { spec with Representations = spec.Representations @ [ mediaType, producer ] }
+
 [<AutoOpen>]
 module NegotiateFunctions =
     let negotiate = NegotiateBuilder()

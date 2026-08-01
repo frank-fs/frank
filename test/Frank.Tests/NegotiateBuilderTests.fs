@@ -3,6 +3,7 @@ module Frank.Tests.NegotiateBuilderTests
 open System.IO
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
+open Microsoft.Extensions.DependencyInjection
 open Expecto
 open Frank.Builder
 
@@ -250,4 +251,73 @@ let tests =
               def.Handler.Invoke(ctx).Wait()
 
               Expect.equal ctx.Response.StatusCode 200 "The more specific text/html;q=0.8 entry governs, not the broader */*;q=0"
-              Expect.equal (getResponseBody ctx) "html" "text/html should have been selected and served" ]
+              Expect.equal (getResponseBody ctx) "html" "text/html should have been selected and served"
+
+          testCase "a Task<'a>-returning accepts handler has its value auto-formatted, not discarded"
+          <| fun () ->
+              let ctx = createMockContext ()
+              setAccept ctx "application/json"
+              let services = Microsoft.Extensions.DependencyInjection.ServiceCollection()
+              services.AddLogging() |> ignore
+              services.AddMvcCore() |> ignore
+              ctx.RequestServices <- services.BuildServiceProvider()
+
+              let def =
+                  negotiate {
+                      accepts "application/json" (fun (_: HttpContext) -> task { return {| Name = "Widget" |} })
+                      accepts "text/html" (writeText "html")
+                  }
+
+              def.Handler.Invoke(ctx).Wait()
+
+              // The JSON formatter's own WriteAsync appends a charset to the Content-Type it
+              // sets, overriding the plain media type assigned beforehand (mirrors
+              // ContentNegotiationTests.fs's viaOutputFormatter assertions) -- hence a prefix
+              // match rather than exact equality.
+              Expect.stringStarts ctx.Response.ContentType "application/json" "Value should be written via viaOutputFormatter"
+              Expect.stringContains (getResponseBody ctx) "Widget" "Serialized value should appear in the body"
+
+          testCase "an Async<'a>-returning accepts handler has its value auto-formatted"
+          <| fun () ->
+              let ctx = createMockContext ()
+              setAccept ctx "application/json"
+              let services = Microsoft.Extensions.DependencyInjection.ServiceCollection()
+              services.AddLogging() |> ignore
+              services.AddMvcCore() |> ignore
+              ctx.RequestServices <- services.BuildServiceProvider()
+
+              let def =
+                  negotiate {
+                      accepts "application/json" (fun (_: HttpContext) -> async { return {| Name = "Widget" |} })
+                  }
+
+              def.Handler.Invoke(ctx).Wait()
+
+              Expect.stringContains (getResponseBody ctx) "Widget" "Serialized value should appear in the body"
+
+          testCase "a value-returning accepts entry composes with an independent-producer entry"
+          <| fun () ->
+              let ctx = createMockContext ()
+              setAccept ctx "application/ld+json"
+              let services = Microsoft.Extensions.DependencyInjection.ServiceCollection()
+              services.AddLogging() |> ignore
+              services.AddMvcCore() |> ignore
+              ctx.RequestServices <- services.BuildServiceProvider()
+              let mutable jsonRan = false
+
+              // Registration order matters here: Microsoft.Net.Http.Headers' MatchesMediaType
+              // treats a "+json" structured-syntax suffix as matching the plain "json"
+              // subtype (RFC 6839), so "application/json" and "application/ld+json" both
+              // match an Accept: application/ld+json with equal effective quality -- ties are
+              // broken by registration order (documented elsewhere in this file), so the
+              // independent-producer entry must be registered first for it to win here.
+              let def =
+                  negotiate {
+                      accepts "application/ld+json" (writeText "jsonld")
+                      accepts "application/json" (fun (_: HttpContext) -> jsonRan <- true; task { return {| Name = "Widget" |} })
+                  }
+
+              def.Handler.Invoke(ctx).Wait()
+
+              Expect.isFalse jsonRan "The value-returning representation should not run when a different one is selected"
+              Expect.equal (getResponseBody ctx) "jsonld" "The independent producer should have run instead" ]
