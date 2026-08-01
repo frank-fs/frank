@@ -31,7 +31,7 @@ let messageOfThrow (build: unit -> unit) : string =
         build ()
         failtest "Expected an exception, but none was raised"
     with
-    | :? Expecto.FailedException -> reraise ()
+    | :? Expecto.AssertException -> reraise ()
     | ex -> ex.Message
 
 // CLIMutable: XmlSerializer (used by AddXmlSerializerFormatters) requires a public
