@@ -13,9 +13,15 @@ type NegotiateSpec =
         { Representations = []
           Metadata = [] }
 
+/// The functions below `isWildcard` through `selectRepresentation` run on every
+/// negotiated request (unlike `NegotiateBuilder`'s CE members, which run once, when a
+/// `negotiate { }` block is constructed at startup) -- so they're marked `inline`,
+/// matching `Frank.Datastar`'s zero-overhead-wrapper convention for hot-path code.
+/// `dispatch` and `mergeProducesMetadata` are excluded: both run once per `negotiate { }`
+/// block build, not once per request, so inlining them wouldn't remove per-request cost.
 module internal Negotiation =
 
-    let isWildcard (mediaType: string) = mediaType.Contains "*"
+    let inline isWildcard (mediaType: string) = mediaType.Contains "*"
 
     /// Guards the value-returning `accepts` overloads (`HttpContext -> Task<'a>` and
     /// `HttpContext -> Async<'a>`), which auto-format their returned value through
@@ -54,7 +60,7 @@ module internal Negotiation =
     ///   catch-all `accepts "*/*"` still matches any concrete client entry. Without
     ///   that gate a concrete registered `application/json` would act as if it were
     ///   itself a pattern and match an Accept of `application/ld+json`.
-    let matches (candidate: MediaTypeHeaderValue) (registered: string) : bool =
+    let inline matches (candidate: MediaTypeHeaderValue) (registered: string) : bool =
         let registeredValue = MediaTypeHeaderValue.Parse(registered)
         // MediaTypeHeaderValue.MediaType is a StringSegment, not a string -- render both
         // sides to plain strings so `isWildcard` and the equality check are unambiguous.
@@ -70,7 +76,7 @@ module internal Negotiation =
     /// the subtype wildcarded ("text/*"), which outranks "*/*". This -- not quality
     /// -- is what RFC 9110 §12.5.1 says determines which entry governs a given
     /// representation when more than one entry matches it.
-    let specificity (entry: MediaTypeHeaderValue) : int =
+    let inline specificity (entry: MediaTypeHeaderValue) : int =
         (if entry.MatchesAllTypes then 0 else 1) + (if entry.MatchesAllSubTypes then 0 else 1)
 
     /// The effective quality of `mt` under this Accept header: the Quality (defaulting
@@ -81,7 +87,7 @@ module internal Negotiation =
     /// "text/html;q=0" override a broader "*/*;q=0.5" (the narrow entry wins and the
     /// representation is rejected) -- both directions of precedence fall out of the
     /// same rule. None means no parsed entry matches `mt` at all.
-    let effectiveQuality (parsed: MediaTypeHeaderValue list) (mt: string) : float option =
+    let inline effectiveQuality (parsed: MediaTypeHeaderValue list) (mt: string) : float option =
         parsed
         |> List.filter (fun entry -> matches entry mt)
         |> List.fold
@@ -101,7 +107,7 @@ module internal Negotiation =
     /// the highest wins, ties broken by registration order; a representation whose
     /// effective quality is 0, or that no entry matches at all, is never a candidate.
     /// Returns None when no representation has a positive effective quality.
-    let selectRepresentation (acceptValues: string seq) (mediaTypes: string list) : int option =
+    let inline selectRepresentation (acceptValues: string seq) (mediaTypes: string list) : int option =
         if List.isEmpty mediaTypes then
             None
         else
