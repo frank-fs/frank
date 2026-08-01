@@ -193,4 +193,48 @@ let tests =
               let buildTrulyEmpty () =
                   (NegotiateBuilder()).Run(NegotiateSpec.Empty) |> ignore
 
-              Expect.throws buildTrulyEmpty "Should throw when no representations are registered" ]
+              Expect.throws buildTrulyEmpty "Should throw when no representations are registered"
+
+          testCase "a representation registered via a bare HttpContext -> unit function is selected and runs its side effect"
+          <| fun () ->
+              let ctx = createMockContext ()
+              setAccept ctx "application/json"
+
+              let def =
+                  negotiate {
+                      accepts "application/json" (fun (ctx: HttpContext) ->
+                          ctx.Response.Headers.["X-Sync"] <- Microsoft.Extensions.Primitives.StringValues("1")
+                          ctx.Response.StatusCode <- 200)
+                      accepts "text/html" (writeText "html")
+                  }
+
+              def.Handler.Invoke(ctx).Wait()
+
+              Expect.equal ctx.Response.StatusCode 200 "The HttpContext -> unit representation should have been selected"
+              Expect.equal (ctx.Response.Headers.["X-Sync"].ToString()) "1" "Its side effect should have run"
+
+          testCase "Accept with q=0 on the only registered media type is rejected, not merely deprioritized"
+          <| fun () ->
+              let ctx = createMockContext ()
+              setAccept ctx "application/json;q=0"
+
+              let def =
+                  negotiate { accepts "application/json" (writeText "json") }
+
+              def.Handler.Invoke(ctx).Wait()
+
+              Expect.equal ctx.Response.StatusCode 406 "q=0 must exclude the representation entirely, per RFC 9110 12.5.1"
+              Expect.equal (getResponseBody ctx) "" "No body should be written"
+
+          testCase "Accept: */*;q=0.5, text/html;q=0 rejects text/html even though */* is present"
+          <| fun () ->
+              let ctx = createMockContext ()
+              setAccept ctx "*/*;q=0.5, text/html;q=0"
+
+              let def =
+                  negotiate { accepts "text/html" (writeText "html") }
+
+              def.Handler.Invoke(ctx).Wait()
+
+              Expect.equal ctx.Response.StatusCode 406 "The */*;q=0.5 entry doesn't name text/html, and the text/html;q=0 entry explicitly excludes it"
+              Expect.equal (getResponseBody ctx) "" "No body should be written" ]

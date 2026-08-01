@@ -29,12 +29,21 @@ module internal Negotiation =
         let registeredValue = MediaTypeHeaderValue.Parse(registered)
         candidate.MatchesMediaType(registeredValue.MediaType) || registeredValue.MatchesMediaType(candidate.MediaType)
 
+    /// RFC 9110 §12.5.1: a quality value of exactly 0 means the client explicitly
+    /// does NOT want this media type -- it must never be selected, unlike a merely
+    /// low (but nonzero) quality value which is just deprioritized.
+    let isExplicitlyRejected (entry: MediaTypeHeaderValue) : bool =
+        entry.Quality.HasValue && entry.Quality.Value = 0.0
+
     /// Selects the index of the representation that should serve this request, given
     /// the raw Accept header values and the registered media types, in registration
     /// order. An absent, empty, or entirely unparseable Accept is treated as an
     /// implicit "*/*" -- there is no separate "default representation" concept, it
-    /// falls out of ordinary wildcard matching. Returns None only when nothing
-    /// registered matches any entry.
+    /// falls out of ordinary wildcard matching. Returns None when nothing registered
+    /// matches any (non-rejected) entry, or when the Accept header named entries but
+    /// every one of them was excluded by an explicit q=0 -- that case must NOT fall
+    /// back to the "*/*" default, since the client did express a preference, it just
+    /// rejected everything on offer.
     let selectRepresentation (acceptValues: string seq) (mediaTypes: string list) : int option =
         if List.isEmpty mediaTypes then
             None
@@ -50,13 +59,35 @@ module internal Negotiation =
                 | true, values -> values |> List.ofSeq
                 | false, _ -> []
 
-            let entries =
-                if List.isEmpty parsed then
-                    [ MediaTypeHeaderValue.Parse("*/*") ]
-                else
-                    parsed |> List.sortWith (fun a b -> MediaTypeHeaderValueComparer.QualityComparer.Compare(b, a))
+            if List.isEmpty parsed then
+                let defaultEntry = MediaTypeHeaderValue.Parse("*/*")
+                mediaTypes |> List.tryFindIndex (matches defaultEntry)
+            else
+                let indexedMediaTypes = mediaTypes |> List.indexed
 
-            entries |> List.tryPick (fun entry -> mediaTypes |> List.tryFindIndex (matches entry))
+                // A representation matched by an explicit q=0 entry is excluded outright,
+                // even if a broader entry (e.g. "*/*;q=0.5") also matches it with positive
+                // quality -- an explicit rejection takes precedence over a less specific
+                // positive match, it is not merely outranked by it.
+                let rejectedIndices =
+                    parsed
+                    |> List.filter isExplicitlyRejected
+                    |> List.collect (fun entry ->
+                        indexedMediaTypes
+                        |> List.filter (fun (_, mt) -> matches entry mt)
+                        |> List.map fst)
+                    |> Set.ofList
+
+                let acceptedEntries =
+                    parsed
+                    |> List.filter (isExplicitlyRejected >> not)
+                    |> List.sortWith (fun a b -> MediaTypeHeaderValueComparer.QualityComparer.Compare(b, a))
+
+                acceptedEntries
+                |> List.tryPick (fun entry ->
+                    indexedMediaTypes
+                    |> List.tryFind (fun (idx, mt) -> not (Set.contains idx rejectedIndices) && matches entry mt)
+                    |> Option.map fst)
 
     let dispatch (representations: (string * RequestDelegate) list) : RequestDelegate =
         RequestDelegate(fun ctx ->

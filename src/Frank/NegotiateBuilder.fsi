@@ -21,7 +21,9 @@ type NegotiateBuilder =
 
     [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: RequestDelegate -> NegotiateSpec
+    [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> unit) -> NegotiateSpec
+    [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handlerDef: HandlerDefinition -> NegotiateSpec
 
 [<AutoOpen>]
