@@ -144,28 +144,99 @@ let searchProducts =
         })
     }
 
-/// Content negotiation example - supports both JSON and XML
+/// Content negotiation example -- genuinely returns a different body for JSON vs. HTML
 let getProductNegotiated =
-    handler {
-        name "getProductNegotiated"
-        summary "Get product with content negotiation"
-        description "Returns a product in JSON or XML format based on Accept header"
-        tags [ "Products"; "Advanced" ]
-        produces typeof<Product> 200 [ "application/json"; "application/xml" ]
-        produces typeof<ErrorResponse> 404 [ "application/json"; "application/xml" ]
-        handle (fun (ctx: HttpContext) -> task {
+    negotiate {
+        accepts "application/json" (handler {
+            name "getProductNegotiatedJson"
+            produces typeof<Product> 200
+            produces typeof<ErrorResponse> 404
+            handle (fun (ctx: HttpContext) -> task {
+                let id = ctx.Request.RouteValues.["id"] |> string |> Guid.Parse
+                match ProductStore.getById id with
+                | Some product -> do! ctx.Response.WriteAsJsonAsync(product)
+                | None ->
+                    ctx.Response.StatusCode <- 404
+                    do! ctx.Response.WriteAsJsonAsync({
+                        Code = "NOT_FOUND"
+                        Message = $"Product with ID {id} not found"
+                        Details = None
+                    })
+            })
+        })
+        accepts "text/html" (fun (ctx: HttpContext) -> task {
             let id = ctx.Request.RouteValues.["id"] |> string |> Guid.Parse
             match ProductStore.getById id with
             | Some product ->
-                // In a real app, you'd check Accept header and serialize accordingly
-                do! ctx.Response.WriteAsJsonAsync(product)
+                do! ctx.Response.WriteAsync(
+                    $"<html><body><h1>{product.Name}</h1><p>${product.Price}</p></body></html>")
             | None ->
                 ctx.Response.StatusCode <- 404
-                do! ctx.Response.WriteAsJsonAsync({
-                    Code = "NOT_FOUND"
-                    Message = $"Product with ID {id} not found"
-                    Details = None
-                })
+                do! ctx.Response.WriteAsync($"<html><body><h1>Not found</h1><p>{id}</p></body></html>")
+        })
+    }
+
+/// Wire-friendly shape for `getProductBridged`'s JSON/XML representations.
+///
+/// `Product` itself can't go through `viaOutputFormatter` as-is: `Category` is a plain
+/// discriminated union with no built-in System.Text.Json support (throws
+/// System.NotSupportedException), and `Product` isn't `[<CLIMutable>]` -- required by
+/// `AddXmlSerializerFormatters()`'s `XmlSerializer`, which also can't introspect the DU
+/// or `Set<string>` fields (silently emits an empty element instead of throwing).
+/// `Domain.fs` is out of scope for this change, so this DTO -- flattening `Category` to
+/// its case name and `Tags` to a plain array -- exists solely to make the bridge
+/// representation genuinely round-trip through both formatters.
+[<CLIMutable>]
+type ProductWire =
+    { Id: Guid
+      Name: string
+      Description: string
+      Price: decimal
+      Category: string
+      Tags: string[]
+      InStock: bool }
+
+module ProductWire =
+    let ofProduct (p: Product) : ProductWire =
+        { Id = p.Id
+          Name = p.Name
+          Description = p.Description |> Option.toObj
+          Price = p.Price
+          Category = string p.Category
+          Tags = p.Tags |> Set.toArray
+          InStock = p.InStock }
+
+    let notFound (id: Guid) : ProductWire =
+        { Id = id
+          Name = null
+          Description = null
+          Price = 0m
+          Category = null
+          Tags = [||]
+          InStock = false }
+
+/// Content negotiation with the IOutputFormatter bridge -- JSON and XML reuse MVC's
+/// formatter registry (requires AddMvcCore().AddXmlSerializerFormatters(), wired up in
+/// Program.fs), while an independent producer still handles HTML.
+let getProductBridged =
+    negotiate {
+        accepts [ "application/json"; "application/xml" ] (fun (ctx: HttpContext) -> task {
+            let id = ctx.Request.RouteValues.["id"] |> string |> Guid.Parse
+            match ProductStore.getById id with
+            | Some product -> return ProductWire.ofProduct product
+            | None ->
+                ctx.Response.StatusCode <- 404
+                return ProductWire.notFound id
+        })
+        accepts "text/html" (fun (ctx: HttpContext) -> task {
+            let id = ctx.Request.RouteValues.["id"] |> string |> Guid.Parse
+            match ProductStore.getById id with
+            | Some product ->
+                do! ctx.Response.WriteAsync(
+                    $"<html><body><h1>{product.Name}</h1><p>${product.Price}</p></body></html>")
+            | None ->
+                ctx.Response.StatusCode <- 404
+                do! ctx.Response.WriteAsync($"<html><body><h1>Not found</h1><p>{id}</p></body></html>")
         })
     }
 
