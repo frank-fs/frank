@@ -16,6 +16,8 @@
   <ItemGroup>
     <Compile Include="RdfTypes.fsi" />
     <Compile Include="RdfTypes.fs" />
+    <Compile Include="Rdf.fsi" />
+    <Compile Include="Rdf.fs" />
   </ItemGroup>
 
   <ItemGroup>

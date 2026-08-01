@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <Compile Include="RdfTypesTests.fs" />
+    <Compile Include="PrefixResolutionTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
