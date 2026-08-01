@@ -54,7 +54,7 @@ module WebLink =
 
 `format` produces one RFC 8288 field value (`<target>; rel="rel"; param="value"...`), including the quoted-parameter escaping (`\`, `"`) both existing implementations already do independently. This is the single implementation replacing both private copies.
 
-An `internal` helper in the same file, `appendToResponse : HttpContext -> WebLink seq -> unit`, is shared by both middlewares below: given a non-empty sequence of links for the current request, register **one** `Response.OnStarting` callback that formats all of them and appends a single `StringValues` array to the `Link` header. Given an empty sequence, it does nothing — no empty or malformed header is ever added.
+A `private` helper in the same file, `appendToResponse : HttpContext -> WebLink list -> unit`, is shared by both middlewares below: given a non-empty list of links for the current request, register **one** `Response.OnStarting` callback that formats all of them and appends a single `StringValues` array to the `Link` header. Given an empty list, it does nothing — no empty or malformed header is ever added.
 
 ### 2. App-wide contributions — `WebHostSpec.LinkProviders`
 
@@ -79,23 +79,29 @@ The first is sugar for the common static case (`link "https://example.com/licens
 
 `WebHostBuilder.Run()` synthesizes one middleware from the accumulated `spec.LinkProviders` and splices it in **immediately before `spec.BeforeRoutingMiddleware` runs** — preserving today's before-routing placement so unmatched-route (404) and exception-handler-regenerated responses still carry app-wide links. For each request it calls every provider with `ctx`, concatenates the results, and calls `WebLink.appendToResponse`.
 
-### 3. Resource-scoped contributions — `ResourceSpec.LinkProviders`
+### 3. Resource-scoped contributions — `ResourceBuilder.link` writing into `ResourceSpec.Metadata`
 
-`ResourceSpec` (in `src/Frank/ResourceBuilder.fs`) gains the identical authoring shape:
+`ResourceSpec` (in `src/Frank/ResourceBuilder.fs`) is **unchanged** — it gains no new field. Instead, `ResourceBuilder` gains a `link` custom operation, two overloads, that write directly into the pre-existing `Metadata: (EndpointBuilder -> unit) list` extensibility point (already threaded through to `RouteEndpointBuilder.Metadata` in `Build()`, and already used by `Frank.Auth`):
 
 ```fsharp
-LinkProviders: (HttpContext -> WebLink seq) list   // ResourceSpec.Empty: []
+[<CustomOperation("link")>]
+member __.Link(spec: ResourceSpec, target: string, rel: string) : ResourceSpec =
+    __.Link(spec, fun (_: HttpContext) -> Seq.singleton { Target = target; Rel = rel; Params = [] })
+
+[<CustomOperation("link")>]
+member __.Link(spec: ResourceSpec, provider: HttpContext -> WebLink seq) : ResourceSpec =
+    ResourceBuilder.AddMetadata(spec, fun builder -> builder.Metadata.Add(ResourceLinkProvider provider))
 ```
 
-with matching `link` overloads on `ResourceBuilder` — same two signatures as `WebHostBuilder`'s. From the author's side, app-wide and resource-scoped contributions look the same; only which builder you call `link` inside determines the scope.
+From the author's side, app-wide and resource-scoped contributions look the same — the same static sugar / general-provider choice — only which builder you call `link` inside determines the scope.
 
-Under the hood, delivery differs, because reaching "only this resource's responses" requires request-time knowledge of which endpoint matched — something `WebHostSpec.LinkProviders` doesn't need and `ResourceSpec.LinkProviders` does. `ResourceSpec.Build()` already threads a `Metadata: (EndpointBuilder -> unit) list` extensibility point through to `RouteEndpointBuilder.Metadata` (built for `Frank.Auth`); this reuses it. Each entry in `spec.LinkProviders` is wrapped in an `internal` marker and added to the endpoint's metadata during `Build()`:
+Under the hood, delivery differs, because reaching "only this resource's responses" requires request-time knowledge of which endpoint matched — something `WebHostSpec.LinkProviders` doesn't need. There is no separate `ResourceSpec.LinkProviders` list to accumulate first: each resource-scoped `link` call wraps its provider immediately in an `internal` marker type and adds it directly to the endpoint's metadata via the existing `AddMetadata` convention mechanism:
 
 ```fsharp
 type internal ResourceLinkProvider = ResourceLinkProvider of (HttpContext -> WebLink seq)
 ```
 
-(`internal` — not part of the public `.fsi` surface; the only public surface is the `link` operation itself, per `CLAUDE.md`'s rule that private/internal wiring stays out of signature files unless another file in the assembly needs it — which `WebHostBuilder.fs` does, to read it back.)
+(Defined in `src/Frank/WebLink.fs`, not `ResourceBuilder.fs` — `WebLink.useResourceScopedLinks` is the file that needs to read it back at request time, and `ResourceBuilder.fs` only needs to construct it. `internal` — not part of the public `.fsi` surface; the only public surface is the `link` operation itself, per `CLAUDE.md`'s rule that private/internal wiring stays out of signature files unless another file in the same assembly needs it — which `WebLink.fs` does.)
 
 `WebHostBuilder.Run()` synthesizes a second middleware, spliced in **immediately after `UseRouting()`, before `spec.Middleware` runs**. For each request it reads `ctx.GetEndpoint()`; if non-null, it resolves `endpoint.Metadata.GetOrderedMetadata<ResourceLinkProvider>()`, calls each wrapped provider with `ctx`, concatenates the results, and calls `WebLink.appendToResponse` — same helper, same append-not-assign, same single-`OnStarting`-callback shape as the app-wide middleware. On an unmatched route, `GetEndpoint()` is null, so this middleware contributes nothing — only app-wide contributions can reach a 404 response, since no resource ever ran for it.
 
@@ -111,7 +117,7 @@ app
 |> fun app -> app.UseEndpoints(...)
 ```
 
-Both new middlewares are installed unconditionally, same as `UseRouting`/`UseEndpoints` are today; with no providers registered anywhere, each is a cheap per-request check (empty list / no matching metadata) that appends nothing.
+The app-wide middleware only installs itself when `spec.LinkProviders` is non-empty — `WebLink.useAppWideLinks` short-circuits and returns `app` unchanged for an empty list, so an app that never calls `link` doesn't pay even a no-op `app.Use` per request. The resource-scoped middleware, by contrast, is installed unconditionally, same as `UseRouting`/`UseEndpoints` are today; with no resource ever registering a `link`, it's a cheap per-request check (`GetEndpoint()` non-null, no matching metadata) that appends nothing.
 
 ### 4. Error handling
 
