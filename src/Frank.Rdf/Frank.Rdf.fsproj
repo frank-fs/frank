@@ -4,6 +4,12 @@
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <PackageTags>rdf;linked-data;json-ld;triples</PackageTags>
     <Description>Hand-authored RDF triples for Frank resources, serialized as JSON-LD</Description>
+    <!-- NU1902: dotNetRdf.Core 3.5.1's transitive dependency on AngleSharp >=1.4.0 carries a known
+         moderate-severity advisory (GHSA-pgww-w46g-26qg). dotNetRdf.Core is pinned to exactly 3.5.1
+         per the plan's global version constraint, so this cannot be resolved by bumping the package
+         today. src/Directory.Build.props sets TreatWarningsAsErrors, which promotes this NuGet audit
+         warning to a build-breaking error; suppressing it here is required to build/restore. Revisit
+         when the dotNetRdf.Core pin is lifted or AngleSharp ships a patched transitive version. -->
     <NoWarn>NU1902</NoWarn>
   </PropertyGroup>
 
