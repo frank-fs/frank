@@ -213,18 +213,14 @@ module ProductWire =
 /// Content negotiation with the IOutputFormatter bridge -- JSON and XML each reuse MVC's
 /// formatter registry (requires AddMvcCore().AddXmlSerializerFormatters(), wired up in
 /// Program.fs) for the found case, calling `ContentNegotiation.viaOutputFormatter`
-/// directly on a plain `ProductWire`. JSON and XML are two separate `accepts` entries
-/// here, not one shared `accepts [ "application/json"; "application/xml" ]` handler --
-/// Task 4's batch-registration sugar is for one handler that genuinely applies to
-/// multiple types, and here it doesn't: the not-found case needs a body PER content
-/// type, written directly rather than forced through `viaOutputFormatter` (which would
-/// mean padding `ProductWire` with error-only fields nobody wants on the success path,
-/// just to give both content types one shared serializable shape). Writing the 404 body
-/// directly instead matches how every other 404 in this file already works (`getProduct`,
-/// `getProductNegotiated`, `updateProduct`, `deleteProduct` all write JSON directly for
-/// their error case, not via `IOutputFormatter`), and how the `text/html` representation
-/// below already hand-writes its own markup -- so this is actually more consistent with
-/// the rest of the file, not less.
+/// directly on a plain `ProductWire`. JSON and XML are registered as two separate
+/// `accepts` entries rather than one shared handler, because the not-found case needs
+/// its own body per content type: the domain `ErrorResponse` type isn't `[<CLIMutable>]`
+/// and has an `option` field, so it can't go through `XmlSerializer` either. Each
+/// representation writes its own 404 body directly instead -- the same pattern every
+/// other 404 in this file already uses (`getProduct`, `getProductNegotiated`,
+/// `updateProduct`, `deleteProduct`), and the same pattern the `text/html` representation
+/// below already uses for its whole response.
 let getProductBridged =
     negotiate {
         accepts "application/json" (fun (ctx: HttpContext) -> task {
@@ -247,7 +243,6 @@ let getProductBridged =
                 do! Frank.ContentNegotiation.viaOutputFormatter "application/xml" (ProductWire.ofProduct product) ctx
             | None ->
                 ctx.Response.StatusCode <- 404
-                ctx.Response.ContentType <- "application/xml"
                 do! ctx.Response.WriteAsync(
                     $"""<?xml version="1.0" encoding="utf-8"?><Error><Code>NOT_FOUND</Code><Message>Product with ID {id} not found</Message></Error>""")
         })
