@@ -15,6 +15,9 @@ module WebHostBuilderExtensions =
 
     let private openApiRoutePattern = "/.well-known/openapi.json"
 
+    let private serviceDescLinkProvider (_: HttpContext) : WebLink seq =
+        Seq.singleton { Target = openApiRoutePattern; Rel = "service-desc"; Params = [ "type", "application/json" ] }
+
     let private mapOpenApiEndpoints (endpoints: IEndpointRouteBuilder) =
         endpoints.MapOpenApi(openApiRoutePattern) |> ignore
         endpoints.MapScalarApiReference(fun (options: ScalarOptions) ->
@@ -53,10 +56,7 @@ module WebHostBuilderExtensions =
                         configureOpenApiDefaults options
                     ) |> ignore
                     services
-                LinkProviders =
-                    spec.LinkProviders
-                    @ [ fun (_: HttpContext) ->
-                            Seq.singleton { Target = openApiRoutePattern; Rel = "service-desc"; Params = [ "type", "application/json" ] } ]
+                LinkProviders = spec.LinkProviders @ [ serviceDescLinkProvider ]
                 Middleware = spec.Middleware >> fun app ->
                     app.UseEndpoints(mapOpenApiEndpoints) |> ignore
                     app }
@@ -69,10 +69,7 @@ module WebHostBuilderExtensions =
                         configure options
                     ) |> ignore
                     services
-                LinkProviders =
-                    spec.LinkProviders
-                    @ [ fun (_: HttpContext) ->
-                            Seq.singleton { Target = openApiRoutePattern; Rel = "service-desc"; Params = [ "type", "application/json" ] } ]
+                LinkProviders = spec.LinkProviders @ [ serviceDescLinkProvider ]
                 Middleware = spec.Middleware >> fun app ->
                     app.UseEndpoints(mapOpenApiEndpoints) |> ignore
                     app }
