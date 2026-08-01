@@ -41,6 +41,11 @@ type WebHostBuilder =
         spec: WebHostSpec * cond: (IApplicationBuilder -> bool) * f: (IApplicationBuilder -> IApplicationBuilder) ->
             WebHostSpec
 
+    /// Registers an app-wide Link header contribution: present on every
+    /// response, including unmatched routes (404) and responses regenerated
+    /// by exception-handling middleware. Two forms: `link target rel` is
+    /// sugar for a static entry; `link (fun ctx -> ...)` is the general form
+    /// for a provider whose value depends on the request or on configuration.
     [<CustomOperation("link")>]
     member Link: spec: WebHostSpec * provider: (HttpContext -> WebLink seq) -> WebHostSpec
 

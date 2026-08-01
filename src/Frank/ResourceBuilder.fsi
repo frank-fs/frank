@@ -27,6 +27,11 @@ type ResourceBuilder =
     [<CustomOperation("name")>]
     member Name: spec: ResourceSpec * name: string -> ResourceSpec
 
+    /// Registers a resource-scoped Link header contribution: present only on
+    /// responses from this resource's own endpoints, never on unmatched
+    /// routes or other resources. Two forms: `link target rel` is sugar for
+    /// a static entry; `link (fun ctx -> ...)` is the general form for a
+    /// provider whose value depends on the request.
     [<CustomOperation("link")>]
     member Link: spec: ResourceSpec * target: string * rel: string -> ResourceSpec
 
