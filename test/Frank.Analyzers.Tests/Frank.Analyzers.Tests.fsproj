@@ -20,6 +20,8 @@
     <Compile Include="fixtures/DatastarConflict.fs" />
     <Compile Include="fixtures/DatastarWithPost.fs" />
     <Compile Include="fixtures/DatastarNoConflict.fs" />
+    <Compile Include="fixtures/DuplicateAccepts.fs" />
+    <Compile Include="fixtures/DistinctAccepts.fs" />
   </ItemGroup>
 
   <ItemGroup>

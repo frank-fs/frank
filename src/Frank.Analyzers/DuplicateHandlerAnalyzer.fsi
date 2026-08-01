@@ -25,6 +25,10 @@ val tryGetDatastarMethodFromArg: argExpr: SynExpr -> string option
 /// Create a message for a duplicate HTTP handler
 val createDuplicateMessage: methodName: string -> duplicateRange: range -> firstRange: range -> Message
 
+/// Create a message for a duplicate `accepts` media-type registration inside one
+/// `negotiate { }` block
+val createDuplicateMediaTypeMessage: mediaType: string -> duplicateRange: range -> firstRange: range -> Message
+
 /// Analyze a parsed F# file for duplicate HTTP handlers
 val analyzeFile: parseTree: ParsedInput -> Message list
 
