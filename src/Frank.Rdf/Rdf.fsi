@@ -69,3 +69,24 @@ module Rdf =
 
     /// Enters a `describe { }` block: `describe (Node.Iri "https://example.org/g1") { typ "schema:Game" }`.
     val describe: subject: Node -> DescribeBuilder
+
+    /// Builds a `Doc`. Mirrors Frank core's `ResourceBuilder`/`resource { }` exactly: one accumulator,
+    /// no Combine/Delay -- `about` and `triple` each take and return the same `Doc`, the same way
+    /// `resource { }`'s `get`/`post` take and return one `ResourceSpec`.
+    [<Sealed>]
+    type RdfBuilder =
+        new: unit -> RdfBuilder
+        member Yield: 'a -> Doc
+        member Run: doc: Doc -> Doc
+
+        [<CustomOperation("prefix")>]
+        member Prefix: doc: Doc * name: string * uri: string -> Doc
+
+        [<CustomOperation("about")>]
+        member About: doc: Doc * d: Description -> Doc
+
+        [<CustomOperation("triple")>]
+        member Triple: doc: Doc * subject: Node * predicate: string * value: Value -> Doc
+
+    /// Enters an `rdf { }` block.
+    val rdf: RdfBuilder

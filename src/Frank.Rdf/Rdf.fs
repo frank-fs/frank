@@ -60,3 +60,25 @@ module Rdf =
             { d with Statements = d.Statements @ [ predicate, Value.Node value ] }
 
     let describe subject = DescribeBuilder(subject)
+
+    [<Sealed>]
+    type RdfBuilder() =
+        member _.Yield(_) : Doc = Doc.Empty
+        member _.Run(doc: Doc) : Doc = doc
+
+        [<CustomOperation("prefix")>]
+        member _.Prefix(doc: Doc, name: string, uri: string) : Doc =
+            { doc with
+                Prefixes = doc.Prefixes @ [ name, uri ] }
+
+        [<CustomOperation("about")>]
+        member _.About(doc: Doc, d: Description) : Doc =
+            { doc with
+                Statements = doc.Statements @ (d.Statements |> List.map (fun (p, v) -> d.Subject, p, v)) }
+
+        [<CustomOperation("triple")>]
+        member _.Triple(doc: Doc, subject: Node, predicate: string, value: Value) : Doc =
+            { doc with
+                Statements = doc.Statements @ [ subject, predicate, value ] }
+
+    let rdf = RdfBuilder()
