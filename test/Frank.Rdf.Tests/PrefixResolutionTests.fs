@@ -35,7 +35,11 @@ let tests =
           }
 
           test "raises for an undeclared prefix that isn't an absolute IRI either" {
-              Expect.throws (fun () -> resolveIri [] "schema:Game" |> ignore) "No declared prefixes at all"
+              // Deliberately not "schema:Game" -- that string is itself a well-formed absolute URI
+              // under System.Uri's loose rules (see the test above), so with no declared prefixes it
+              // would pass through unchanged rather than raise. The unescaped space here is what makes
+              // this string genuinely neither a resolvable CURIE nor a well-formed absolute IRI.
+              Expect.throws (fun () -> resolveIri [] "schema:Game Object" |> ignore) "No declared prefixes at all"
           }
 
           test "raises for a string with no colon" {
