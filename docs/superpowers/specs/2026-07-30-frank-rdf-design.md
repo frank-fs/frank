@@ -189,18 +189,18 @@ module Doc =
 
 That it's this simple isn't an oversight — the two things that look like they'd need special-case handling are already covered elsewhere. A prefix declared with two different URIs across the two docs is caught by the existing conflict check in *Data model*, which runs at `toGraph` time over the merged `Prefixes` list regardless of provenance — merge needs no validation of its own. An identical statement asserted by both docs is harmless: `VDS.RDF.Graph.Assert` has set semantics, so a duplicate tuple in `Doc.Statements` collapses to one triple in the built graph, not two. The one thing that *does* need a real decision is blank node identity across documents built independently of each other, which is why `Node.blank` mints a GUID rather than a per-`Doc` counter (see *Data model*) — with that in place, two docs that each minted their own blank nodes can never collide when merged.
 
-`rdf { }` exposes this as `include`, taking an already-built `Doc` the same way `about` takes an already-built `Description`:
+`rdf { }` exposes this as `includeDoc`, taking an already-built `Doc` the same way `about` takes an already-built `Description`:
 
 ```fsharp
-[<CustomOperation("include")>]
-member _.Include(doc: Doc, other: Doc) : Doc = Doc.merge doc other
+[<CustomOperation("includeDoc")>]
+member _.IncludeDoc(doc: Doc, other: Doc) : Doc = Doc.merge doc other
 ```
 
 ```fsharp
 rdf {
     prefix "schema" "https://schema.org/"
     about (describe (Node.Iri gameUri) { typ "schema:Game"; property "schema:name" "Tic-tac-toe" })
-    include otherDoc   // e.g. facts about the same gameUri built by a different function
+    includeDoc otherDoc   // e.g. facts about the same gameUri built by a different function
 }
 ```
 
@@ -227,7 +227,7 @@ With both pieces in place, the tic-tac-toe follow-on plan can build the actual `
 
 | Situation | Behaviour |
 |---|---|
-| `property`/`typ`/predicate CURIE uses an undeclared prefix | Throws at `toGraph` time with the unresolved CURIE named in the message. Fail fast rather than emit a garbage IRI. |
+| `property`/`typ`/predicate CURIE uses an undeclared prefix | Only throws when the string is *also* not a well-formed absolute URI (e.g. it contains whitespace). For a syntactically URI-shaped typo like `foaf:name` with no declared `foaf` prefix — the common case — `resolveIri`'s fallback (`Uri.IsWellFormedUriString`) accepts it, so it silently passes through as the literal (wrong) IRI `<foaf:name>` in the output graph instead of raising. Not a fail-fast guarantee for undeclared prefixes in general, despite appearances; see [frank-fs/frank#484](https://github.com/frank-fs/frank/issues/484), which tracks tightening this. |
 | Same prefix declared twice with different URIs | Throws — ambiguous mapping. |
 | `Node.blank ()` handle reused across `describe` blocks | Same underlying blank node — this is how you assert more statements about a node you don't have an IRI for, not an error. |
 | `describe` with no `typ`/`property` calls, passed to `about` | Omitted — no triples asserted, so no trace of the subject appears in the graph. |
@@ -238,7 +238,7 @@ With both pieces in place, the tic-tac-toe follow-on plan can build the actual `
 1. **`RdfTypes.fs`** — the model, plus unit tests for construction (no serialization yet).
 2. **`Rdf.fs`: `DescribeBuilder` + `RdfBuilder` + `Doc.toGraph`** — `DescribeBuilder` first in isolation (`typ`/`property` overloads accumulating into a `Description`), then `RdfBuilder`'s `prefix`/`about`/`triple` operations threading `Doc` the same way `ResourceBuilder`'s operations thread `ResourceSpec`, then prefix resolution and blank node minting in `toGraph`. Unit-tested by inspecting the resulting `Graph`'s triples directly (subject/predicate/object), not through JSON-LD.
 3. **`Doc.toJsonLd`** — wire up `JsonLdWriter`, expanded-form output.
-4. **`Doc.merge` + `include`** — trivial once `Node.blank` is GUID-based from step 1; covered by tests proving cross-document blank nodes don't collide.
+4. **`Doc.merge` + `includeDoc`** — trivial once `Node.blank` is GUID-based from step 1; covered by tests proving cross-document blank nodes don't collide.
 5. **tic-tac-toe integration** — replace `gameJsonLd`.
 
 Each stage independently verifiable, matching how `Frank.JsonHome` was staged.
@@ -250,7 +250,7 @@ New project `test/Frank.Rdf.Tests`.
 - **Unit, no serialization**: `DescribeBuilder` in isolation — `typ`/`property` overload resolution (literal and `Node` forms), multi-valued properties, producing a plain `Description`. `RdfBuilder` separately — `prefix` accumulation, `about` absorbing a `Description`, bare `triple`, two consecutive `about` calls, an empty `describe` block. No `Combine`/`Delay` cases to test, since neither builder has any — that's the point of matching `handler`/`get`'s shape instead of inventing composition machinery.
 - **Graph-level**: `toGraph` output asserted by triple count/shape for a representative document (including the two-subject `QuantitativeValue` case), not by string comparison.
 - **Round-trip check** (the JSON-LD equivalent of JsonHome's golden-document test): serialize with `Doc.toJsonLd`, then parse the result back into a graph with dotNetRDF's own JSON-LD reader, and assert the two graphs are isomorphic. This is the strongest available check that the expanded output means what the input graph meant — stronger than diffing against a hand-written expected string, which is exactly the kind of brittleness that made the compact-form attempt fragile.
-- **Merge**: two independently-built `Doc`s (built by two separate `rdf { }` calls, each minting its own blank node) combined via `Doc.merge`/`include`, asserting the merged graph contains the union of both and that the two blank nodes remain distinct — the concrete proof that GUID-based `Node.blank` actually prevents the collision described in *Data model*. A second case merging two docs that legitimately share a prefix (same name, same URI) to confirm that's a no-op, not a spurious conflict.
+- **Merge**: two independently-built `Doc`s (built by two separate `rdf { }` calls, each minting its own blank node) combined via `Doc.merge`/`includeDoc`, asserting the merged graph contains the union of both and that the two blank nodes remain distinct — the concrete proof that GUID-based `Node.blank` actually prevents the collision described in *Data model*. A second case merging two docs that legitimately share a prefix (same name, same URI) to confirm that's a no-op, not a spurious conflict.
 - **tic-tac-toe regression**: the existing schema.org fields (`@type`, `name`, `description`, `numberOfPlayers`, `sameAs` to Wikidata/DBpedia) are all present in the new expanded output, via the round-trip graph rather than a literal string comparison against the old compact form.
 
 ## Future work (separate)
