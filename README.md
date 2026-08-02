@@ -645,9 +645,11 @@ dotnet add package Frank.Rdf
 ### Example
 
 ```fsharp
+open System
 open Frank.Rdf
 
 let players = Node.Iri "https://example.org/games/1#players"
+let anonymousReview = Node.blank ()   // no natural IRI -- minted fresh, GUID-backed
 
 let gameDoc =
     rdf {
@@ -658,15 +660,22 @@ let gameDoc =
                 typ "schema:Game"
                 propertyString "schema:name" "Tic-tac-toe"
                 propertyInt "schema:numberOfPlayers" 2
+                propertyBool "schema:isFree" true
+                propertyDateTime "schema:datePublished" (DateTimeOffset(1952, 1, 1, 0, 0, 0, TimeSpan.Zero))
                 propertyNode "schema:sameAs" (Node.Iri "http://www.wikidata.org/entity/Q210339")
+                propertyNode "schema:review" anonymousReview
             }
         )
+
+        about (describe anonymousReview { propertyString "schema:reviewBody" "A timeless classic." })
     }
 
 Doc.toJsonLd gameDoc
 ```
 
 `describe`/`about` mirrors `handler { }`/`get`: `describe subject { ... }` runs to completion on its own, producing a plain `Description`, and `about` absorbs it into the surrounding `rdf { }` document — the same two-CE composition pattern Frank core already uses for `handler { }` feeding `resource { }`'s `get`. A bare `triple subject predicate value` operation is also available for one-off statements.
+
+`Node.blank ()` mints an anonymous node for values with no natural IRI (like the review above) — each call is GUID-backed, so blank nodes minted by two independently-built `Doc`s never collide when merged via `Doc.merge`/`includeDoc`.
 
 ### Available Operations
 
@@ -676,6 +685,7 @@ Doc.toJsonLd gameDoc
 - `includeDoc otherDoc` - Merges another independently-built `Doc` in (same as `Doc.merge`)
 - `typ "prefix:Type"` - Asserts `rdf:type`
 - `propertyString` / `propertyInt` / `propertyBool` / `propertyDateTime` / `propertyNode` - Asserts a property, picked by the value's type (five distinct operations rather than one overloaded `property`, since F#'s custom-operation overload resolution can't reliably disambiguate by argument type across calls in the same block)
+- `Node.blank ()` - Mints a fresh, GUID-backed blank node for a subject/object with no natural IRI
 
 ### Serializing
 
