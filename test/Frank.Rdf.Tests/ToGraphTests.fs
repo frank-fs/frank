@@ -89,4 +89,17 @@ let tests =
                   }
 
               Expect.throws (fun () -> Doc.toGraph doc |> ignore) ""
+          }
+
+          test "undeclared prefix throws with the CURIE named in the message" {
+              // Deliberately not "schema:Game" -- that string is itself a well-formed absolute URI
+              // under System.Uri's loose rules (see Task 2's PrefixResolutionTests.fs), so with no
+              // declared prefix it would pass through unchanged rather than raise. The unescaped space
+              // here is what makes this string genuinely neither a resolvable CURIE nor a well-formed
+              // absolute IRI, so it actually exercises the raise path this test is named for.
+              let doc = rdf { about (describe (Node.Iri "https://example.org/g1") { typ "schema:Game Object" }) }
+              // No `prefix "schema" ...` declared above.
+              Expect.throwsC
+                  (fun () -> Doc.toGraph doc |> ignore)
+                  (fun ex -> Expect.stringContains ex.Message "schema:Game Object" "Names the offending CURIE")
           } ]
