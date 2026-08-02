@@ -88,8 +88,8 @@ module Rdf =
         [<CustomOperation("triple")>]
         member Triple: doc: Doc * subject: Node * predicate: string * value: Value -> Doc
 
-        [<CustomOperation("include")>]
-        member Include: doc: Doc * other: Doc -> Doc
+        [<CustomOperation("includeDoc")>]
+        member IncludeDoc: doc: Doc * other: Doc -> Doc
 
     /// Enters an `rdf { }` block.
     val rdf: RdfBuilder

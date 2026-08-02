@@ -6,7 +6,7 @@ open Frank.Rdf
 [<Tests>]
 let tests =
     testList
-        "Doc.merge / include"
+        "Doc.merge / includeDoc"
         [ test "merges two documents' prefixes and statements" {
               let a = rdf { prefix "schema" "https://schema.org/" }
               let b = rdf { triple (Node.Iri "https://example.org/g1") "schema:name" (Value.Literal(Literal.String "x")) }
@@ -17,14 +17,14 @@ let tests =
               Expect.equal merged.Statements b.Statements ""
           }
 
-          test "include inside rdf { } does the same thing as Doc.merge" {
+          test "includeDoc inside rdf { } does the same thing as Doc.merge" {
               let other =
                   rdf { triple (Node.Iri "https://example.org/g1") "schema:name" (Value.Literal(Literal.String "x")) }
 
               let doc =
                   rdf {
                       prefix "schema" "https://schema.org/"
-                      include other
+                      includeDoc other
                   }
 
               Expect.equal doc.Statements other.Statements ""

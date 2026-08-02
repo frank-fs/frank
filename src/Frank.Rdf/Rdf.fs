@@ -133,7 +133,7 @@ module Rdf =
             { doc with
                 Statements = doc.Statements @ [ subject, predicate, value ] }
 
-        [<CustomOperation("include")>]
-        member _.Include(doc: Doc, other: Doc) : Doc = Doc.merge doc other
+        [<CustomOperation("includeDoc")>]
+        member _.IncludeDoc(doc: Doc, other: Doc) : Doc = Doc.merge doc other
 
     let rdf = RdfBuilder()
