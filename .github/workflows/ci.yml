@@ -36,6 +36,7 @@ jobs:
           dotnet test test/Frank.Auth.Tests
           dotnet test test/Frank.OpenApi.Tests
           dotnet test test/Frank.Datastar.Tests
+          dotnet test test/Frank.JsonHome.Tests
           dotnet test test/Frank.Rdf.Tests
       - name: Pack
         run: |
@@ -44,6 +45,7 @@ jobs:
           dotnet pack src/Frank.Auth -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.OpenApi -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.Datastar -c Release --no-restore --include-symbols -o out
+          dotnet pack src/Frank.JsonHome -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.Rdf -c Release --no-restore --include-symbols -o out
       - name: Upload artifact
         uses: actions/upload-artifact@v4
