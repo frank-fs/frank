@@ -49,7 +49,7 @@ let private gameDoc (baseUri: string) (id: string) (name: string) : Doc =
 // `negotiate { }` picks a representation by `Accept`, both serving the SAME
 // `/games/{id}` url. "application/json" is registered first, so it's also
 // what a request with no `Accept` header (or an unparseable one) gets --
-// see NegotiateBuilder.fsi. Each representation does its own game lookup
+// see `selectRepresentation` in NegotiateBuilder.fs. Each representation does its own game lookup
 // and 404 handling, independently -- matching Frank.OpenApi.Sample's
 // `getProductNegotiated` pattern (deliberately not factored out).
 let private getGame =

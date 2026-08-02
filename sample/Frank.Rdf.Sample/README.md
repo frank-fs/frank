@@ -16,10 +16,11 @@ dotnet run --project sample/Frank.Rdf.Sample/
 ## Try it
 
 ```bash
-# No Accept header, or an explicit "application/json", both get the plain-JSON
-# representation -- a small DTO, no RDF involved.
+# curl's default Accept (*/*), or an explicit "application/json", both get the
+# plain-JSON representation -- a small DTO, no RDF involved.
 curl -s http://localhost:5000/games/1 | jq
 curl -s -H "Accept: application/json" http://localhost:5000/games/1 | jq
+curl -s -H "Accept: application/json" http://localhost:5000/games/2 | jq
 
 # Ask for "application/ld+json" and get the expanded-form JSON-LD representation
 # instead, at the SAME url.
