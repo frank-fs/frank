@@ -27,7 +27,7 @@ let tests =
               Expect.equal d.Statements.Length 2 "Two rdf:type statements"
           }
 
-          test "property overloads wrap plain values into the right Value/Literal case" {
+          test "propertyString/Int/Bool/DateTime/Node operations wrap plain values into the right Value/Literal case" {
               let d =
                   describe (Node.Iri "https://example.org/g1") {
                       propertyString "schema:name" "Tic-tac-toe"
