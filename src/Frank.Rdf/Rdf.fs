@@ -61,28 +61,6 @@ module Rdf =
 
     let describe subject = DescribeBuilder(subject)
 
-    [<Sealed>]
-    type RdfBuilder() =
-        member _.Yield(_) : Doc = Doc.Empty
-        member _.Run(doc: Doc) : Doc = doc
-
-        [<CustomOperation("prefix")>]
-        member _.Prefix(doc: Doc, name: string, uri: string) : Doc =
-            { doc with
-                Prefixes = doc.Prefixes @ [ name, uri ] }
-
-        [<CustomOperation("about")>]
-        member _.About(doc: Doc, d: Description) : Doc =
-            { doc with
-                Statements = doc.Statements @ (d.Statements |> List.map (fun (p, v) -> d.Subject, p, v)) }
-
-        [<CustomOperation("triple")>]
-        member _.Triple(doc: Doc, subject: Node, predicate: string, value: Value) : Doc =
-            { doc with
-                Statements = doc.Statements @ [ subject, predicate, value ] }
-
-    let rdf = RdfBuilder()
-
     module Doc =
         open VDS.RDF
         open VDS.RDF.Writing
@@ -130,3 +108,32 @@ module Rdf =
             use writer = new System.IO.StringWriter()
             writeJsonLd doc writer
             writer.ToString()
+
+        let merge (a: Doc) (b: Doc) : Doc =
+            { Prefixes = a.Prefixes @ b.Prefixes
+              Statements = a.Statements @ b.Statements }
+
+    [<Sealed>]
+    type RdfBuilder() =
+        member _.Yield(_) : Doc = Doc.Empty
+        member _.Run(doc: Doc) : Doc = doc
+
+        [<CustomOperation("prefix")>]
+        member _.Prefix(doc: Doc, name: string, uri: string) : Doc =
+            { doc with
+                Prefixes = doc.Prefixes @ [ name, uri ] }
+
+        [<CustomOperation("about")>]
+        member _.About(doc: Doc, d: Description) : Doc =
+            { doc with
+                Statements = doc.Statements @ (d.Statements |> List.map (fun (p, v) -> d.Subject, p, v)) }
+
+        [<CustomOperation("triple")>]
+        member _.Triple(doc: Doc, subject: Node, predicate: string, value: Value) : Doc =
+            { doc with
+                Statements = doc.Statements @ [ subject, predicate, value ] }
+
+        [<CustomOperation("include")>]
+        member _.Include(doc: Doc, other: Doc) : Doc = Doc.merge doc other
+
+    let rdf = RdfBuilder()

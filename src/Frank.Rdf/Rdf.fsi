@@ -88,6 +88,9 @@ module Rdf =
         [<CustomOperation("triple")>]
         member Triple: doc: Doc * subject: Node * predicate: string * value: Value -> Doc
 
+        [<CustomOperation("include")>]
+        member Include: doc: Doc * other: Doc -> Doc
+
     /// Enters an `rdf { }` block.
     val rdf: RdfBuilder
 
@@ -108,3 +111,8 @@ module Rdf =
         /// Convenience wrapper over writeJsonLd for callers that need the whole document as a string
         /// (tests that reparse it, mainly). Prefer writeJsonLd directly when writing to a response.
         val toJsonLd: doc: Doc -> string
+
+        /// Combines two independently-built documents: concatenates Prefixes and Statements, nothing
+        /// more. Safe because Node.blank mints a GUID (never a per-Doc counter, see RdfTypes.fsi) and
+        /// because prefix-conflict/duplicate-statement handling already lives in toGraph, not here.
+        val merge: a: Doc -> b: Doc -> Doc
