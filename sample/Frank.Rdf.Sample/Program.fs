@@ -10,7 +10,7 @@ open Frank.Rdf
 let private games = dict [ "1", "Tic-tac-toe"; "2", "Connect Four" ]
 
 // Shared across every game's document: who publishes this API. Built once and merged into
-// each per-game document via `include` -- a genuine reason to merge (facts every resource
+// each per-game document via `Doc.merge` -- a genuine reason to merge (facts every resource
 // wants to assert), demonstrating Doc.merge for real rather than contriving one.
 let private publisher = Node.Iri "https://frank-fs.github.io/#organization"
 

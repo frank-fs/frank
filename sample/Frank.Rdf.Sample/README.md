@@ -1,9 +1,9 @@
 # Frank.Rdf Sample
 
 Demonstrates [`Frank.Rdf`](../../src/Frank.Rdf): the `rdf { }` CE authoring RDF triples
-across two subjects (a game and its `numberOfPlayers` value), `Doc.merge`/`include`
-folding in facts shared across every resource, and `Doc.writeJsonLd` streaming straight
-into the response body.
+across two subjects (a game and its `numberOfPlayers` value), `Doc.merge` folding in facts
+shared across every resource, and `Doc.writeJsonLd` streaming straight into the response
+body.
 
 ## Run it
 
