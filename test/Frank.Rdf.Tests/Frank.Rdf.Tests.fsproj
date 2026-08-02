@@ -14,6 +14,7 @@
     <Compile Include="DescribeBuilderTests.fs" />
     <Compile Include="RdfBuilderTests.fs" />
     <Compile Include="ToGraphTests.fs" />
+    <Compile Include="RoundTripTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

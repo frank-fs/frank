@@ -85,6 +85,7 @@ module Rdf =
 
     module Doc =
         open VDS.RDF
+        open VDS.RDF.Writing
 
         let private toGraphNode (graph: Graph) (prefixes: (string * string) list) (node: Node) : INode =
             match node with
@@ -118,3 +119,14 @@ module Rdf =
                 graph.Assert(Triple(s, p, o)) |> ignore
 
             graph
+
+        let writeJsonLd (doc: Doc) (writer: System.IO.TextWriter) : unit =
+            let graph = toGraph doc
+            let store = new TripleStore()
+            store.Add(graph) |> ignore
+            (new JsonLdWriter()).Save(store, writer, true)
+
+        let toJsonLd (doc: Doc) : string =
+            use writer = new System.IO.StringWriter()
+            writeJsonLd doc writer
+            writer.ToString()
