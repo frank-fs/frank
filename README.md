@@ -19,6 +19,7 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 | **Frank.OpenApi** | Native OpenAPI document generation with F# type schemas | [![NuGet](https://img.shields.io/nuget/v/Frank.OpenApi)](https://www.nuget.org/packages/Frank.OpenApi/) |
 | **Frank.JsonHome** | JSON Home discovery document, filtered by authorization | [![NuGet](https://img.shields.io/nuget/v/Frank.JsonHome)](https://www.nuget.org/packages/Frank.JsonHome/) |
 | **Frank.Datastar** | Datastar SSE integration for reactive hypermedia | [![NuGet](https://img.shields.io/nuget/v/Frank.Datastar)](https://www.nuget.org/packages/Frank.Datastar/) |
+| **Frank.Rdf** | Hand-authored RDF triples via `rdf { }`, serialized to JSON-LD | [![NuGet](https://img.shields.io/nuget/v/Frank.Rdf)](https://www.nuget.org/packages/Frank.Rdf/) |
 | **Frank.Analyzers** | F# Analyzers for compile-time error detection | [![NuGet](https://img.shields.io/nuget/v/Frank.Analyzers)](https://www.nuget.org/packages/Frank.Analyzers/) |
 
 ---
@@ -631,6 +632,63 @@ Each operation also has a `WithOptions` variant for advanced customization.
 
 ---
 
+## Frank.Rdf
+
+Frank.Rdf provides an `rdf { }` computation expression for hand-authoring RDF triples across one or more resources, serialized to JSON-LD in expanded form. Zero ASP.NET Core dependency — no `ProjectReference` to `Frank`, no `FrameworkReference` to `Microsoft.AspNetCore.App`; the only NuGet dependency is `dotNetRdf.Core`. It builds and serializes documents; it has no opinion on how a handler returns the result.
+
+### Installation
+
+```bash
+dotnet add package Frank.Rdf
+```
+
+### Example
+
+```fsharp
+open Frank.Rdf
+
+let players = Node.Iri "https://example.org/games/1#players"
+
+let gameDoc =
+    rdf {
+        prefix "schema" "https://schema.org/"
+
+        about (
+            describe (Node.Iri "https://example.org/games/1") {
+                typ "schema:Game"
+                propertyString "schema:name" "Tic-tac-toe"
+                propertyInt "schema:numberOfPlayers" 2
+                propertyNode "schema:sameAs" (Node.Iri "http://www.wikidata.org/entity/Q210339")
+            }
+        )
+    }
+
+Doc.toJsonLd gameDoc
+```
+
+`describe`/`about` mirrors `handler { }`/`get`: `describe subject { ... }` runs to completion on its own, producing a plain `Description`, and `about` absorbs it into the surrounding `rdf { }` document — the same two-CE composition pattern Frank core already uses for `handler { }` feeding `resource { }`'s `get`. A bare `triple subject predicate value` operation is also available for one-off statements.
+
+### Available Operations
+
+- `prefix "name" "uri"` - Declares a CURIE namespace mapping
+- `about (describe subject { ... })` - Absorbs a `Description` built by a nested `describe { }` block
+- `triple subject predicate value` - Asserts a single statement directly
+- `includeDoc otherDoc` - Merges another independently-built `Doc` in (same as `Doc.merge`)
+- `typ "prefix:Type"` - Asserts `rdf:type`
+- `propertyString` / `propertyInt` / `propertyBool` / `propertyDateTime` / `propertyNode` - Asserts a property, picked by the value's type (five distinct operations rather than one overloaded `property`, since F#'s custom-operation overload resolution can't reliably disambiguate by argument type across calls in the same block)
+
+### Serializing
+
+- `Doc.toGraph doc` - Builds a `VDS.RDF.Graph`
+- `Doc.writeJsonLd doc writer` - Streams expanded-form JSON-LD straight into a `System.IO.TextWriter` (e.g. wrapping `HttpResponse.Body`), without materializing the whole document as a string first
+- `Doc.toJsonLd doc` - Convenience wrapper returning the JSON-LD as a `string`
+
+Output is always **expanded-form** JSON-LD: no `@context`, every predicate and type expanded to its absolute IRI. There is no compact-form option.
+
+See `sample/Frank.Rdf.Sample` for a runnable demonstration, including `Doc.merge` folding shared facts (a publisher record) into each per-resource document.
+
+---
+
 ## Frank.Analyzers
 
 Frank.Analyzers provides compile-time static analysis to catch common mistakes in Frank applications.
@@ -707,6 +765,7 @@ The `sample/` directory contains several example applications:
 | `Frank.Datastar.Basic` | Datastar integration with minimal HTML |
 | `Frank.Datastar.Hox` | Datastar with [Hox](https://github.com/AngelMunoz/Hox) view engine |
 | `Frank.Datastar.Oxpecker` | Datastar with [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/) |
+| `Frank.Rdf.Sample` | RDF triples authored via `rdf { }`, served as expanded-form JSON-LD |
 | `Frank.Falco` | Frank with [Falco.Markup](https://github.com/pimbrouwers/Falco.Markup) |
 | `Frank.Giraffe` | Frank with [Giraffe.ViewEngine](https://github.com/giraffe-fsharp/Giraffe.ViewEngine) |
 | `Frank.Oxpecker` | Frank with [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/) |
