@@ -163,9 +163,9 @@ let tests =
               let graph = Doc.toGraph doc
 
               // The query below never mentions the "schema" prefix at all -- it uses the resolved
-              // absolute IRI directly. If resolveIri had failed to expand the CURIE (leaving a literal
-              // "schema:name" string in the graph, or something else entirely), this query would match
-              // nothing.
+              // absolute IRI directly. If resolveIri had failed to expand the CURIE (leaving an
+              // unexpanded <schema:name> URI node in the graph, or something else entirely), this
+              // query would match nothing.
               let rs =
                   select
                       graph
@@ -179,4 +179,50 @@ let tests =
               let result = rs |> Seq.exactlyOne
               let nameValue = (result.["name"] :?> ILiteralNode).Value
               Expect.equal nameValue "Tic-tac-toe" "CURIE was expanded to the absolute IRI in the graph, not left as literal text"
+          }
+
+          test "two-hop SPARQL query follows an IRI reference and retrieves the correct value" {
+              // The production-realistic counterpart to the blank-node test above: the reference
+              // target is a real, addressable IRI (as in RoundTripTests's two-subject document),
+              // not a blank node. That earlier test only checks graph isomorphism after a round
+              // trip -- it never actually queries through the reference. This test closes that gap
+              // by running the same two-hop query and asserting the retrieved value.
+              let players = Node.Iri "https://example.org/g1#players"
+
+              let doc =
+                  rdf {
+                      prefix "schema" "https://schema.org/"
+
+                      about (
+                          describe (Node.Iri "https://example.org/g1") {
+                              typ "schema:Game"
+                              propertyNode "schema:numberOfPlayers" players
+                          }
+                      )
+
+                      about (
+                          describe players {
+                              typ "schema:QuantitativeValue"
+                              propertyInt "schema:value" 2
+                          }
+                      )
+                  }
+
+              let graph = Doc.toGraph doc
+
+              let rs =
+                  select
+                      graph
+                      """
+                      PREFIX schema: <https://schema.org/>
+                      SELECT ?value WHERE {
+                          <https://example.org/g1> schema:numberOfPlayers ?p .
+                          ?p schema:value ?value .
+                      }
+                      """
+
+              Expect.equal rs.Count 1 "Exactly one result: the chained pattern matched through the IRI reference"
+              let result = rs |> Seq.exactlyOne
+              let value = result.["value"] :?> ILiteralNode
+              Expect.equal value.Value "2" "The value retrieved by following the IRI reference is the one asserted on the target node"
           } ]
