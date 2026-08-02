@@ -26,3 +26,36 @@ module Rdf =
 
             if uris.Length > 1 then
                 failwithf "Frank.Rdf: prefix '%s' declared with conflicting URIs: %s" prefix (String.concat ", " uris))
+
+    let RdfTypeIri = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+
+    type DescribeBuilder(subject: Node) =
+        member _.Yield(_: unit) : Description = { Subject = subject; Statements = [] }
+        member _.Zero() : Description = { Subject = subject; Statements = [] }
+        member _.Run(d: Description) : Description = d
+
+        [<CustomOperation("typ")>]
+        member _.Typ(d: Description, curie: string) : Description =
+            { d with Statements = d.Statements @ [ RdfTypeIri, Value.Node(Node.Iri curie) ] }
+
+        [<CustomOperation("propertyString")>]
+        member _.PropertyString(d: Description, predicate: string, value: string) : Description =
+            { d with Statements = d.Statements @ [ predicate, Value.Literal(Literal.String value) ] }
+
+        [<CustomOperation("propertyInt")>]
+        member _.PropertyInt(d: Description, predicate: string, value: int) : Description =
+            { d with Statements = d.Statements @ [ predicate, Value.Literal(Literal.Int value) ] }
+
+        [<CustomOperation("propertyBool")>]
+        member _.PropertyBool(d: Description, predicate: string, value: bool) : Description =
+            { d with Statements = d.Statements @ [ predicate, Value.Literal(Literal.Bool value) ] }
+
+        [<CustomOperation("propertyDateTime")>]
+        member _.PropertyDateTime(d: Description, predicate: string, value: System.DateTimeOffset) : Description =
+            { d with Statements = d.Statements @ [ predicate, Value.Literal(Literal.DateTime value) ] }
+
+        [<CustomOperation("propertyNode")>]
+        member _.PropertyNode(d: Description, predicate: string, value: Node) : Description =
+            { d with Statements = d.Statements @ [ predicate, Value.Node value ] }
+
+    let describe subject = DescribeBuilder(subject)

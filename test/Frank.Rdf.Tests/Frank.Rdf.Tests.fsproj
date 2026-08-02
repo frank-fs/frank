@@ -11,6 +11,7 @@
   <ItemGroup>
     <Compile Include="RdfTypesTests.fs" />
     <Compile Include="PrefixResolutionTests.fs" />
+    <Compile Include="DescribeBuilderTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
