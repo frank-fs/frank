@@ -29,8 +29,9 @@ module Rdf =
 
     let RdfTypeIri = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 
+    [<Sealed>]
     type DescribeBuilder(subject: Node) =
-        member _.Yield(_: unit) : Description = { Subject = subject; Statements = [] }
+        member _.Yield(_) : Description = { Subject = subject; Statements = [] }
         member _.Zero() : Description = { Subject = subject; Statements = [] }
         member _.Run(d: Description) : Description = d
 

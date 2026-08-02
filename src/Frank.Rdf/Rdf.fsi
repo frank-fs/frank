@@ -19,15 +19,39 @@ module Rdf =
     /// Builds a `Description`: statements about one subject, to be attached to an `rdf { }` document
     /// via `about`. Self-contained -- mirrors Frank core's `HandlerBuilder`/`handler { }` exactly: one
     /// accumulator, no Combine/Delay, `Run` returns a plain value.
+    ///
+    /// `Yield` is generic (`'a -> Description`), not `unit -> Description`, matching
+    /// `HandlerBuilder.Yield: 'T -> HandlerDefinition` -- this is required, not stylistic. F#'s custom
+    /// operations desugar `describe subject { typ "x" }` into `b.Typ(b.Yield(()), "x")`, i.e. `Yield` is
+    /// invoked with an explicit unit-typed seed value. A signature file has no syntax that distinguishes
+    /// a member taking a real `unit`-typed argument from a nullary member -- `member Yield: unit ->
+    /// Description` always matches only the nullary (`Yield()`) implementation, so it can never match a
+    /// `Yield(_: unit)` implementation, and a `Yield()` implementation can't be *called* with the seed
+    /// value the custom-operation desugaring passes. Making the parameter generic sidesteps the
+    /// ambiguity entirely (`unit` unifies with `'a` at the call site) and is what Frank core's own
+    /// builders do.
+    ///
+    /// `Zero` is also required, despite not appearing in this type's originating brief: an
+    /// entirely-`()`-bodied block (`describe subject { () }`, with no custom operation and nothing
+    /// yielded) desugars to `b.Zero()`, not `b.Yield(())` -- omitting `Zero` fails with FS0708 ("this
+    /// control construct may only be used if the computation expression builder defines a 'Zero'
+    /// method"), confirmed by direct testing.
+    [<Sealed>]
     type DescribeBuilder =
         new: subject: Node -> DescribeBuilder
-        member Yield: unit -> Description
-        member Zero: Description
+        member Yield: 'a -> Description
+        member Zero: unit -> Description
         member Run: d: Description -> Description
 
         [<CustomOperation("typ")>]
         member Typ: d: Description * curie: string -> Description
 
+        // `property` is overloaded over 5 types in the brief, but F#'s custom-operation overload
+        // resolution commits to a single resolved parameter type for the whole CE once one call to
+        // `property` is type-checked, so a block calling `property` with a string then an int then a
+        // bool etc. fails to type-check every call after the first (confirmed by direct testing -- see
+        // task-3-report.md). Falling back to distinct operation names per the brief's documented escape
+        // hatch.
         [<CustomOperation("propertyString")>]
         member PropertyString: d: Description * predicate: string * value: string -> Description
 
