@@ -82,3 +82,39 @@ module Rdf =
                 Statements = doc.Statements @ [ subject, predicate, value ] }
 
     let rdf = RdfBuilder()
+
+    module Doc =
+        open VDS.RDF
+
+        let private toGraphNode (graph: Graph) (prefixes: (string * string) list) (node: Node) : INode =
+            match node with
+            | Node.Iri s -> graph.CreateUriNode(Uri(resolveIri prefixes s)) :> INode
+            | Node.Blank id -> graph.CreateBlankNode(id) :> INode
+
+        let private toLiteralNode (graph: Graph) (literal: Literal) : INode =
+            match literal with
+            | Literal.String s -> graph.CreateLiteralNode(s) :> INode
+            | Literal.Int i -> i.ToLiteral(graph)
+            | Literal.Bool b -> b.ToLiteral(graph)
+            | Literal.DateTime dt -> dt.ToLiteral(graph)
+
+        let private toObjectNode (graph: Graph) (prefixes: (string * string) list) (value: Value) : INode =
+            match value with
+            | Value.Node n -> toGraphNode graph prefixes n
+            | Value.Literal l -> toLiteralNode graph l
+
+        let toGraph (doc: Doc) : Graph =
+            validatePrefixes doc.Prefixes
+
+            let graph = new Graph()
+
+            for prefixName, uri in doc.Prefixes do
+                graph.NamespaceMap.AddNamespace(prefixName, Uri(uri))
+
+            for subject, predicate, value in doc.Statements do
+                let s = toGraphNode graph doc.Prefixes subject
+                let p = graph.CreateUriNode(Uri(resolveIri doc.Prefixes predicate))
+                let o = toObjectNode graph doc.Prefixes value
+                graph.Assert(Triple(s, p, o)) |> ignore
+
+            graph

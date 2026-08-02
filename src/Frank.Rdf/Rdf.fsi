@@ -90,3 +90,10 @@ module Rdf =
 
     /// Enters an `rdf { }` block.
     val rdf: RdfBuilder
+
+    /// Serializes a Doc's triples and building blocks.
+    module Doc =
+        /// Builds a dotNetRDF Graph: registers declared prefixes, resolves every Node.Iri/CURIE, mints
+        /// one real blank node per distinct Node.Blank label, and asserts one triple per statement.
+        /// Raises the same way `resolveIri`/`validatePrefixes` do, for the same reasons.
+        val toGraph: doc: Doc -> VDS.RDF.Graph
