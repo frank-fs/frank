@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <PackageTags>rdf;linked-data;json-ld;triples</PackageTags>
+    <Description>Hand-authored RDF triples for Frank resources, serialized as JSON-LD</Description>
+    <!-- NU1902: dotNetRdf.Core 3.5.1's transitive dependency on AngleSharp >=1.4.0 carries a known
+         moderate-severity advisory (GHSA-pgww-w46g-26qg). dotNetRdf.Core is pinned to exactly 3.5.1
+         per the plan's global version constraint, so this cannot be resolved by bumping the package
+         today. src/Directory.Build.props sets TreatWarningsAsErrors, which promotes this NuGet audit
+         warning to a build-breaking error; suppressing it here is required to build/restore. Revisit
+         when the dotNetRdf.Core pin is lifted or AngleSharp ships a patched transitive version. -->
+    <NoWarn>NU1902</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="RdfTypes.fsi" />
+    <Compile Include="RdfTypes.fs" />
+    <Compile Include="Rdf.fsi" />
+    <Compile Include="Rdf.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="dotNetRdf.Core" Version="3.5.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Frank.Rdf.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

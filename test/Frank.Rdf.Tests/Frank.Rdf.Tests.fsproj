@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <GenerateProgramFile>false</GenerateProgramFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="RdfTypesTests.fs" />
+    <Compile Include="PrefixResolutionTests.fs" />
+    <Compile Include="DescribeBuilderTests.fs" />
+    <Compile Include="RdfBuilderTests.fs" />
+    <Compile Include="ToGraphTests.fs" />
+    <Compile Include="RoundTripTests.fs" />
+    <Compile Include="MergeTests.fs" />
+    <Compile Include="QueryVerificationTests.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
+    <PackageReference Include="Expecto" Version="10.*" />
+    <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.14.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Frank.Rdf/Frank.Rdf.fsproj" />
+  </ItemGroup>
+
+</Project>
