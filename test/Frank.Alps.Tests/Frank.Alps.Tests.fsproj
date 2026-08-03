@@ -25,6 +25,7 @@
     <Compile Include="AlpsDocumentTests.fs" />
     <Compile Include="AlpsDocumentIntegrationTests.fs" />
     <Compile Include="ExcerptTests.fs" />
+    <Compile Include="SampleIntegrationTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
