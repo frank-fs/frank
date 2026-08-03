@@ -13,6 +13,8 @@
     <Compile Include="Descriptor.fs" />
     <Compile Include="ProtocolGraph.fsi" />
     <Compile Include="ProtocolGraph.fs" />
+    <Compile Include="DescriptorBuilder.fsi" />
+    <Compile Include="DescriptorBuilder.fs" />
   </ItemGroup>
 
   <ItemGroup>

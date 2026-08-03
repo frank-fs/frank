@@ -17,6 +17,7 @@
     <Compile Include="ReferenceTests.fs" />
     <Compile Include="FromTests.fs" />
     <Compile Include="ProtocolGraphTests.fs" />
+    <Compile Include="DescriptorBuilderTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
