@@ -15,6 +15,9 @@ type AlpsOptions =
 /// The app-wide ALPS document: served at a fixed path (default `/.well-known/alps.json`), registered
 /// via `useAlps` exactly the way `useJsonHome` registers its own document (`src/Frank.JsonHome`).
 module AlpsDocument =
+    [<Literal>]
+    val MediaType: string = "application/alps+json"
+
     /// Raises if any non-semantic descriptor's bound endpoint's HTTP method(s) don't match its
     /// `DescriptorType` (`Safe` -> GET/HEAD, `Idempotent` -> PUT/DELETE, `Unsafe` -> POST). Semantic
     /// descriptors are never validated -- they aren't transitions bound to a method.

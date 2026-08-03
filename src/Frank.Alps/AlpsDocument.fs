@@ -1,11 +1,12 @@
 namespace Frank.Alps
 
-open System.Threading
+open System
 open System.Threading.Tasks
+open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.Hosting
 open Frank.Builder
 
 type AlpsOptions =
@@ -83,24 +84,51 @@ module AlpsDocument =
         let alpsOptions = options
         resource alpsOptions.Path { get (RequestDelegate(documentHandler profile)) }
 
-    /// Resolves the DI-registered EndpointDataSource and validates every registered resource's
-    /// bound transitions during host startup -- after routing has fully built every endpoint
-    /// regardless of webHost {} block order, and before the app accepts its first request.
-    /// internal (not private): WebHostBuilderExtensions.install, a sibling module in this same
-    /// file, needs to name this type as AddHostedService<'T>'s type argument; internal is visible
-    /// assembly-wide (including that sibling module) while staying out of AlpsDocument.fsi, so it
-    /// never becomes part of the public API. Its implicit primary constructor is still emitted
-    /// public by the F# compiler regardless of the type's own internal accessibility (verified:
-    /// `type internal Foo(x) = ...` yields a public ctor), so
-    /// Microsoft.Extensions.DependencyInjection's activator (which only looks at public
-    /// constructors) can still construct it.
-    type internal ValidationHostedService(services: System.IServiceProvider) =
-        interface IHostedService with
-            member _.StartAsync(_: CancellationToken) : Task =
-                EndpointSurface.allDescriptors services |> validate
-                Task.CompletedTask
-
-            member _.StopAsync(_: CancellationToken) : Task = Task.CompletedTask
+    /// Validates every registered resource's bound transitions during host startup -- after
+    /// routing has fully built every endpoint, and before the app accepts its first request.
+    ///
+    /// This is an IStartupFilter, not an IHostedService: an IHostedService's StartAsync runs
+    /// BEFORE the host's Configure delegate (the one that calls app.UseEndpoints(...) and
+    /// actually populates the EndpointDataSource) -- confirmed empirically with a standalone
+    /// probe replicating src/Frank/WebHostBuilder.fs's exact
+    /// Host.CreateDefaultBuilder(args).ConfigureWebHost(config) shape, where `config` does
+    /// .ConfigureServices(...) then .Configure(fun app -> ... app.UseEndpoints(...) ...):
+    /// ConfigureWebHost registers the GenericWebHostService that runs Configure strictly AFTER
+    /// any IHostedService the app itself registered via spec.Services has already started.
+    /// So an IHostedService-based validate call here would always see zero endpoints and
+    /// silently pass, no matter how badly a descriptor's Type mismatched its bound method.
+    ///
+    /// IStartupFilter.Configure(next) instead runs as part of *building* the middleware
+    /// pipeline: calling next.Invoke(app) first runs the rest of that pipeline-building chain
+    /// (including the app's own Configure delegate and its app.UseEndpoints(...) call), so by
+    /// the time this filter's own code runs after that call, the EndpointDataSource is fully
+    /// populated -- and this still happens before the server starts accepting requests, so an
+    /// exception here still fails host startup rather than surfacing on first request.
+    /// (IHostApplicationLifetime.ApplicationStarted is not a substitute: it fires after the
+    /// listener is already accepting connections, and hosting does not fail startup on an
+    /// exception raised from an ApplicationStarted callback.)
+    ///
+    /// internal (not private): a `private` type nested in `module AlpsDocument` is visible only
+    /// from within that module itself -- not from a sibling module, even one declared later in
+    /// this same file (verified empirically: F# raises FS0491 "The member or object constructor
+    /// ... is not accessible" when a sibling module tries to construct a `private`-nested type).
+    /// `WebHostBuilderExtensions.install` below needs to name this type as
+    /// AddSingleton<IStartupFilter, 'T>'s type argument, and `internal` is the accessibility
+    /// level that satisfies that -- by ordinary CLR/.NET semantics `internal` grants access from
+    /// anywhere in the compiled Frank.Alps.dll assembly (not just this file); F# has no
+    /// accessibility level narrower than that but broader than "this module", so `internal` is
+    /// used here even though only one sibling module, in this one file, currently needs it. It
+    /// still stays out of AlpsDocument.fsi, so it is never part of the assembly's public API.
+    /// Its implicit primary constructor is still emitted public by the F# compiler regardless of
+    /// the type's own internal accessibility (verified: `type internal Foo(x) = ...` yields a
+    /// public ctor), so Microsoft.Extensions.DependencyInjection's activator (which only looks
+    /// at public constructors) can still construct it.
+    type internal ValidationStartupFilter() =
+        interface IStartupFilter with
+            member _.Configure(next: Action<IApplicationBuilder>) : Action<IApplicationBuilder> =
+                Action<IApplicationBuilder>(fun app ->
+                    next.Invoke(app)
+                    EndpointSurface.allDescriptors app.ApplicationServices |> validate)
 
 [<AutoOpen>]
 module WebHostBuilderExtensions =
@@ -110,7 +138,7 @@ module WebHostBuilderExtensions =
         { spec with
             Services =
                 spec.Services
-                >> fun services -> services.AddHostedService<AlpsDocument.ValidationHostedService>()
+                >> fun services -> services.AddSingleton<IStartupFilter, AlpsDocument.ValidationStartupFilter>()
             LinkProviders =
                 spec.LinkProviders
                 @ [ fun (_: HttpContext) -> Seq.singleton { Target = options.Path; Rel = options.Rel; Params = [] } ]
