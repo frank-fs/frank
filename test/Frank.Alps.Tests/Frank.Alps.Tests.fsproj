@@ -18,6 +18,7 @@
     <Compile Include="FromTests.fs" />
     <Compile Include="ProtocolGraphTests.fs" />
     <Compile Include="DescriptorBuilderTests.fs" />
+    <Compile Include="SerializationTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
