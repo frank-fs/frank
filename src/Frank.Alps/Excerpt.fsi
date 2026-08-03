@@ -3,11 +3,14 @@ namespace Frank.Alps
 open System
 open Microsoft.AspNetCore.Http
 
-/// Answers "what state is this specific resource in", if the application supplies one -- a plain
-/// function wired at composition time, no dependency on `Frank.Provenance` or any other package. The
-/// natural implementation queries a provenance/event store; absent, or returning `None`, means state
-/// filtering simply does not apply (design doc, *State-based filtering*).
-type CurrentStateResolver = string -> Uri option
+/// Answers "what states is this specific resource concurrently in", if the application supplies one --
+/// a plain function wired at composition time, no dependency on `Frank.Provenance` or any other package.
+/// One element per active orthogonal region (design doc, *State-based filtering*); an empty list means
+/// state filtering simply does not apply for this resource, the same as the old `None`. A `from`-state
+/// candidate is satisfied if it is satisfied by *any* element of the returned list (existential/OR
+/// match across regions) -- this reaches independent-region OR filtering correctly but does not reach
+/// conjunctive AND-guards or multi-region fan-out targets; see frank-fs/frank#489 for that.
+type CurrentStateResolver = string -> Uri list
 
 module Excerpt =
     /// Whether the resolver's returned `current` state satisfies an authored `from`-state `candidate`,

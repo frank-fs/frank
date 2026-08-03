@@ -103,16 +103,16 @@ Both emit `Cache-Control: private, no-cache` and `Vary: Authorization` whenever 
 
 ### State-Based Filtering
 
-`from [ states ]` marks a transition valid only from the given source state(s); a transition with no `from` is never state-filtered. `CurrentStateResolver` — a plain `string -> Uri option`, wired at composition time — answers "what state is this specific resource in":
+`from [ states ]` marks a transition valid only from the given source state(s); a transition with no `from` is never state-filtered. `CurrentStateResolver` — a plain `string -> Uri list`, wired at composition time — answers "what states is this specific resource concurrently in" (one element per active orthogonal region):
 
 ```fsharp
 let resolver: CurrentStateResolver =
-    fun resourceIri -> if isFinished resourceIri then Some closedIri else Some openIri
+    fun resourceIri -> if isFinished resourceIri then [ closedIri ] else [ openIri ]
 
 accepts "application/alps+json" (Alps.excerpt (Some resolver))
 ```
 
-No dependency on any store: the natural implementation queries a provenance or event store, and an absent resolver (or one returning `None`) simply means state filtering does not apply. Matching walks `contains` ancestry rather than requiring exact equality, so being in a substate satisfies a transition declared `from` any of its ancestors.
+No dependency on any store: the natural implementation queries a provenance or event store, and an absent resolver (or one returning `[]`) simply means state filtering does not apply. Matching walks `contains` ancestry rather than requiring exact equality, so being in a substate satisfies a transition declared `from` any of its ancestors. A transition's `from` candidate is satisfied if *any* element of the resolved list satisfies it (existential/OR match across concurrently-active regions) — conjunctive AND-guards and multi-region fan-out targets are out of scope here (frank-fs/frank#489).
 
 `ProtocolGraph.ofProfile` derives the read-only `{ FromState; Transition; ToState }` edge set from the authored profile — one edge per `from` state on a transition that also declares `rt`. Nothing in this package executes a transition or owns what state a resource is actually in.
 
