@@ -12,6 +12,7 @@
     <Compile Include="ProvVocabularyTests.fs" />
     <Compile Include="ProvTests.fs" />
     <Compile Include="ProvenanceRecordTests.fs" />
+    <Compile Include="ProvenanceQueryTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

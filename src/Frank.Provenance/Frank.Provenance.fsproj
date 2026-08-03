@@ -20,6 +20,8 @@
     <Compile Include="Prov.fs" />
     <Compile Include="ProvenanceRecord.fsi" />
     <Compile Include="ProvenanceRecord.fs" />
+    <Compile Include="ProvenanceStore.fsi" />
+    <Compile Include="ProvenanceStore.fs" />
   </ItemGroup>
 
   <ItemGroup>
