@@ -5,7 +5,7 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 
-type CurrentStateResolver = string -> Uri option
+type CurrentStateResolver = string -> Uri list
 
 module Excerpt =
     let rec satisfiesState (current: Uri) (candidate: Descriptor) : bool =
@@ -29,11 +29,13 @@ module Alps =
                     | None -> authAllowed
                     | Some resolve ->
                         match resolve ctx.Request.Path.Value with
-                        | None -> authAllowed
-                        | Some current ->
+                        | [] -> authAllowed
+                        | activeStates ->
                             authAllowed
                             |> List.filter (fun d ->
-                                List.isEmpty d.From || d.From |> List.exists (Excerpt.satisfiesState current))
+                                List.isEmpty d.From
+                                || d.From
+                                   |> List.exists (fun candidate -> activeStates |> List.exists (fun s -> Excerpt.satisfiesState s candidate)))
 
                 // `descriptorsForRoute` yields the descriptors bound directly to this route's endpoints,
                 // so the roots here are already authorization-checked -- but nothing in the type system

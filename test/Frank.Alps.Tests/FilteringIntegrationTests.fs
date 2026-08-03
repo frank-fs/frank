@@ -281,9 +281,9 @@ let tests =
               let resolver: CurrentStateResolver =
                   fun path ->
                       match path with
-                      | "/games/1" -> Some(Uri "https://tictactoe.example/states/open")
-                      | "/games/2" -> Some(Uri "https://tictactoe.example/states/closed")
-                      | _ -> None
+                      | "/games/1" -> [ Uri "https://tictactoe.example/states/open" ]
+                      | "/games/2" -> [ Uri "https://tictactoe.example/states/closed" ]
+                      | _ -> []
 
               let client = createServer (Some resolver)
 
@@ -304,4 +304,29 @@ let tests =
                   (Set.ofList (topLevelIds closedBody))
                   (Set.ofList [ "viewGame" ])
                   "In the 'closed' state, makeMove is excluded and the unconditional viewGame remains"
+          }
+
+          testTask "Alps.excerpt (Some resolver) matches existentially across a multi-region active-state list" {
+              // Simulates two concurrently-active orthogonal regions for "/games/1": the FIRST returned
+              // state is "closed" (which does NOT satisfy makeMove's `from [ openState ]`), and the
+              // SECOND is "open" (which does). If the filtering call site only checked the first element
+              // of the list -- the old singleton behavior -- makeMove would be wrongly excluded here.
+              let resolver: CurrentStateResolver =
+                  fun path ->
+                      match path with
+                      | "/games/1" ->
+                          [ Uri "https://tictactoe.example/states/closed"
+                            Uri "https://tictactoe.example/states/open" ]
+                      | _ -> []
+
+              let client = createServer (Some resolver)
+
+              let message = request HttpMethod.Get "/games/1" (Some "application/alps+json") (Some "admin")
+              let! (response: HttpResponseMessage) = client.SendAsync message
+              let! (body: string) = response.Content.ReadAsStringAsync()
+
+              Expect.equal
+                  (Set.ofList (topLevelIds body))
+                  (Set.ofList [ "viewGame"; "makeMove" ])
+                  "makeMove is satisfied by the SECOND active state in the list, not just the first"
           } ]
