@@ -20,6 +20,7 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 | **Frank.JsonHome** | JSON Home discovery document, filtered by authorization | [![NuGet](https://img.shields.io/nuget/v/Frank.JsonHome)](https://www.nuget.org/packages/Frank.JsonHome/) |
 | **Frank.Datastar** | Datastar SSE integration for reactive hypermedia | [![NuGet](https://img.shields.io/nuget/v/Frank.Datastar)](https://www.nuget.org/packages/Frank.Datastar/) |
 | **Frank.Rdf** | Hand-authored RDF triples via `rdf { }`, serialized to JSON-LD | [![NuGet](https://img.shields.io/nuget/v/Frank.Rdf)](https://www.nuget.org/packages/Frank.Rdf/) |
+| **Frank.Provenance** | PROV-O provenance recording and querying, built on Frank.Rdf | [![NuGet](https://img.shields.io/nuget/v/Frank.Provenance)](https://www.nuget.org/packages/Frank.Provenance/) |
 | **Frank.Analyzers** | F# Analyzers for compile-time error detection | [![NuGet](https://img.shields.io/nuget/v/Frank.Analyzers)](https://www.nuget.org/packages/Frank.Analyzers/) |
 
 ---
@@ -696,6 +697,46 @@ Doc.toJsonLd gameDoc
 Output is always **expanded-form** JSON-LD: no `@context`, every predicate and type expanded to its absolute IRI. There is no compact-form option.
 
 See `sample/Frank.Rdf.Sample` for a runnable demonstration, including `Doc.merge` folding shared facts (a publisher record) into each per-resource document.
+
+---
+
+## Frank.Provenance
+
+Frank.Provenance records and queries [PROV-O](https://www.w3.org/TR/prov-o/) provenance -- who (`Agent`) did what (`Activity`), producing which resource (`Resource`), and when -- as a `ProvenanceRecord`, and stores/queries records via `IProvenanceStore` (with an in-memory `MailboxProcessorProvenanceStore` implementation). Built on `Frank.Rdf` for its RDF/JSON-LD plumbing; zero ASP.NET Core dependency, same as `Frank.Rdf` itself. Queries go through a closed vocabulary, `ProvenanceQuery` (`ByResource`/`ByAgent`/`ByActivityId`) -- there is no public API accepting a raw SPARQL query or query string.
+
+### Installation
+
+```bash
+dotnet add package Frank.Provenance
+```
+
+### Example
+
+```fsharp
+open System
+open Microsoft.Extensions.Logging.Abstractions
+open Frank.Rdf
+open Frank.Provenance
+
+let record: ProvenanceRecord =
+    { Activity = Node.Iri "https://example.org/activities/1"
+      Resource = Node.Iri "https://example.org/games/1"
+      Agent = Node.Iri "https://example.org/users/42"
+      StartedAt = DateTimeOffset.UtcNow
+      EndedAt = DateTimeOffset.UtcNow.AddSeconds(1.0)
+      ActivityType = None
+      Properties = [] }
+
+let store =
+    new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance)
+    :> IProvenanceStore
+
+store.Append(record)
+
+match store.Query(ProvenanceQuery.ByResource "https://example.org/games/1") with
+| SparqlQueryResult.Graph g -> printfn "%d triples" g.Triples.Count
+| SparqlQueryResult.Bindings _ -> ()
+```
 
 ---
 

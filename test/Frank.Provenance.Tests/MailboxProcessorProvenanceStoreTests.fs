@@ -136,8 +136,38 @@ let tests =
               | SparqlQueryResult.Graph g -> Expect.equal g.Triples.Count 0 "Oldest record evicted"
               | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
 
+              // ByActivityId compiles to a DESCRIBE query, and dotNetRDF's default Concise Bounded
+              // Description only returns the Activity's own outbound triples -- so the assertion above
+              // would pass identically even if eviction only removed the Activity's triples and left
+              // the same record's Resource/Agent triples orphaned in the store. ByResource additionally
+              // pulls in the resource's own outbound triples (including wasGeneratedBy), proving the
+              // whole record's named graph -- not just the Activity's outbound edges -- was removed.
+              match store.Query(ProvenanceQuery.ByResource "https://example.org/games/a") with
+              | SparqlQueryResult.Graph g -> Expect.equal g.Triples.Count 0 "Oldest record's resource data also evicted"
+              | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
+
               match store.Query(ProvenanceQuery.ByActivityId "https://example.org/activities/c") with
               | SparqlQueryResult.Graph g -> Expect.isGreaterThan g.Triples.Count 0 "Newest record still present"
+              | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
+          }
+
+          test "a pathological EvictionBatchSize never evicts the record just appended" {
+              // EvictionBatchSize (100) far exceeds MaxRecords (1): without the min-with-(length - 1)
+              // clamp in the eviction path, evictCount would equal updated.Length and wipe out every
+              // record in the store -- including the one just appended in this very Append call.
+              let config = { MaxRecords = 1; EvictionBatchSize = 100 }
+              let store = newStore config
+
+              store.Append(
+                  record
+                      "https://example.org/activities/pathological"
+                      "https://example.org/games/pathological"
+                      "https://example.org/users/pathological"
+              )
+
+              match store.Query(ProvenanceQuery.ByActivityId "https://example.org/activities/pathological") with
+              | SparqlQueryResult.Graph g ->
+                  Expect.isGreaterThan g.Triples.Count 0 "The just-appended record is never evicted in the same Append call"
               | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
           }
 

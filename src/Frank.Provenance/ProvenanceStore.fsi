@@ -25,9 +25,16 @@ type IProvenanceStore =
     abstract Append: record: ProvenanceRecord -> unit
     abstract Query: query: ProvenanceQuery -> SparqlQueryResult
 
-/// Bounds an in-memory store.
+/// Bounds an in-memory store. Eviction is clamped defensively at the store: regardless of the values
+/// configured here (including pathological ones, e.g. MaxRecords <= 0 or EvictionBatchSize >=
+/// MaxRecords), the store never evicts the record most recently appended.
 type ProvenanceStoreConfig =
-    { MaxRecords: int
+    { /// The number of records to retain before the store starts evicting the oldest ones. A value
+      /// <= 0 does not stop the store from accepting appends -- it just means eviction kicks in on
+      /// (almost) every append, subject to the "never evict the newest record" clamp below.
+      MaxRecords: int
+      /// The number of oldest records to evict at once, once MaxRecords is exceeded. Clamped so it can
+      /// never evict the record just appended, even when configured >= MaxRecords.
       EvictionBatchSize: int }
 
 module ProvenanceStoreConfig =

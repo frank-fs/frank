@@ -61,7 +61,12 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
 
                             let retained =
                                 if updated.Length > config.MaxRecords then
-                                    let evictCount = min config.EvictionBatchSize updated.Length
+                                    // Clamp so eviction can never remove the record just appended above,
+                                    // regardless of how config.MaxRecords/EvictionBatchSize are configured
+                                    // (e.g. MaxRecords <= 0, or EvictionBatchSize >= MaxRecords): always
+                                    // leave at least the newest entry behind.
+                                    let evictCount =
+                                        [ config.EvictionBatchSize; updated.Length - 1 ] |> List.min |> max 0
 
                                     for evictedName, evictedUri in updated |> List.truncate evictCount do
                                         store.Remove(evictedName) |> ignore
