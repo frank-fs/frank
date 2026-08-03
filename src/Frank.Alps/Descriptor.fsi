@@ -37,3 +37,17 @@ module DescriptorFunctions =
     /// Sets `name` -- rare; only for describing a pre-existing design where the descriptor's id conflicts
     /// with another name (draft-07 §2.2.11).
     val named: name: string -> Descriptor -> Descriptor
+
+    /// Appends an `ext` element with `id` and `value` set (shorthand). Use `extWith` for href/tag.
+    val ext: id: string -> value: string -> Descriptor -> Descriptor
+
+    /// Appends a full `Ext` record verbatim.
+    val extWith: ext: Ext -> Descriptor -> Descriptor
+
+    /// Appends an RFC 8288 `link` element with `href` and `rel` set (shorthand). Use `linkWith` for title/tag.
+    /// Distinct from `href`/`hrefExternal` (descriptor inheritance) -- this is an arbitrary web link, e.g.
+    /// `rel="tag-doc"` per draft-07 §2.2.14's guidance for documenting tag vocabularies.
+    val link: href: string -> rel: string -> Descriptor -> Descriptor
+
+    /// Appends a full `Link` record verbatim.
+    val linkWith: link: Link -> Descriptor -> Descriptor

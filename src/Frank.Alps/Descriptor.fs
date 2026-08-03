@@ -43,3 +43,25 @@ module DescriptorFunctions =
     let rel (relation: string) (d: Descriptor) : Descriptor = { d with Rel = Some relation }
 
     let named (name: string) (d: Descriptor) : Descriptor = { d with Name = Some name }
+
+    let ext (id: string) (value: string) (d: Descriptor) : Descriptor =
+        { d with
+            Ext =
+                d.Ext
+                @ [ { Id = id
+                      Href = None
+                      Value = Some value
+                      Tag = [] } ] }
+
+    let extWith (ext: Ext) (d: Descriptor) : Descriptor = { d with Ext = d.Ext @ [ ext ] }
+
+    let link (href: string) (rel: string) (d: Descriptor) : Descriptor =
+        { d with
+            Link =
+                d.Link
+                @ [ { Href = Uri href
+                      Rel = rel
+                      Title = None
+                      Tag = [] } ] }
+
+    let linkWith (link: Link) (d: Descriptor) : Descriptor = { d with Link = d.Link @ [ link ] }
