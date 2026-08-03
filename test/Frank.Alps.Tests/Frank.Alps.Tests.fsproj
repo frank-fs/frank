@@ -20,6 +20,7 @@
     <Compile Include="DescriptorBuilderTests.fs" />
     <Compile Include="SerializationTests.fs" />
     <Compile Include="HandlerBuilderExtensionsTests.fs" />
+    <Compile Include="EndpointSurfaceTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -31,6 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/Frank/Frank.fsproj" />
     <ProjectReference Include="../../src/Frank.Alps/Frank.Alps.fsproj" />
   </ItemGroup>
 

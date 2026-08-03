@@ -19,6 +19,8 @@
     <Compile Include="Serialization.fs" />
     <Compile Include="HandlerBuilderExtensions.fsi" />
     <Compile Include="HandlerBuilderExtensions.fs" />
+    <Compile Include="EndpointSurface.fsi" />
+    <Compile Include="EndpointSurface.fs" />
   </ItemGroup>
 
   <ItemGroup>
