@@ -9,6 +9,8 @@
   <ItemGroup>
     <Compile Include="DescriptorTypes.fsi" />
     <Compile Include="DescriptorTypes.fs" />
+    <Compile Include="Descriptor.fsi" />
+    <Compile Include="Descriptor.fs" />
   </ItemGroup>
 
   <ItemGroup>
