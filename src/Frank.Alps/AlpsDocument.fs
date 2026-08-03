@@ -7,6 +7,7 @@ open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Logging
 open Frank.Builder
 
 type AlpsOptions =
@@ -49,18 +50,44 @@ module AlpsDocument =
                         actual
                         allowed
 
+    /// Transitions (non-`Semantic` descriptors) anywhere in `profile`'s tree that no registered endpoint
+    /// `binds`. They are dropped from the served document -- `DescriptorTree.prune` keeps a transition
+    /// only if authorization was actually evaluated for it, and with no bound endpoint there is nothing
+    /// to evaluate -- so this reports them at startup rather than letting them vanish silently.
+    ///
+    /// A warning, not a startup failure, deliberately: the design doc's *Multi-party protocols* section
+    /// describes a role's document legitimately naming transitions that role invokes but another service
+    /// hosts, and those have no local endpoint by construction. `Semantic` descriptors are excluded
+    /// entirely -- vocabulary is expected to have no binding and is never filtered.
+    let internal unboundTransitions (profile: Descriptor list) (pairs: (Endpoint * Descriptor) list) : Descriptor list =
+        let boundIds = pairs |> List.map (fun (_, d) -> d.Id) |> Set.ofList
+
+        DescriptorTree.flattenAll profile
+        |> List.filter (fun d -> d.Type <> DescriptorType.Semantic && not (Set.contains d.Id boundIds))
+        |> List.distinctBy (fun d -> d.Id)
+
     let private documentHandler (profile: Descriptor list) (ctx: HttpContext) : Task =
         task {
+            // Membership is tested against the WHOLE tree reachable from `profile`, not just its
+            // top-level elements: `contains` nesting is general, so a `binds`-bound transition is
+            // routinely authored as a child of the semantic state it acts on
+            // (`semantic "game" |> contains [ viewGame; makeMove ]`). Matching only the top level left
+            // every such transition out of `pairs`, hence out of `allowedIds`, hence -- since its
+            // `Semantic` parent was kept unconditionally and nothing pruned inside it -- served to every
+            // principal regardless of the authorization metadata on its endpoint.
+            let profileIds = DescriptorTree.flattenAll profile |> List.map (fun d -> d.Id) |> Set.ofList
+
             let pairs =
                 EndpointSurface.allDescriptors ctx.RequestServices
-                |> List.filter (fun (_, d) -> profile |> List.exists (fun p -> p.Id = d.Id))
+                |> List.filter (fun (_, d) -> Set.contains d.Id profileIds)
 
             let! allowed = AuthorizationFilter.filter ctx pairs
             let allowedIds = allowed |> List.map (fun d -> d.Id) |> Set.ofList
 
-            let served =
-                profile
-                |> List.filter (fun d -> d.Type = DescriptorType.Semantic || Set.contains d.Id allowedIds)
+            // Prune recursively rather than filtering the top-level list: a kept `Semantic` parent's own
+            // children still have to be filtered, or removing the transition from the top level achieves
+            // nothing (it was never there).
+            let served = DescriptorTree.prune allowedIds profile
 
             if AuthorizationFilter.varies pairs then
                 // A shared cache must never serve one principal's view to another. Mirrors
@@ -123,12 +150,32 @@ module AlpsDocument =
     /// the type's own internal accessibility (verified: `type internal Foo(x) = ...` yields a
     /// public ctor), so Microsoft.Extensions.DependencyInjection's activator (which only looks
     /// at public constructors) can still construct it.
-    type internal ValidationStartupFilter() =
+    ///
+    /// Takes the authored `profile` so it can also report transitions the profile names but nothing
+    /// binds (see `unboundTransitions`). Registered as a constructed instance rather than by type
+    /// (`AddSingleton<IStartupFilter>(ValidationStartupFilter profile)`), since `Descriptor list` is not
+    /// something DI's activator could supply.
+    type internal ValidationStartupFilter(profile: Descriptor list) =
         interface IStartupFilter with
             member _.Configure(next: Action<IApplicationBuilder>) : Action<IApplicationBuilder> =
                 Action<IApplicationBuilder>(fun app ->
                     next.Invoke(app)
-                    EndpointSurface.allDescriptors app.ApplicationServices |> validate)
+                    let pairs = EndpointSurface.allDescriptors app.ApplicationServices
+                    validate pairs
+
+                    // GetService, not GetRequiredService: logging is genuinely optional here, and a host
+                    // assembled without it must not fail startup over a diagnostic.
+                    match app.ApplicationServices.GetService<ILoggerFactory>() with
+                    | null -> ()
+                    | factory ->
+                        let logger = factory.CreateLogger "Frank.Alps.AlpsDocument"
+
+                        for d in unboundTransitions profile pairs do
+                            logger.LogWarning(
+                                "Frank.Alps: descriptor '{DescriptorId}' ({DescriptorType}) is in the profile passed to useAlps but no registered endpoint binds it, so it is omitted from the served document. Either bind it with `binds` on a handler, or remove it from the profile.",
+                                d.Id,
+                                d.Type
+                            ))
 
 [<AutoOpen>]
 module WebHostBuilderExtensions =
@@ -138,7 +185,8 @@ module WebHostBuilderExtensions =
         { spec with
             Services =
                 spec.Services
-                >> fun services -> services.AddSingleton<IStartupFilter, AlpsDocument.ValidationStartupFilter>()
+                >> fun services ->
+                    services.AddSingleton<IStartupFilter>(AlpsDocument.ValidationStartupFilter profile)
             LinkProviders =
                 spec.LinkProviders
                 @ [ fun (_: HttpContext) -> Seq.singleton { Target = options.Path; Rel = options.Rel; Params = [] } ]

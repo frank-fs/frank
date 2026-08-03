@@ -21,8 +21,6 @@ type private TestEndpointDataSource(endpoints: Endpoint[]) =
     override _.Endpoints = endpoints :> _
     override _.GetChangeToken() = NullChangeToken.Singleton :> _
 
-let private ok: RequestDelegate = RequestDelegate(fun ctx -> ctx.Response.WriteAsync "OK")
-
 /// Builds a real `IHost` around `spec` using the same pipeline shape as
 /// `src/Frank/WebHostBuilder.fs`'s own `WebHostBuilder.Run` (UseRouting -> resource-scoped links ->
 /// spec.Middleware -> UseEndpoints), substituted onto `UseTestServer()` instead of a real Kestrel

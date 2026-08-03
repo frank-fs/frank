@@ -23,6 +23,15 @@ module AlpsDocument =
     /// descriptors are never validated -- they aren't transitions bound to a method.
     val validate: pairs: (Endpoint * Descriptor) list -> unit
 
+    /// Transitions (non-`Semantic` descriptors) anywhere in `profile`'s tree that no registered endpoint
+    /// `binds`, deduplicated by id. Such a descriptor is dropped from the served document (authorization
+    /// could never be evaluated for it), so `useAlps`'s startup filter logs each one as a warning rather
+    /// than letting it vanish silently. A warning, not a startup failure: a multi-party profile may name
+    /// a transition another service hosts. `internal` -- a diagnostic, not public API; exposed only so
+    /// `Frank.Alps.Tests` can assert on it directly.
+    val internal unboundTransitions:
+        profile: Descriptor list -> pairs: (Endpoint * Descriptor) list -> Descriptor list
+
     /// The resource that serves the document itself, restricted to `profile`. Add its Endpoints to
     /// WebHostSpec.Endpoints rather than a separate app.UseEndpoints(...) call: that dispatches
     /// through the same, single, structurally-last routing stage every other Frank resource uses, so

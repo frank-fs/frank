@@ -11,6 +11,8 @@
     <Compile Include="DescriptorTypes.fs" />
     <Compile Include="Descriptor.fsi" />
     <Compile Include="Descriptor.fs" />
+    <Compile Include="DescriptorTree.fsi" />
+    <Compile Include="DescriptorTree.fs" />
     <Compile Include="ProtocolGraph.fsi" />
     <Compile Include="ProtocolGraph.fs" />
     <Compile Include="DescriptorBuilder.fsi" />

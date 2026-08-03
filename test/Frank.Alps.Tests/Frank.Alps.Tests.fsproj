@@ -16,6 +16,7 @@
     <Compile Include="CompositeStateTests.fs" />
     <Compile Include="ReferenceTests.fs" />
     <Compile Include="FromTests.fs" />
+    <Compile Include="DescriptorTreeTests.fs" />
     <Compile Include="ProtocolGraphTests.fs" />
     <Compile Include="DescriptorBuilderTests.fs" />
     <Compile Include="SerializationTests.fs" />
@@ -25,6 +26,7 @@
     <Compile Include="AlpsDocumentTests.fs" />
     <Compile Include="AlpsDocumentIntegrationTests.fs" />
     <Compile Include="ExcerptTests.fs" />
+    <Compile Include="FilteringIntegrationTests.fs" />
     <Compile Include="SampleIntegrationTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

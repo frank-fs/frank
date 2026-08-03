@@ -6,11 +6,10 @@ type ProtocolTransition =
       ToState: Descriptor }
 
 module ProtocolGraph =
-    let rec private flatten (d: Descriptor) : Descriptor list = d :: (d.Descriptors |> List.collect flatten)
-
     let ofProfile (profile: Descriptor list) : ProtocolTransition list =
-        profile
-        |> List.collect flatten
+        // DescriptorTree.flattenAll is this module's own former private `flatten`, promoted so the
+        // authorization filtering in AlpsDocument/Excerpt walks the tree exactly the same way.
+        DescriptorTree.flattenAll profile
         |> List.collect (fun d ->
             match d.Rt with
             | Some toState when not (List.isEmpty d.From) ->
