@@ -30,7 +30,7 @@ Confirmed against the actual spec text (fetched during design, not assumed from 
 
 ## Goals
 
-1. Author ALPS profiles as hand-authored F# `Descriptor` values with `|>` combinators — never derived from CLR types or view templates (see *Why vocabulary is authored, not derived* in the superseded doc; unchanged).
+1. Author ALPS profiles as hand-authored F# `Descriptor` values — via plain `|>` combinators or an equivalent `descriptor { }` computation expression (see *Two authoring surfaces*) — never derived from CLR types or view templates (see *Why vocabulary is authored, not derived* in the superseded doc; unchanged).
 2. Full draft-07 field coverage — `id`, `name`, `type`, `def`, `doc` (with `href`/`format`/`contentType`), `ext` (with `href`/`value`/`tag`), `href` (descriptor inheritance), `link` (with `title`/`tag`), `rel`, `rt`, `tag`, nested `descriptor`.
 3. Compile-time-checked references wherever there is something in-process to check against (`rt`, `from`, `href`, `contains`); plain strings/URIs only where there is nothing to check (`hrefExternal`, a descriptor's own `id`, `def`).
 4. Leave room, in the wire format and the type model, for hierarchical (composite/substate) and orthogonal (parallel-region) protocol structure to be *authored* today, independent of whether anything ever executes it — without a breaking rewrite if execution is pursued later.
@@ -46,7 +46,7 @@ Confirmed against the actual spec text (fetched during design, not assumed from 
 - **Conjunctive (AND-guard) or multi-region-fan-out transitions.** `ProtocolTransition` expresses one `FromState`/`ToState` pair per edge; a transition requiring multiple orthogonal regions to simultaneously satisfy a guard, or one that enters several regions at once, needs a distinct wrapper type layered alongside `ProtocolTransition` — not designed here (see *Reviewed against Harel's formalism*).
 - **History states, guard conditions, entry/exit actions, run-to-completion/event-queue semantics.** All additive-if-ever-pursued (per the same review), none designed here.
 - **Automatic multi-party projection.** No unifying `ProtocolType<'Role,...>`, no derivation/projection algorithm. See *Multi-party protocols*.
-- **State-based filtering consuming orthogonal regions.** `initial`/`regions` are authoring-only in this design — real, spec-compliant, wire-visible — but `CurrentStateResolver` and the filtering predicate stay single-state-scoped (see *State-based filtering*); resolver-returns-a-set/existential-match for AND-region filtering is future work.
+- **`CurrentStateResolver` consuming orthogonal regions.** `initial` and `regions` are themselves in scope and fully designed (see *Composite states*) — this bullet is narrower: `CurrentStateResolver` and the filtering predicate stay single-state-scoped in v1, so a region authored via `regions` isn't yet something the resolver can report as "active" for filtering purposes. Resolver-returns-a-set/existential-match, the consumption-side counterpart, is future work (see *State-based filtering*).
 
 ## The design
 
@@ -124,6 +124,40 @@ Field-by-field mapping from draft-07 §2.2 to combinators:
 | `rt` | `rt (target: Descriptor)` | descriptor-typed, dangling references are compile errors |
 | `tag` | `tag "x y z"` | |
 | nested `descriptor` | `contains [ children ]` | deliberately untyped by child `DescriptorType` — see *Nesting* |
+
+### Two authoring surfaces — plain combinators and a CE
+
+Every combinator above (`doc`/`def`/`tag`/`rel`/`contains`/`rt`/`from`/`href`/`hrefExternal`/`link`/`ext`/`initial`/`regions`) is a plain `... -> Descriptor -> Descriptor` function, pipeable with `|>`, exactly as shown throughout this document. `semantic`/`safe`/`unsafe`/`idempotent` are plain `string -> Descriptor` constructors, unchanged.
+
+Alongside that, a `DescriptorBuilder` — a **separate type from `Descriptor`**, not `Descriptor` doubling as its own builder — offers the same vocabulary as a computation expression:
+
+```fsharp
+[<Sealed>]
+type DescriptorBuilder =
+    new: id: string -> DescriptorBuilder
+    member Yield: 'a -> Descriptor       // seeds Id = id, Type = Semantic (the spec's own default), everything else empty
+    member Zero: unit -> Descriptor
+    member Run: d: Descriptor -> Descriptor
+
+    [<CustomOperation("semantic")>]   member Semantic: d: Descriptor -> Descriptor
+    [<CustomOperation("safe")>]       member Safe: d: Descriptor -> Descriptor
+    [<CustomOperation("unsafe")>]     member Unsafe: d: Descriptor -> Descriptor
+    [<CustomOperation("idempotent")>] member Idempotent: d: Descriptor -> Descriptor
+    // ... doc / def / tag / rel / contains / rt / from / href / hrefExternal / link / ext / initial / regions,
+    // one [<CustomOperation>] each, same names and shapes as the plain combinators above
+
+val descriptor: id: string -> DescriptorBuilder
+```
+
+```fsharp
+let listProducts = descriptor "listProducts" { safe; rt product }
+let product       = descriptor "product" { contains [ productId; productName; price ] }   // Type unstated, defaults semantic
+
+// unchanged, still available:
+let productName = semantic "productName" |> doc "Display name"
+```
+
+`semantic`/`safe`/`unsafe`/`idempotent` are reused as zero-argument custom operations *inside* a `descriptor { }` block, setting `Type` rather than constructing a value — this has direct precedent in F#'s own `query { }` builder (`distinct` is exactly a state-only custom operation). Custom-operation names resolve against the builder in scope only inside `{ }`; outside it, the same names resolve to the unrelated plain functions — no collision, no shadowing. Net result: one new top-level name (`descriptor`), `Descriptor` stays a plain, CE-machinery-free data type used everywhere else in this design (`ProtocolGraph`, `StateComposition`, pattern matching), and both surfaces produce the identical `Descriptor` value.
 
 ### Descriptor references — `href` vs `hrefExternal`
 
@@ -249,6 +283,7 @@ An independent review (conducted during design, against Harel 1987 and SCXML) of
 Mirrors `Frank.Rdf`/`Frank.Provenance`'s established pattern (`TestHost`, `JsonElement` inspection in the style of the prior `UnifiedAlpsGeneratorTests.fs`, not string comparison):
 
 - **Per-combinator**: `doc`/`def`/`tag`/`rel`/`contains`/`rt`/`from`/`href`/`hrefExternal`/`link`/`ext`/`initial`/`regions` each produce the correct fields on the resulting `Descriptor`.
+- **Authoring-surface parity**: the same profile built via plain `|>` combinators and via `descriptor { }` produces structurally equal `Descriptor` values; `semantic`/`safe`/`unsafe`/`idempotent` used as custom operations set `Type` correctly, and an unset `Type` defaults to `Semantic` matching draft-07 §2.2.16.
 - **Serialization**: full round-trip against draft-07's JSON shape; `href` local-fragment (`#id`) vs. `hrefExternal` full-URI emission; `protocolState`/`availableInStates` ext auto-emission exactly when `from`+`rt` are both present (one pair per declared `from` state), absent otherwise.
 - **`ProtocolGraph.ofProfile`**: correct edge set for `from`+`rt` combinations, including the one-edge-per-source-state expansion; zero edges for transitions missing either.
 - **`StateComposition`**: `Alternatives` vs. `Regions` classification; `initialChild` resolution; construction-time rejection of multiple `initial` markers in one `contains` list.
