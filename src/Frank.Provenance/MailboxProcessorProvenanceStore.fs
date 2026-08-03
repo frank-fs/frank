@@ -38,36 +38,57 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
 
                     match msg with
                     | Append record ->
-                        let graphName = graphNameFor record
-                        // dotNetRDF names a graph via its constructor (IRefNode/Uri), not via a mutable
-                        // property: setting Graph.BaseUri does NOT set Graph.Name, so a graph built that
-                        // way is added as the store's unnamed default graph, not a named graph. Build the
-                        // record's content unnamed (via Doc.toGraph), then merge it into a freshly
-                        // constructed, properly named graph before adding it to the store.
-                        let content = record |> ProvenanceRecord.toDoc |> Doc.toGraph
-                        let namedGraph = new Graph(graphName)
-                        namedGraph.Merge(content :> IGraph)
-                        store.Add(namedGraph :> IGraph, true) |> ignore
-                        logger.LogDebug("Appended provenance record for activity {GraphName}", graphName)
+                        // A malformed record (a relative-IRI Activity, an invalid prefix/IRI Doc.toGraph
+                        // rejects, ...) must not kill the mailbox loop: an unhandled exception here stops
+                        // MailboxProcessor's Receive loop for good, so every subsequent Append silently
+                        // vanishes into a dead mailbox and every subsequent Query (PostAndReply, infinite
+                        // timeout) blocks its caller forever. Catch, log, and keep the previous, known-good
+                        // entries state -- the bad record is dropped, not retried.
+                        try
+                            let graphName = graphNameFor record
+                            // dotNetRDF names a graph via its constructor (IRefNode/Uri), not via a mutable
+                            // property: setting Graph.BaseUri does NOT set Graph.Name, so a graph built that
+                            // way is added as the store's unnamed default graph, not a named graph. Build the
+                            // record's content unnamed (via Doc.toGraph), then merge it into a freshly
+                            // constructed, properly named graph before adding it to the store.
+                            let content = record |> ProvenanceRecord.toDoc |> Doc.toGraph
+                            let namedGraph = new Graph(graphName)
+                            namedGraph.Merge(content :> IGraph)
+                            store.Add(namedGraph :> IGraph, true) |> ignore
+                            logger.LogDebug("Appended provenance record for activity {GraphName}", graphName)
 
-                        let updated = entries @ [ namedGraph.Name, graphName ]
+                            let updated = entries @ [ namedGraph.Name, graphName ]
 
-                        let retained =
-                            if updated.Length > config.MaxRecords then
-                                let evictCount = min config.EvictionBatchSize updated.Length
+                            let retained =
+                                if updated.Length > config.MaxRecords then
+                                    let evictCount = min config.EvictionBatchSize updated.Length
 
-                                for evictedName, evictedUri in updated |> List.truncate evictCount do
-                                    store.Remove(evictedName) |> ignore
-                                    logger.LogDebug("Evicted provenance record {GraphName}", evictedUri)
+                                    for evictedName, evictedUri in updated |> List.truncate evictCount do
+                                        store.Remove(evictedName) |> ignore
+                                        logger.LogDebug("Evicted provenance record {GraphName}", evictedUri)
 
-                                updated |> List.skip evictCount
-                            else
-                                updated
+                                    updated |> List.skip evictCount
+                                else
+                                    updated
 
-                        return! loop retained
+                            return! loop retained
+                        with ex ->
+                            logger.LogError(ex, "Failed to append a provenance record; dropping it and continuing")
+                            return! loop entries
 
                     | Query(query, reply) ->
-                        reply.Reply(runQuery query)
+                        // Same story as Append, but the caller is blocked in PostAndReply waiting on
+                        // `reply` -- so on failure we must still Reply (with an empty graph) rather than
+                        // let the exception propagate, or that caller hangs forever with no log line to
+                        // explain it.
+                        let result =
+                            try
+                                runQuery query
+                            with ex ->
+                                logger.LogError(ex, "Failed to run provenance query {Query}; returning an empty graph", query)
+                                SparqlQueryResult.Graph(new Graph() :> IGraph)
+
+                        reply.Reply(result)
                         return! loop entries
                 }
 

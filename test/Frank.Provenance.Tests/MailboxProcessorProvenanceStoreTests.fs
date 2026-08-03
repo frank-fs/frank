@@ -159,4 +159,39 @@ let tests =
                   |> Array.ofList
 
               System.Threading.Tasks.Task.WaitAll(work)
+          }
+
+          test "a malformed record does not kill the mailbox -- subsequent Append/Query still succeed" {
+              let store = newStore ProvenanceStoreConfig.defaults
+
+              // "not-a-uri" is a relative reference, not an absolute IRI: System.Uri(string) defaults to
+              // UriKind.Absolute and throws UriFormatException when graphNameFor tries to turn this
+              // Activity into a graph name. Before the mailbox loop caught exceptions, this would kill
+              // the loop -- silently dropping every later Append and hanging every later Query forever.
+              store.Append(
+                  record "not-a-uri" "https://example.org/games/broken" "https://example.org/users/broken"
+              )
+
+              // Run the recovery Append/Query on a background thread and bound the wait: if the mailbox
+              // died above, PostAndReply blocks forever (MailboxProcessor.DefaultTimeout is
+              // Timeout.Infinite), and without a bound this test would hang the whole run instead of
+              // failing fast.
+              let task =
+                  System.Threading.Tasks.Task.Run(fun () ->
+                      store.Append(
+                          record
+                              "https://example.org/activities/recovery"
+                              "https://example.org/games/recovery"
+                              "https://example.org/users/recovery"
+                      )
+
+                      store.Query(ProvenanceQuery.ByActivityId "https://example.org/activities/recovery"))
+
+              let completedInTime = task.Wait(TimeSpan.FromSeconds(5.0))
+              Expect.isTrue completedInTime "Query completed within the bound instead of hanging on a dead mailbox"
+
+              match task.Result with
+              | SparqlQueryResult.Graph g ->
+                  Expect.isGreaterThan g.Triples.Count 0 "The recovery record was actually appended and is queryable"
+              | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
           } ]
