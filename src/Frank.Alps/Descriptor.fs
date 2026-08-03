@@ -65,3 +65,5 @@ module DescriptorFunctions =
                       Tag = [] } ] }
 
     let linkWith (link: Link) (d: Descriptor) : Descriptor = { d with Link = d.Link @ [ link ] }
+
+    let contains (children: Descriptor list) (d: Descriptor) : Descriptor = { d with Descriptors = children }

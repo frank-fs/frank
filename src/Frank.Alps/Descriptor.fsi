@@ -51,3 +51,8 @@ module DescriptorFunctions =
 
     /// Appends a full `Link` record verbatim.
     val linkWith: link: Link -> Descriptor -> Descriptor
+
+    /// Sets the nested `descriptor` array (draft-07 §2.2.4). Deliberately untyped by child `DescriptorType`
+    /// -- any descriptor may nest under any other. Replaces any previously-set `Descriptors`, unlike the
+    /// append-only `tag`/`ext`/`link` -- there is exactly one nested-descriptor array per parent.
+    val contains: children: Descriptor list -> Descriptor -> Descriptor

@@ -12,6 +12,7 @@
     <Compile Include="DescriptorTypesTests.fs" />
     <Compile Include="ConstructorTests.fs" />
     <Compile Include="ExtLinkTests.fs" />
+    <Compile Include="ContainsTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
