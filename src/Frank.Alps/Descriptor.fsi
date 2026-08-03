@@ -95,6 +95,14 @@ module DescriptorFunctions =
     /// against, so a bare string/URI -- the same reasoning that makes a descriptor's own `id` a string.
     val hrefExternal: uri: string -> Descriptor -> Descriptor
 
+    /// Marks a safe/unsafe/idempotent transition as valid only from the given source state(s). Not an
+    /// ALPS property -- sets `From`, a Frank.Alps-only field. A transition with no `from` (`From = []`) is
+    /// never filtered by state -- graceful degradation, matching how a transition with no auth requirement
+    /// is never filtered by authorization. Serialization (Task 8) projects a non-empty `From` into one
+    /// `protocolState`/`availableInStates` ext pair per declared state -- `From` itself is not serialized
+    /// as ext directly.
+    val from: sources: Descriptor list -> Descriptor -> Descriptor
+
 /// Whether a descriptor's nested `Descriptors` are OR-alternatives (substates -- exactly one is
 /// current) or AND-regions (orthogonal -- all are concurrently current), derived by reading the
 /// `OrthogonalExtId` marker that `regions` sets. Purely a read of already-authored data -- no runtime

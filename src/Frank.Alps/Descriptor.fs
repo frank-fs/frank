@@ -115,6 +115,8 @@ module DescriptorFunctions =
         { d with
             InheritsFrom = Some(DescriptorRef.External(Uri uri)) }
 
+    let from (sources: Descriptor list) (d: Descriptor) : Descriptor = { d with From = sources }
+
 [<RequireQualifiedAccess>]
 type StateComposition =
     | Leaf
