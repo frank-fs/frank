@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Claude Code Stop hook: warns when a src/Frank.* package introduced on the
-# current branch (relative to master) is missing a package README.md or a
-# runnable sample under sample/.
+# current branch (relative to master) is missing a package README.md, a
+# runnable sample under sample/, or its Frank.sln/CI/build.ps1 wiring.
 #
 # Scope: only packages that are NEW relative to master are checked — this
 # intentionally does not flag pre-existing gaps (e.g. Frank.Analyzers,
@@ -40,6 +40,18 @@ while IFS= read -r fsproj; do
     fi
     if [ ! -d "sample/${pkg_name}.Sample" ]; then
         pkg_warnings="${pkg_warnings}\n  - missing sample/${pkg_name}.Sample/ (no runnable sample demonstrating it works)"
+    fi
+    if [ -f Frank.sln ] && ! grep -q "\"${pkg_name}\"" Frank.sln 2>/dev/null; then
+        pkg_warnings="${pkg_warnings}\n  - not registered in Frank.sln"
+    fi
+    if [ -f .github/workflows/ci.yml ] && ! grep -q "test/${pkg_name}.Tests" .github/workflows/ci.yml 2>/dev/null; then
+        pkg_warnings="${pkg_warnings}\n  - .github/workflows/ci.yml has no 'dotnet test test/${pkg_name}.Tests' step, so its tests never run in CI"
+    fi
+    if [ -f .github/workflows/ci.yml ] && ! grep -q "src/${pkg_name} " .github/workflows/ci.yml 2>/dev/null; then
+        pkg_warnings="${pkg_warnings}\n  - .github/workflows/ci.yml has no 'dotnet pack src/${pkg_name}' step, so no NuGet package is ever produced"
+    fi
+    if [ -f build.ps1 ] && ! grep -q "src/${pkg_name} " build.ps1 2>/dev/null; then
+        pkg_warnings="${pkg_warnings}\n  - build.ps1 has no 'dotnet pack ... src/${pkg_name}' step"
     fi
 
     if [ -n "$pkg_warnings" ]; then
