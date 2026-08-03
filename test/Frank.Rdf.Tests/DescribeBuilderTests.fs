@@ -48,6 +48,16 @@ let tests =
                   ""
           }
 
+          test "propertyLangString wraps a value and BCP47 language tag into Literal.LangString" {
+              let d =
+                  describe (Node.Iri "https://example.org/g1") { propertyLangString "schema:name" "Tic-tac-toe" "en" }
+
+              Expect.equal
+                  d.Statements
+                  [ "schema:name", Value.Literal(Literal.LangString("Tic-tac-toe", "en")) ]
+                  ""
+          }
+
           test "property can be called more than once for the same predicate (multi-valued property)" {
               let d =
                   describe (Node.Iri "https://example.org/g1") {

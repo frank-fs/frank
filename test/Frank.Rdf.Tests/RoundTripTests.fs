@@ -48,6 +48,29 @@ let tests =
               Expect.isTrue (originalGraph.Equals(parsedGraph)) "Isomorphic after round-trip"
           }
 
+          test "round-trips a language-tagged string literal, preserving @language" {
+              let doc =
+                  rdf {
+                      prefix "schema" "https://schema.org/"
+
+                      about (
+                          describe (Node.Iri "https://example.org/g1") {
+                              propertyLangString "schema:name" "Tic-tac-toe" "en"
+                          }
+                      )
+                  }
+
+              let json = Doc.toJsonLd doc
+
+              Expect.stringContains json "@language" "Expanded form carries @language for a langString literal"
+              Expect.stringContains json "en" "Language tag is present"
+
+              let originalGraph = Doc.toGraph doc :> IGraph
+              let parsedGraph = json |> parseBackToGraph
+
+              Expect.isTrue (originalGraph.Equals(parsedGraph)) "Isomorphic after round-trip, language tag preserved"
+          }
+
           test "round-trips a two-subject document (a reference plus its target's own statements)" {
               let players = Node.Iri "https://example.org/g1#players"
 

@@ -55,6 +55,11 @@ module Rdf =
         member _.PropertyDateTime(d: Description, predicate: string, value: System.DateTimeOffset) : Description =
             { d with Statements = d.Statements @ [ predicate, Value.Literal(Literal.DateTime value) ] }
 
+        [<CustomOperation("propertyLangString")>]
+        member _.PropertyLangString(d: Description, predicate: string, value: string, language: string) : Description =
+            { d with
+                Statements = d.Statements @ [ predicate, Value.Literal(Literal.LangString(value, language)) ] }
+
         [<CustomOperation("propertyNode")>]
         member _.PropertyNode(d: Description, predicate: string, value: Node) : Description =
             { d with Statements = d.Statements @ [ predicate, Value.Node value ] }
@@ -76,6 +81,7 @@ module Rdf =
             | Literal.Int i -> i.ToLiteral(graph)
             | Literal.Bool b -> b.ToLiteral(graph)
             | Literal.DateTime dt -> dt.ToLiteral(graph)
+            | Literal.LangString(value, lang) -> graph.CreateLiteralNode(value, lang) :> INode
 
         let private toObjectNode (graph: Graph) (prefixes: (string * string) list) (value: Value) : INode =
             match value with

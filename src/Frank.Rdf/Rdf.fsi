@@ -64,6 +64,9 @@ module Rdf =
         [<CustomOperation("propertyDateTime")>]
         member PropertyDateTime: d: Description * predicate: string * value: System.DateTimeOffset -> Description
 
+        [<CustomOperation("propertyLangString")>]
+        member PropertyLangString: d: Description * predicate: string * value: string * language: string -> Description
+
         [<CustomOperation("propertyNode")>]
         member PropertyNode: d: Description * predicate: string * value: Node -> Description
 

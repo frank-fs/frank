@@ -15,6 +15,8 @@ type Literal =
     | Int of int
     | Bool of bool
     | DateTime of DateTimeOffset
+    /// A language-tagged string (rdf:langString), e.g. "Tic-tac-toe"@en -- (value, BCP47 language tag).
+    | LangString of string * string
 
 /// The object of a triple: either a reference to another resource, or a literal.
 [<RequireQualifiedAccess>]
