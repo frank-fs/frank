@@ -69,3 +69,42 @@ module DescriptorFunctions =
     /// Sets `href` (inheritance) to a URI into a document this codebase doesn't own. Nothing to check
     /// against, so a bare string/URI -- the same reasoning that makes a descriptor's own `id` a string.
     val hrefExternal: uri: string -> Descriptor -> Descriptor
+
+    /// Two of the canonical Frank.Alps ext ids under the shared https://frank-fs.github.io/alps-ext/
+    /// namespace (protocolState/availableInStates, from PR #165/#214, are declared in Serialization.fsi --
+    /// Task 8, alongside the projection logic that's their only user).
+    [<Literal>]
+    val InitialExtId: string = "https://frank-fs.github.io/alps-ext/initial"
+
+    [<Literal>]
+    val OrthogonalExtId: string = "https://frank-fs.github.io/alps-ext/orthogonal"
+
+    /// Marks this descriptor as the default child entered when its parent (a composite state) is targeted
+    /// without naming a substate. No native ALPS property -- rides `ext` under `InitialExtId`. Any
+    /// ALPS-agnostic reader ignores the unrecognized ext element; the document stays fully spec-valid.
+    val initial: Descriptor -> Descriptor
+
+    /// Orthogonal (AND) composition, distinct from `contains`'s OR/substate decomposition: `regions
+    /// [a; b]` means being in the parent implies being concurrently in some state within *each* of `a`
+    /// and `b`. Same `Descriptors` field as `contains`, plus `OrthogonalExtId` on the parent -- no
+    /// `Descriptor` shape change. Does not enforce `contains`'s at-most-one-`initial` rule: an AND-region
+    /// composition has no single default to disambiguate.
+    val regions: children: Descriptor list -> Descriptor -> Descriptor
+
+    /// Whether a descriptor's nested `Descriptors` are OR-alternatives (substates -- exactly one is
+    /// current) or AND-regions (orthogonal -- all are concurrently current), derived by reading the
+    /// `OrthogonalExtId` marker `regions` sets. Purely a read of already-authored data -- no runtime
+    /// execution.
+    [<RequireQualifiedAccess>]
+    type StateComposition =
+        | Leaf
+        | Alternatives of Descriptor list
+        | Regions of Descriptor list
+
+    [<RequireQualifiedAccess>]
+    module StateComposition =
+        val ofDescriptor: Descriptor -> StateComposition
+
+        /// The child marked `initial`, if any. Meaningful only when `ofDescriptor` returns `Alternatives`
+        /// -- an AND-region composition has no single default child.
+        val initialChild: Descriptor -> Descriptor option

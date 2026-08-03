@@ -13,6 +13,7 @@
     <Compile Include="ConstructorTests.fs" />
     <Compile Include="ExtLinkTests.fs" />
     <Compile Include="ContainsTests.fs" />
+    <Compile Include="CompositeStateTests.fs" />
     <Compile Include="ReferenceTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

@@ -66,7 +66,44 @@ module DescriptorFunctions =
 
     let linkWith (link: Link) (d: Descriptor) : Descriptor = { d with Link = d.Link @ [ link ] }
 
-    let contains (children: Descriptor list) (d: Descriptor) : Descriptor = { d with Descriptors = children }
+    [<Literal>]
+    let InitialExtId = "https://frank-fs.github.io/alps-ext/initial"
+
+    [<Literal>]
+    let OrthogonalExtId = "https://frank-fs.github.io/alps-ext/orthogonal"
+
+    let hasExtId (extId: string) (d: Descriptor) : bool =
+        d.Ext |> List.exists (fun e -> e.Id = extId)
+
+    let contains (children: Descriptor list) (d: Descriptor) : Descriptor =
+        let initialCount = children |> List.filter (hasExtId InitialExtId) |> List.length
+
+        if initialCount > 1 then
+            failwithf
+                "Frank.Alps: descriptor '%s' has %d children marked `initial`, at most one is allowed"
+                d.Id
+                initialCount
+
+        { d with Descriptors = children }
+
+    let initial (d: Descriptor) : Descriptor =
+        { d with
+            Ext =
+                d.Ext
+                @ [ { Id = InitialExtId
+                      Href = None
+                      Value = None
+                      Tag = [] } ] }
+
+    let regions (children: Descriptor list) (d: Descriptor) : Descriptor =
+        { d with
+            Descriptors = children
+            Ext =
+                d.Ext
+                @ [ { Id = OrthogonalExtId
+                      Href = None
+                      Value = None
+                      Tag = [] } ] }
 
     let rt (target: Descriptor) (d: Descriptor) : Descriptor = { d with Rt = Some target }
 
@@ -77,3 +114,23 @@ module DescriptorFunctions =
     let hrefExternal (uri: string) (d: Descriptor) : Descriptor =
         { d with
             InheritsFrom = Some(DescriptorRef.External(Uri uri)) }
+
+    [<RequireQualifiedAccess>]
+    type StateComposition =
+        | Leaf
+        | Alternatives of Descriptor list
+        | Regions of Descriptor list
+
+    [<RequireQualifiedAccess>]
+    module StateComposition =
+        let ofDescriptor (d: Descriptor) : StateComposition =
+            match d.Descriptors with
+            | [] -> StateComposition.Leaf
+            | children when hasExtId OrthogonalExtId d -> StateComposition.Regions children
+            | children -> StateComposition.Alternatives children
+
+        let initialChild (d: Descriptor) : Descriptor option =
+            match ofDescriptor d with
+            | StateComposition.Alternatives children -> children |> List.tryFind (hasExtId InitialExtId)
+            | StateComposition.Regions _
+            | StateComposition.Leaf -> None
