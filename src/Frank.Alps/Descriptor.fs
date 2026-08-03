@@ -72,7 +72,7 @@ module DescriptorFunctions =
     [<Literal>]
     let OrthogonalExtId = "https://frank-fs.github.io/alps-ext/orthogonal"
 
-    let hasExtId (extId: string) (d: Descriptor) : bool =
+    let internal hasExtId (extId: string) (d: Descriptor) : bool =
         d.Ext |> List.exists (fun e -> e.Id = extId)
 
     let contains (children: Descriptor list) (d: Descriptor) : Descriptor =
@@ -115,22 +115,22 @@ module DescriptorFunctions =
         { d with
             InheritsFrom = Some(DescriptorRef.External(Uri uri)) }
 
-    [<RequireQualifiedAccess>]
-    type StateComposition =
-        | Leaf
-        | Alternatives of Descriptor list
-        | Regions of Descriptor list
+[<RequireQualifiedAccess>]
+type StateComposition =
+    | Leaf
+    | Alternatives of Descriptor list
+    | Regions of Descriptor list
 
-    [<RequireQualifiedAccess>]
-    module StateComposition =
-        let ofDescriptor (d: Descriptor) : StateComposition =
-            match d.Descriptors with
-            | [] -> StateComposition.Leaf
-            | children when hasExtId OrthogonalExtId d -> StateComposition.Regions children
-            | children -> StateComposition.Alternatives children
+[<RequireQualifiedAccess>]
+module StateComposition =
+    let ofDescriptor (d: Descriptor) : StateComposition =
+        match d.Descriptors with
+        | [] -> StateComposition.Leaf
+        | children when DescriptorFunctions.hasExtId DescriptorFunctions.OrthogonalExtId d -> StateComposition.Regions children
+        | children -> StateComposition.Alternatives children
 
-        let initialChild (d: Descriptor) : Descriptor option =
-            match ofDescriptor d with
-            | StateComposition.Alternatives children -> children |> List.tryFind (hasExtId InitialExtId)
-            | StateComposition.Regions _
-            | StateComposition.Leaf -> None
+    let initialChild (d: Descriptor) : Descriptor option =
+        match ofDescriptor d with
+        | StateComposition.Alternatives children -> children |> List.tryFind (DescriptorFunctions.hasExtId DescriptorFunctions.InitialExtId)
+        | StateComposition.Regions _
+        | StateComposition.Leaf -> None

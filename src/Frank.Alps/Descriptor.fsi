@@ -52,10 +52,35 @@ module DescriptorFunctions =
     /// Appends a full `Link` record verbatim.
     val linkWith: link: Link -> Descriptor -> Descriptor
 
+    /// Two of the canonical Frank.Alps ext ids under the shared https://frank-fs.github.io/alps-ext/
+    /// namespace (protocolState/availableInStates, from PR #165/#214, are declared in Serialization.fsi --
+    /// Task 8, alongside the projection logic that's their only user).
+    [<Literal>]
+    val InitialExtId: string = "https://frank-fs.github.io/alps-ext/initial"
+
+    [<Literal>]
+    val OrthogonalExtId: string = "https://frank-fs.github.io/alps-ext/orthogonal"
+
+    /// Helper to check if a descriptor has a specific ext id. Internal use only.
+    val internal hasExtId: extId: string -> Descriptor -> bool
+
     /// Sets the nested `descriptor` array (draft-07 §2.2.4). Deliberately untyped by child `DescriptorType`
     /// -- any descriptor may nest under any other. Replaces any previously-set `Descriptors`, unlike the
     /// append-only `tag`/`ext`/`link` -- there is exactly one nested-descriptor array per parent.
+    /// Raises if more than one direct child is marked `initial` (via the `initial` function).
     val contains: children: Descriptor list -> Descriptor -> Descriptor
+
+    /// Marks this descriptor as the default child entered when its parent (a composite state) is targeted
+    /// without naming a substate. No native ALPS property -- rides `ext` under `InitialExtId`. Any
+    /// ALPS-agnostic reader ignores the unrecognized ext element; the document stays fully spec-valid.
+    val initial: Descriptor -> Descriptor
+
+    /// Orthogonal (AND) composition, distinct from `contains`'s OR/substate decomposition: `regions
+    /// [a; b]` means being in the parent implies being concurrently in some state within *each* of `a`
+    /// and `b`. Same `Descriptors` field as `contains`, plus `OrthogonalExtId` on the parent -- no
+    /// `Descriptor` shape change. Does not enforce `contains`'s at-most-one-`initial` rule: an AND-region
+    /// composition has no single default to disambiguate.
+    val regions: children: Descriptor list -> Descriptor -> Descriptor
 
     /// Sets `rt` -- the target resource type/state for a safe/unsafe/idempotent transition (draft-07
     /// §2.2.13). Descriptor-typed: a dangling reference is a compile error, not a wrong document.
@@ -70,41 +95,20 @@ module DescriptorFunctions =
     /// against, so a bare string/URI -- the same reasoning that makes a descriptor's own `id` a string.
     val hrefExternal: uri: string -> Descriptor -> Descriptor
 
-    /// Two of the canonical Frank.Alps ext ids under the shared https://frank-fs.github.io/alps-ext/
-    /// namespace (protocolState/availableInStates, from PR #165/#214, are declared in Serialization.fsi --
-    /// Task 8, alongside the projection logic that's their only user).
-    [<Literal>]
-    val InitialExtId: string = "https://frank-fs.github.io/alps-ext/initial"
+/// Whether a descriptor's nested `Descriptors` are OR-alternatives (substates -- exactly one is
+/// current) or AND-regions (orthogonal -- all are concurrently current), derived by reading the
+/// `OrthogonalExtId` marker that `regions` sets. Purely a read of already-authored data -- no runtime
+/// execution.
+[<RequireQualifiedAccess>]
+type StateComposition =
+    | Leaf
+    | Alternatives of Descriptor list
+    | Regions of Descriptor list
 
-    [<Literal>]
-    val OrthogonalExtId: string = "https://frank-fs.github.io/alps-ext/orthogonal"
+[<RequireQualifiedAccess>]
+module StateComposition =
+    val ofDescriptor: Descriptor -> StateComposition
 
-    /// Marks this descriptor as the default child entered when its parent (a composite state) is targeted
-    /// without naming a substate. No native ALPS property -- rides `ext` under `InitialExtId`. Any
-    /// ALPS-agnostic reader ignores the unrecognized ext element; the document stays fully spec-valid.
-    val initial: Descriptor -> Descriptor
-
-    /// Orthogonal (AND) composition, distinct from `contains`'s OR/substate decomposition: `regions
-    /// [a; b]` means being in the parent implies being concurrently in some state within *each* of `a`
-    /// and `b`. Same `Descriptors` field as `contains`, plus `OrthogonalExtId` on the parent -- no
-    /// `Descriptor` shape change. Does not enforce `contains`'s at-most-one-`initial` rule: an AND-region
-    /// composition has no single default to disambiguate.
-    val regions: children: Descriptor list -> Descriptor -> Descriptor
-
-    /// Whether a descriptor's nested `Descriptors` are OR-alternatives (substates -- exactly one is
-    /// current) or AND-regions (orthogonal -- all are concurrently current), derived by reading the
-    /// `OrthogonalExtId` marker `regions` sets. Purely a read of already-authored data -- no runtime
-    /// execution.
-    [<RequireQualifiedAccess>]
-    type StateComposition =
-        | Leaf
-        | Alternatives of Descriptor list
-        | Regions of Descriptor list
-
-    [<RequireQualifiedAccess>]
-    module StateComposition =
-        val ofDescriptor: Descriptor -> StateComposition
-
-        /// The child marked `initial`, if any. Meaningful only when `ofDescriptor` returns `Alternatives`
-        /// -- an AND-region composition has no single default child.
-        val initialChild: Descriptor -> Descriptor option
+    /// The child marked `initial`, if any. Meaningful only when `ofDescriptor` returns `Alternatives`
+    /// -- an AND-region composition has no single default child.
+    val initialChild: Descriptor -> Descriptor option
