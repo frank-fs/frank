@@ -5,8 +5,16 @@ module Rdf =
     /// Resolves a CURIE ("prefix:local") against declared prefixes, or passes an absolute IRI through
     /// unchanged. A declared prefix always takes priority over "is this already a well-formed URI" --
     /// see the comment on the .fs implementation for why the other order is a real bug, not a style choice.
-    /// Raises if the text before the colon isn't a declared prefix and the whole string isn't a
-    /// well-formed absolute URI either. Raises if there's no colon at all.
+    /// When the text before the colon isn't a declared prefix, the string only passes through as an
+    /// absolute IRI if it looks genuinely absolute -- the part immediately after the parsed scheme's
+    /// colon starts with "//" (not merely "://" appearing anywhere later in the string, which would
+    /// wrongly admit a typo like "schema:http://weird"), or the string starts with an allow-listed
+    /// non-hierarchical scheme ("urn:", "mailto:", "tel:", matched case-insensitively per RFC 3986 §3.1)
+    /// -- *and* is well-formed under System.Uri.IsWellFormedUriString. Anything else raises, including
+    /// strings that System.Uri.IsWellFormedUriString alone would call well-formed (almost any
+    /// "word:word" string qualifies under its loose absolute-URI rules, which is why that check alone
+    /// isn't enough to catch a typo'd, undeclared CURIE prefix like "foaf:name"). Raises if there's no
+    /// colon at all.
     val internal resolveIri: prefixes: (string * string) list -> s: string -> string
 
     /// Raises if the same prefix name appears more than once with different URIs.
