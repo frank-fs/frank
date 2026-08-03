@@ -25,6 +25,8 @@
     <Compile Include="AuthorizationFilter.fs" />
     <Compile Include="AlpsDocument.fsi" />
     <Compile Include="AlpsDocument.fs" />
+    <Compile Include="Excerpt.fsi" />
+    <Compile Include="Excerpt.fs" />
   </ItemGroup>
 
   <ItemGroup>

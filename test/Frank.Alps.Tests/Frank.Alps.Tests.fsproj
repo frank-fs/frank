@@ -24,6 +24,7 @@
     <Compile Include="AuthorizationFilterTests.fs" />
     <Compile Include="AlpsDocumentTests.fs" />
     <Compile Include="AlpsDocumentIntegrationTests.fs" />
+    <Compile Include="ExcerptTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
