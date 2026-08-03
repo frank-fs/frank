@@ -18,6 +18,8 @@
     <Compile Include="ProvVocabulary.fs" />
     <Compile Include="Prov.fsi" />
     <Compile Include="Prov.fs" />
+    <Compile Include="ProvBuilder.fsi" />
+    <Compile Include="ProvBuilder.fs" />
     <Compile Include="ProvenanceRecord.fsi" />
     <Compile Include="ProvenanceRecord.fs" />
     <Compile Include="ProvenanceStore.fsi" />
