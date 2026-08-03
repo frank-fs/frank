@@ -249,10 +249,31 @@ Unchanged from the superseded doc: `resource { get (handler { handle h; binds So
 
 ### HTTP surface
 
-Two exposures — an addition versus the superseded doc, made necessary by `CurrentStateResolver` taking a `resourceIri` (a specific instance), which the app-wide document has no notion of:
+Two exposures — an addition versus the superseded doc, made necessary by `CurrentStateResolver` taking a `resourceIri` (a specific instance), which the app-wide document has no notion of. Both are built on a shared internal lookup, not on `Frank.JsonHome`'s `ApiSurface`/`IApiDescriptionGroupCollectionProvider` mechanism — that ties resource discovery to ASP.NET Core's ApiExplorer, which `Frank.Alps` doesn't need: `binds` already attaches a `Descriptor` directly to the exact `Endpoint.Metadata` it's bound to (`HandlerDefinitionMetadata.toConventions`, unchanged core mechanism), so both exposures read `Endpoint.Metadata.GetOrderedMetadata<Descriptor>()` straight from the registered `EndpointDataSource` — the same direct-metadata-read pattern the design already uses for `ActivityTypeResolver`-style lookups, with no `Frank.JsonHome` dependency.
 
-1. **App-wide profile** — `GET /.well-known/alps.json`. All descriptors from `useAlps [...]`. Filtered by principal only (existing `IAuthorizationService` mechanism, unchanged); never state-filtered — there is no resource instance in scope. Advertised via `Link: rel="profile"` app-wide (`WebLink.useAppWideLinks`).
-2. **Per-resource, content-negotiated excerpt** — `GET /games/{id}` with `Accept: application/alps+json` returns the subset of transitions `binds`-bound at that endpoint, filtered by *both* principal and `CurrentStateResolver "games/{id}"` (contains-ancestry match, above). Advertised via `WebLink.useResourceScopedLinks`. Mirrors `Frank.Rdf`/`Frank.Provenance`'s own inline, content-negotiated pattern exactly.
+```fsharp
+module EndpointSurface =
+    /// All (Endpoint, Descriptor) pairs for endpoints sharing routePattern -- one resource's several
+    /// HTTP-method endpoints, each carrying the Descriptor its own `binds` attached.
+    val descriptorsForRoute: services: System.IServiceProvider -> routePattern: string -> (Microsoft.AspNetCore.Http.Endpoint * Descriptor) list
+
+    /// Every (Endpoint, Descriptor) pair across every registered endpoint -- used to find, for an
+    /// app-wide document's descriptor, the endpoint(s) it's bound to (for auth filtering), independent
+    /// of which route that happens to be.
+    val allDescriptors: services: System.IServiceProvider -> (Microsoft.AspNetCore.Http.Endpoint * Descriptor) list
+```
+
+1. **App-wide profile** — `GET /.well-known/alps.json`, registered via `useAlps [...]` on `webHost { }` exactly as `useJsonHome` registers its own document (a single dedicated resource at a fixed path — no content negotiation, since nothing else is ever served there). All descriptors from the list passed to `useAlps`; for each, `EndpointSurface.allDescriptors` finds its bound endpoint(s) and filters by principal only (a `Frank.Alps`-local port of `AuthorizationFilter`'s core evaluation logic — gather `IAuthorizeData`/`AuthorizationPolicy` off that endpoint's `Metadata`, resolve and call `IAuthorizationService.AuthorizeAsync`, fail closed on any evaluation error — operating on `Descriptor`+`Endpoint` pairs instead of JsonHome's `ResourceDescription`). Never state-filtered — there is no resource instance in scope. Advertised via `Link: rel="profile"` app-wide (`WebLink.useAppWideLinks`).
+2. **Per-resource, content-negotiated excerpt** — manual, via the existing `negotiate { }` CE, the same way the `Frank.Rdf` sample adds its `application/ld+json` case — *not* automatic middleware, since `negotiate { }` is the only content-negotiation mechanism this codebase has and every other package uses it the same way:
+   ```fsharp
+   resource "/games/{id}" {
+       get (negotiate {
+           accepts "application/json" getGameJson
+           accepts "application/alps+json" (Alps.excerpt resolver)
+       })
+   }
+   ```
+   `val excerpt: resolver: CurrentStateResolver option -> HttpContext -> Task<unit>` — at request time, reads `ctx.GetEndpoint()`'s route pattern, calls `EndpointSurface.descriptorsForRoute` to gather every HTTP method's `binds`-bound descriptor for *this resource* (not just the one method `excerpt` happens to run under), filters each by *both* principal (that descriptor's own endpoint) and, if `resolver` is `Some`, `CurrentStateResolver` (`contains`-ancestry match, above). Advertised the same way the `Frank.Rdf` sample advertises its `application/ld+json` case — `resource { link (fun ctx -> Seq.singleton { Target = string ctx.Request.Path; Rel = "profile"; Params = ["type", "application/alps+json"] }) }`, same URI as the primary representation, disambiguated by the `type` link-param, via `WebLink.useResourceScopedLinks`. `rel="profile"` here (not `"alternate"`, which the Rdf sample uses) because RFC 6906 defines `profile` specifically for this: the excerpt *is* the ALPS profile of this resource's semantics, not an alternate serialization of the same data.
 
 Semantic descriptors are never filtered by either mechanism in either exposure — vocabulary, not capability, unchanged principle extended to state. `Cache-Control: private, no-cache` and `Vary: Authorization` apply to both exposures whenever either filter is active, unchanged from the superseded doc's rule.
 
