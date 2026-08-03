@@ -25,7 +25,7 @@ type TestEndpointDataSource(endpoints: Endpoint[]) =
 
 let private noopDelegate: RequestDelegate = RequestDelegate(fun _ -> System.Threading.Tasks.Task.CompletedTask)
 
-let private makeEndpoint (routePattern: string) (metadata: obj list) : Endpoint =
+let makeEndpoint (routePattern: string) (metadata: obj list) : Endpoint =
     RouteEndpoint(noopDelegate, Patterns.RoutePatternFactory.Parse routePattern, 0, EndpointMetadataCollection(metadata), routePattern)
 
 let private servicesWith (endpoints: Endpoint[]) : System.IServiceProvider =

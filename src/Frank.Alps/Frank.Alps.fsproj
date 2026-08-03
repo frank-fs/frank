@@ -23,6 +23,8 @@
     <Compile Include="EndpointSurface.fs" />
     <Compile Include="AuthorizationFilter.fsi" />
     <Compile Include="AuthorizationFilter.fs" />
+    <Compile Include="AlpsDocument.fsi" />
+    <Compile Include="AlpsDocument.fs" />
   </ItemGroup>
 
   <ItemGroup>

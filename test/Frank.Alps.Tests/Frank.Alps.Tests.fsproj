@@ -22,6 +22,7 @@
     <Compile Include="HandlerBuilderExtensionsTests.fs" />
     <Compile Include="EndpointSurfaceTests.fs" />
     <Compile Include="AuthorizationFilterTests.fs" />
+    <Compile Include="AlpsDocumentTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
