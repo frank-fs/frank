@@ -40,27 +40,27 @@ module ProvenanceStore =
         match query with
         | ProvenanceQuery.ByResource resourceIri ->
             render
-                """
-                CONSTRUCT { @resource ?rp ?ro . ?activity ?ap ?ao . }
-                WHERE {
+                $"""
+                CONSTRUCT {{ @resource ?rp ?ro . ?activity ?ap ?ao . }}
+                WHERE {{
                     @resource ?rp ?ro .
-                    OPTIONAL {
-                        @resource <http://www.w3.org/ns/prov#wasGeneratedBy> ?activity .
+                    OPTIONAL {{
+                        @resource <{ProvRelation.toIri ProvRelation.WasGeneratedBy}> ?activity .
                         ?activity ?ap ?ao .
-                    }
-                }
+                    }}
+                }}
                 """
                 "resource"
                 resourceIri
 
         | ProvenanceQuery.ByAgent agentIri ->
             render
-                """
-                CONSTRUCT { ?activity ?ap ?ao . }
-                WHERE {
-                    ?activity <http://www.w3.org/ns/prov#wasAssociatedWith> @agent .
+                $"""
+                CONSTRUCT {{ ?activity ?ap ?ao . }}
+                WHERE {{
+                    ?activity <{ProvRelation.toIri ProvRelation.WasAssociatedWith}> @agent .
                     ?activity ?ap ?ao .
-                }
+                }}
                 """
                 "agent"
                 agentIri
