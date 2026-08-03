@@ -63,8 +63,8 @@
 - [ ] **Step 1: Create the package project structure**
 
 ```bash
-mkdir -p "C:/Users/ryanr/Code/frank/src/Frank.Alps"
-mkdir -p "C:/Users/ryanr/Code/frank/test/Frank.Alps.Tests"
+mkdir -p "C:/Users/ryanr/Code/frank/.claude/worktrees/alps/src/Frank.Alps"
+mkdir -p "C:/Users/ryanr/Code/frank/.claude/worktrees/alps/test/Frank.Alps.Tests"
 ```
 
 Create `src/Frank.Alps/Frank.Alps.fsproj`:
@@ -338,7 +338,7 @@ let tests =
 - [ ] **Step 5: Register both projects in the solution**
 
 ```bash
-cd "C:/Users/ryanr/Code/frank"
+cd "C:/Users/ryanr/Code/frank/.claude/worktrees/alps"
 dotnet sln Frank.sln add src/Frank.Alps/Frank.Alps.fsproj
 dotnet sln Frank.sln add test/Frank.Alps.Tests/Frank.Alps.Tests.fsproj
 ```
@@ -3155,7 +3155,7 @@ let main args =
 Register the sample:
 
 ```bash
-cd "C:/Users/ryanr/Code/frank"
+cd "C:/Users/ryanr/Code/frank/.claude/worktrees/alps"
 dotnet sln Frank.sln add sample/Frank.Alps.Sample/Frank.Alps.Sample.fsproj
 ```
 
@@ -3210,7 +3210,7 @@ Add it to `test/Frank.Alps.Tests/Frank.Alps.Tests.fsproj`, before `Program.fs`:
 - [ ] **Step 3: Run the sample manually and confirm both `Link` headers by hand**
 
 ```bash
-cd "C:/Users/ryanr/Code/frank"
+cd "C:/Users/ryanr/Code/frank/.claude/worktrees/alps"
 dotnet run --project sample/Frank.Alps.Sample/Frank.Alps.Sample.fsproj &
 sleep 2
 curl -sD - -o /dev/null http://localhost:5000/games/1
