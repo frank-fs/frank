@@ -17,12 +17,6 @@ An F# library that integrates [Datastar](https://github.com/starfederation/datas
 dotnet add package Frank.Datastar
 ```
 
-Or add to your `.fsproj`:
-
-```xml
-<PackageReference Include="Frank.Datastar" Version="1.0.0" />
-```
-
 ## Quick Start
 
 ### Basic Streaming Example
@@ -277,7 +271,7 @@ let main args =
 Frank.Datastar is built on:
 
 1. **Frank**: Provides the computation expression framework for defining HTTP resources
-2. **StarFederation.Datastar.FSharp**: Implements the core Datastar SDK functionality
+2. **A native SSE implementation**: Writes Datastar's SSE event grammar directly via ASP.NET Core's `IBufferWriter<byte>` API — no external Datastar SDK dependency
 3. **ASP.NET Core**: The underlying web framework
 
 The library extends Frank's `ResourceBuilder` with the `datastar` custom operation that:
@@ -334,11 +328,14 @@ Note: Hox uses CSS selector notation for attributes: `[attr=value]`
 
 ## Related Projects
 
-- [Frank](https://github.com/frank-fs/frank) - F# web framework
+- [Frank](https://www.nuget.org/packages/Frank/) - F# web framework
 - [Datastar](https://github.com/starfederation/datastar) - Hypermedia framework
-- [datastar-dotnet](https://github.com/starfederation/datastar-dotnet) - .NET SDK for Datastar
 - [Hox](https://github.com/AngelMunoz/Hox) - Async HTML rendering library for F#
+
+Sample applications: [`Frank.Datastar.Basic`](https://github.com/frank-fs/frank/tree/master/sample/Frank.Datastar.Basic), [`Frank.Datastar.Hox`](https://github.com/frank-fs/frank/tree/master/sample/Frank.Datastar.Hox), and [`Frank.Datastar.Oxpecker`](https://github.com/frank-fs/frank/tree/master/sample/Frank.Datastar.Oxpecker).
+
+See the [project repository](https://github.com/frank-fs/frank) for the complete guide.
 
 ## License
 
-MIT License - see LICENSE file for details
+[MIT](https://github.com/frank-fs/frank/blob/master/LICENSE)
