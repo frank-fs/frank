@@ -42,6 +42,26 @@ let tests =
               Expect.throws (fun () -> resolveIri [] "schema:Game Object" |> ignore) "No declared prefixes at all"
           }
 
+          test "raises for a typo'd, undeclared CURIE that looks well-formed under System.Uri's loose rules" {
+              // "foaf:name" and "schema:Game" are both syntactically well-formed absolute URIs under
+              // System.Uri's loose rules (scheme + opaque part), which is exactly the gap this behavior
+              // change closes: neither contains "://" nor uses an allow-listed non-hierarchical scheme,
+              // so they must now raise instead of silently becoming the literal IRI <foaf:name>.
+              Expect.throws (fun () -> resolveIri [] "foaf:name" |> ignore) "Undeclared prefix, no declared prefixes"
+              Expect.throws (fun () -> resolveIri [] "schema:Game" |> ignore) "Undeclared prefix, no declared prefixes"
+          }
+
+          test "passes allow-listed non-hierarchical schemes through unchanged" {
+              Expect.equal (resolveIri [] "urn:isbn:0451450523") "urn:isbn:0451450523" ""
+              Expect.equal (resolveIri [] "mailto:someone@example.org") "mailto:someone@example.org" ""
+          }
+
+          test "still raises for an allow-listed scheme prefix that isn't actually well-formed" {
+              // The allow-list only loosens the "looks absolute" gate -- Uri.IsWellFormedUriString still
+              // has to agree, so a malformed string starting with an allow-listed scheme still raises.
+              Expect.throws (fun () -> resolveIri [] "mailto:not an email" |> ignore) "Allow-listed scheme, still malformed"
+          }
+
           test "raises for a string with no colon" {
               Expect.throws (fun () -> resolveIri [] "Game" |> ignore) ""
           }

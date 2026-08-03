@@ -27,6 +27,8 @@ let tests =
           test "multi-valued properties become multiple distinct triples with the same subject/predicate" {
               let doc =
                   rdf {
+                      prefix "schema" "https://schema.org/"
+
                       about (
                           describe (Node.Iri "https://example.org/g1") {
                               propertyNode "schema:sameAs" (Node.Iri "http://www.wikidata.org/entity/Q210339")
@@ -44,6 +46,7 @@ let tests =
 
               let doc =
                   rdf {
+                      prefix "schema" "https://schema.org/"
                       about (describe (Node.Iri "https://example.org/g1") { propertyNode "schema:numberOfPlayers" players })
                       about (describe players { propertyInt "schema:value" 2 })
                   }
@@ -56,7 +59,13 @@ let tests =
 
           test "two different Node.blank values never resolve to the same graph node" {
               let a, b = Node.blank (), Node.blank ()
-              let doc = rdf { triple a "schema:x" (Value.Node b) }
+
+              let doc =
+                  rdf {
+                      prefix "schema" "https://schema.org/"
+                      triple a "schema:x" (Value.Node b)
+                  }
+
               let graph = Doc.toGraph doc
               let t = graph.Triples |> Seq.exactlyOne
               Expect.notEqual t.Subject t.Object "Distinct blank nodes"
@@ -65,6 +74,8 @@ let tests =
           test "typed literals round-trip their CLR values" {
               let doc =
                   rdf {
+                      prefix "schema" "https://schema.org/"
+
                       about (
                           describe (Node.Iri "https://example.org/g1") {
                               propertyString "schema:name" "Tic-tac-toe"

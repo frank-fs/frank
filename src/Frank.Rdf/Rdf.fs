@@ -4,6 +4,8 @@ open System
 
 [<AutoOpen>]
 module Rdf =
+    let private nonHierarchicalAbsoluteSchemes = [ "urn:"; "mailto:"; "tel:" ]
+
     let internal resolveIri (prefixes: (string * string) list) (s: string) : string =
         match s.IndexOf ':' with
         | -1 -> failwithf "Frank.Rdf: '%s' is neither an absolute IRI nor a CURIE (no ':')" s
@@ -13,7 +15,11 @@ module Rdf =
             match prefixes |> List.tryFind (fun (p, _) -> p = prefix) with
             | Some(_, ns) -> ns + s.Substring(i + 1)
             | None ->
-                if Uri.IsWellFormedUriString(s, UriKind.Absolute) then
+                let looksAbsolute =
+                    s.Contains "://"
+                    || nonHierarchicalAbsoluteSchemes |> List.exists s.StartsWith
+
+                if looksAbsolute && Uri.IsWellFormedUriString(s, UriKind.Absolute) then
                     s
                 else
                     failwithf "Frank.Rdf: undeclared prefix '%s' in '%s'" prefix s
