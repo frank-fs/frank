@@ -1,7 +1,5 @@
 module Sample.Rdf.Program
 
-open System.Text
-open System.IO
 open Microsoft.AspNetCore.Http
 open Frank.Builder
 open Frank.Rdf
@@ -54,7 +52,7 @@ let private gameDoc (baseUri: string) (id: string) (name: string) : Doc =
 // `getProductNegotiated` pattern (deliberately not factored out).
 let private getGame =
     negotiate {
-        accepts "application/json" (fun (ctx: HttpContext) -> task {
+        accepts "application/json" (RequestDelegate(fun (ctx: HttpContext) -> task {
             let id = string ctx.Request.RouteValues.["id"]
 
             match games.TryGetValue id with
@@ -63,19 +61,18 @@ let private getGame =
             | false, _ ->
                 ctx.Response.StatusCode <- 404
                 do! ctx.Response.WriteAsJsonAsync({| error = $"no game with id {id}" |})
-        })
+        }))
 
-        accepts "application/ld+json" (fun (ctx: HttpContext) -> task {
+        accepts "application/ld+json" (RequestDelegate(fun (ctx: HttpContext) -> task {
             let id = string ctx.Request.RouteValues.["id"]
 
             match games.TryGetValue id with
             | true, name ->
                 let baseUri = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
-                use writer = new StreamWriter(ctx.Response.Body, Encoding.UTF8, leaveOpen = true)
-                Doc.writeJsonLd (gameDoc baseUri id name) writer
-                do! writer.FlushAsync()
+                let json = Doc.toJsonLd (gameDoc baseUri id name)
+                do! ctx.Response.WriteAsync(json)
             | false, _ -> ctx.Response.StatusCode <- 404
-        })
+        }))
     }
 
 let private gameResource =
