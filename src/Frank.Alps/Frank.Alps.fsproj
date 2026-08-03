@@ -17,6 +17,8 @@
     <Compile Include="DescriptorBuilder.fs" />
     <Compile Include="Serialization.fsi" />
     <Compile Include="Serialization.fs" />
+    <Compile Include="HandlerBuilderExtensions.fsi" />
+    <Compile Include="HandlerBuilderExtensions.fs" />
   </ItemGroup>
 
   <ItemGroup>
