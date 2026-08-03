@@ -99,6 +99,7 @@ type Descriptor =
       Ext: Ext list
       InheritsFrom: DescriptorRef option   // descriptor 'href' — inheritance, not a web link
       Rt: Descriptor option
+      From: Descriptor list                // source state(s) set by `from` — not an ALPS property; drives ProtocolGraph and the protocolState/availableInStates ext emitted at serialization time
       Rel: string option
       Tag: string list
       Link: Link list
@@ -222,7 +223,7 @@ val from: Descriptor list -> Descriptor -> Descriptor   // one or more source-st
 type CurrentStateResolver = resourceIri: string -> Uri option
 ```
 
-`from` marks a `safe`/`unsafe`/`idempotent` transition as valid only from the given state(s). A transition with no `from` is never filtered by state — graceful degradation, the same instinct as `Frank.Provenance`'s `ActivityTypeResolver` returning `None`, and consistent with semantic descriptors never being filtered by authorization today. When a transition declares multiple `from` states, serialization emits one `protocolState`/`availableInStates` `ext` pair per declared state (draft-07 explicitly allows `ext` to be an array, §2.2.6) — not a single space-joined value.
+`from` sets `Descriptor.From` (a dedicated field, not a wire-format `ext` — `Ext` only ever carries string data, and `From` needs real descriptor references for `ProtocolGraph` to consume). It marks a `safe`/`unsafe`/`idempotent` transition as valid only from the given state(s). A transition with no `from` (`From = []`) is never filtered by state — graceful degradation, the same instinct as `Frank.Provenance`'s `ActivityTypeResolver` returning `None`, and consistent with semantic descriptors never being filtered by authorization today. At serialization time, a non-empty `From` is projected into one `protocolState`/`availableInStates` `ext` pair per declared state (draft-07 explicitly allows `ext` to be an array, §2.2.6) — computed from `From`, not separately stored.
 
 `CurrentStateResolver` is a plain function the consuming application wires at composition time — no project reference to `Frank.Provenance` or any other package. Proposed by the parallel Frank.Provenance design session (frank-fs/frank#471 comments, 2026-08-02): when supplied, the natural implementation queries `Frank.Provenance`'s store (e.g. a future `ProvenanceQuery.Latest`); when absent, or when it returns `None`, state filtering simply does not apply.
 
