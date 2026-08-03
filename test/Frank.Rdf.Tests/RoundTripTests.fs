@@ -48,6 +48,43 @@ let tests =
               Expect.isTrue (originalGraph.Equals(parsedGraph)) "Isomorphic after round-trip"
           }
 
+          test "round-trips a language-tagged string literal, preserving @language" {
+              let doc =
+                  rdf {
+                      prefix "schema" "https://schema.org/"
+
+                      about (
+                          describe (Node.Iri "https://example.org/g1") {
+                              propertyLangString "schema:name" "Tic-tac-toe" "en"
+                          }
+                      )
+                  }
+
+              // Pin down the exact value/language pairing on the encode side (Doc.toGraph), not just
+              // "some @language key is present somewhere in the JSON" -- a swapped-argument bug
+              // (CreateLiteralNode(lang, value) instead of (value, lang)) would still contain the
+              // substrings "@language" and "en" in the emitted text, so substring assertions can't
+              // distinguish correct from swapped. Inspecting the literal node's own Value/Language
+              // properties can.
+              let originalGraph = Doc.toGraph doc :> IGraph
+              let originalTriple = originalGraph.Triples |> Seq.exactlyOne
+              let originalLiteral = originalTriple.Object :?> VDS.RDF.ILiteralNode
+
+              Expect.equal originalLiteral.Value "Tic-tac-toe" "Literal value is the string, not the language tag"
+              Expect.equal originalLiteral.Language "en" "Literal language is the tag, not the string"
+
+              // And confirm the same holds after a full encode/decode round-trip through JSON-LD.
+              let json = Doc.toJsonLd doc
+              let parsedGraph = json |> parseBackToGraph
+              let parsedTriple = parsedGraph.Triples |> Seq.exactlyOne
+              let parsedLiteral = parsedTriple.Object :?> VDS.RDF.ILiteralNode
+
+              Expect.equal parsedLiteral.Value "Tic-tac-toe" "Round-tripped value still the string"
+              Expect.equal parsedLiteral.Language "en" "Round-tripped language still the tag"
+
+              Expect.isTrue (originalGraph.Equals(parsedGraph)) "Isomorphic after round-trip, language tag preserved"
+          }
+
           test "round-trips a two-subject document (a reference plus its target's own statements)" {
               let players = Node.Iri "https://example.org/g1#players"
 

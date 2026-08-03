@@ -13,6 +13,7 @@ type Literal =
     | Int of int
     | Bool of bool
     | DateTime of DateTimeOffset
+    | LangString of string * string
 
 [<RequireQualifiedAccess>]
 type Value =
