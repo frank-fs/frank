@@ -1,26 +1,15 @@
 module Frank.Alps.Tests.AuthorizationFilterTests
 
-open System
-open System.Collections.Generic
 open System.Security.Claims
-open Microsoft.AspNetCore.Authentication
 open Microsoft.AspNetCore.Authorization
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open Microsoft.AspNetCore.Routing.Patterns
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.FileProviders
 open Microsoft.Extensions.Primitives
 open Expecto
 open Frank.Alps
-
-/// Simple endpoint data source for tests (same pattern as EndpointSurfaceTests)
-type TestEndpointDataSource(endpoints: Endpoint[]) =
-    inherit EndpointDataSource()
-    override _.Endpoints = endpoints :> _
-    override _.GetChangeToken() = NullChangeToken.Singleton :> _
 
 let private noopDelegate: RequestDelegate = RequestDelegate(fun _ -> System.Threading.Tasks.Task.CompletedTask)
 
@@ -32,6 +21,11 @@ let private makeDescriptor id = safe id
 let private adminOnly =
     let builder = AuthorizationPolicyBuilder()
     builder.RequireRole "admin" |> ignore
+    builder.Build()
+
+let private superAdminOnly =
+    let builder = AuthorizationPolicyBuilder()
+    builder.RequireRole "superadmin" |> ignore
     builder.Build()
 
 let private contextForWith (roles: string list) (configurePolicies: AuthorizationOptions -> unit) =
@@ -66,7 +60,6 @@ let tests =
         [ testTask "an endpoint with no auth metadata is always allowed" {
               let ctx = contextFor []
               let endpoint = makeEndpoint "/public" []
-              let descriptor = makeDescriptor "public"
 
               let! result = AuthorizationFilter.isAllowed ctx endpoint
 
@@ -75,18 +68,18 @@ let tests =
 
           testTask "AllowAnonymous metadata is always allowed regardless of auth state" {
               let ctx = contextFor []
-              let endpoint = makeEndpoint "/anon" [ AllowAnonymousAttribute() ]
-              let descriptor = makeDescriptor "anonymous"
+              // Combine AllowAnonymous WITH restrictive metadata on the same endpoint:
+              // this proves the AllowAnonymous short-circuit overrides an otherwise-failing policy.
+              let endpoint = makeEndpoint "/anon" [ AllowAnonymousAttribute(); AuthorizeAttribute(); adminOnly ]
 
               let! result = AuthorizationFilter.isAllowed ctx endpoint
 
-              Expect.isTrue result "AllowAnonymous endpoint is always allowed"
+              Expect.isTrue result "AllowAnonymous overrides restrictive policy for anonymous principal"
           }
 
           testTask "IAuthorizeData present, principal satisfies it -> allowed" {
               let ctx = contextFor [ "admin" ]
               let endpoint = makeEndpoint "/admin" [ AuthorizeAttribute(); adminOnly ]
-              let descriptor = makeDescriptor "admin"
 
               let! result = AuthorizationFilter.isAllowed ctx endpoint
 
@@ -96,7 +89,6 @@ let tests =
           testTask "IAuthorizeData present, principal does not satisfy it -> denied" {
               let ctx = contextFor []
               let endpoint = makeEndpoint "/admin" [ AuthorizeAttribute(); adminOnly ]
-              let descriptor = makeDescriptor "admin"
 
               let! result = AuthorizationFilter.isAllowed ctx endpoint
 
@@ -109,7 +101,6 @@ let tests =
               // guarded resource must deny it, not surface it or crash.
               let ctx = contextWithoutAuthorizationServices ()
               let endpoint = makeEndpoint "/admin" [ AuthorizeAttribute() ]
-              let descriptor = makeDescriptor "admin"
 
               let! result = AuthorizationFilter.isAllowed ctx endpoint
 
@@ -119,23 +110,21 @@ let tests =
           testTask "filter keeps only the Descriptors whose endpoint is allowed, in order" {
               let ctx = contextFor [ "admin" ]
               let publicEndpoint = makeEndpoint "/public" []
-              let publicDescriptor = makeDescriptor "public"
               let adminEndpoint = makeEndpoint "/admin" [ AuthorizeAttribute(); adminOnly ]
-              let adminDescriptor = makeDescriptor "admin"
-              let restrictedEndpoint = makeEndpoint "/restricted" [ AuthorizeAttribute(); adminOnly ]
-              let restrictedDescriptor = makeDescriptor "restricted"
+              // restrictedEndpoint requires superadmin role, which the test principal lacks
+              let restrictedEndpoint = makeEndpoint "/restricted" [ AuthorizeAttribute(); superAdminOnly ]
 
               let pairs =
-                  [ publicEndpoint, publicDescriptor
-                    adminEndpoint, adminDescriptor
-                    restrictedEndpoint, restrictedDescriptor ]
+                  [ publicEndpoint, makeDescriptor "public"
+                    adminEndpoint, makeDescriptor "admin"
+                    restrictedEndpoint, makeDescriptor "restricted" ]
 
               let! result = AuthorizationFilter.filter ctx pairs
 
               Expect.equal
                   (result |> List.map (fun d -> d.Id))
-                  [ "public"; "admin"; "restricted" ]
-                  "All allowed descriptors are kept in order"
+                  [ "public"; "admin" ]
+                  "Allowed descriptors are kept, denied ones excluded, order preserved"
           }
 
           test "varies is true when any pair's endpoint carries auth metadata" {
