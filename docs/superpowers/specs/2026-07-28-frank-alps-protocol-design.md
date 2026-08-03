@@ -2,7 +2,7 @@
 
 **Date**: 2026-07-28
 **Branch**: `json-home` (design only — not scheduled)
-**Status**: Draft — design captured, implementation deferred
+**Status**: Superseded by [2026-08-02-frank-alps-protocol-design.md](2026-08-02-frank-alps-protocol-design.md)
 
 ## Why this is its own document
 
