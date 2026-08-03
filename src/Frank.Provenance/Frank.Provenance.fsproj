@@ -16,6 +16,8 @@
   <ItemGroup>
     <Compile Include="ProvVocabulary.fsi" />
     <Compile Include="ProvVocabulary.fs" />
+    <Compile Include="Prov.fsi" />
+    <Compile Include="Prov.fs" />
   </ItemGroup>
 
   <ItemGroup>
