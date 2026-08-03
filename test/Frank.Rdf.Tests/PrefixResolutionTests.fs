@@ -62,6 +62,26 @@ let tests =
               Expect.throws (fun () -> resolveIri [] "mailto:not an email" |> ignore) "Allow-listed scheme, still malformed"
           }
 
+          test "allow-listed scheme match is case-insensitive, per RFC 3986 URI schemes" {
+              // URI schemes are case-insensitive (RFC 3986 SS3.1); System.Uri.IsWellFormedUriString
+              // agrees ("URN:isbn:..." is well-formed), so the allow-list gate must not reject on case
+              // alone -- that would be a regression versus the old, unconditional-well-formedness code.
+              Expect.equal (resolveIri [] "URN:isbn:0451450523") "URN:isbn:0451450523" ""
+              Expect.equal (resolveIri [] "Mailto:someone@example.org") "Mailto:someone@example.org" ""
+              Expect.equal (resolveIri [] "MAILTO:someone@example.org") "MAILTO:someone@example.org" ""
+              Expect.equal (resolveIri [] "Tel:+1-816-555-1212") "Tel:+1-816-555-1212" ""
+          }
+
+          test "raises for an undeclared prefix whose local part merely contains \"://\"" {
+              // The "looks absolute" check must be anchored to what immediately follows the parsed
+              // scheme's colon, not "does '://' appear anywhere in the string" -- otherwise a stray
+              // leftover prefix in front of a real absolute IRI (e.g. copy-paste residue) would slip
+              // through unchallenged even though "schema"/"foo" are themselves undeclared, unresolved
+              // prefixes.
+              Expect.throws (fun () -> resolveIri [] "schema:http://weird" |> ignore) "Undeclared prefix, unanchored ://"
+              Expect.throws (fun () -> resolveIri [] "foo:bar://baz" |> ignore) "Undeclared prefix, unanchored ://"
+          }
+
           test "raises for a string with no colon" {
               Expect.throws (fun () -> resolveIri [] "Game" |> ignore) ""
           }

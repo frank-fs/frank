@@ -16,8 +16,9 @@ module Rdf =
             | Some(_, ns) -> ns + s.Substring(i + 1)
             | None ->
                 let looksAbsolute =
-                    s.Contains "://"
-                    || nonHierarchicalAbsoluteSchemes |> List.exists s.StartsWith
+                    s.Substring(i + 1).StartsWith("//")
+                    || nonHierarchicalAbsoluteSchemes
+                       |> List.exists (fun scheme -> s.StartsWith(scheme, StringComparison.OrdinalIgnoreCase))
 
                 if looksAbsolute && Uri.IsWellFormedUriString(s, UriKind.Absolute) then
                     s
