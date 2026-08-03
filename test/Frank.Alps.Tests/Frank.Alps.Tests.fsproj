@@ -21,6 +21,7 @@
     <Compile Include="SerializationTests.fs" />
     <Compile Include="HandlerBuilderExtensionsTests.fs" />
     <Compile Include="EndpointSurfaceTests.fs" />
+    <Compile Include="AuthorizationFilterTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

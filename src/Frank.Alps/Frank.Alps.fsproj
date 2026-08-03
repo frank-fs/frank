@@ -21,6 +21,8 @@
     <Compile Include="HandlerBuilderExtensions.fs" />
     <Compile Include="EndpointSurface.fsi" />
     <Compile Include="EndpointSurface.fs" />
+    <Compile Include="AuthorizationFilter.fsi" />
+    <Compile Include="AuthorizationFilter.fs" />
   </ItemGroup>
 
   <ItemGroup>
