@@ -3,7 +3,7 @@ namespace Frank.Alps
 open System
 
 [<AutoOpen>]
-module Descriptors =
+module DescriptorFunctions =
     let private makeDescriptor (id: string) (descriptorType: DescriptorType) : Descriptor =
         { Id = id
           Name = None

@@ -3,7 +3,7 @@ namespace Frank.Alps
 open System
 
 [<AutoOpen>]
-module Descriptors =
+module DescriptorFunctions =
     /// Constructs a bare `Descriptor` of the given `DescriptorType` -- `Id` set, everything else empty.
     val private makeDescriptor: id: string -> descriptorType: DescriptorType -> Descriptor
 
