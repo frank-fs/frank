@@ -2,8 +2,15 @@
 
 Demonstrates [`Frank.Rdf`](../../src/Frank.Rdf): the `rdf { }` CE authoring RDF triples
 across two subjects (a game and its `numberOfPlayers` value), `Doc.merge` folding in facts
-shared across every resource, and `Doc.writeJsonLd` streaming straight into the response
-body. It also demonstrates real `Accept`-based content negotiation on `GET /games/{id}`:
+shared across every resource, and `Doc.toJsonLd` buffering the document to a complete
+string before a single `ctx.Response.WriteAsync` -- not `Doc.writeJsonLd` streaming
+straight into the response body, which this sample used to do. Streaming through a
+`StreamWriter` over `ctx.Response.Body` is a truncation hazard: `StreamWriter`'s default
+internal buffer is 1024 bytes, and without an explicit flush at just the right point a
+response can silently cut off mid-value once the document crosses that size. This game's
+JSON-LD document is already only ~67 bytes under that cliff, so buffering the whole string
+first removes the hazard entirely instead of just leaving it lurking. It also demonstrates
+real `Accept`-based content negotiation on `GET /games/{id}`:
 a `negotiate { }` block serves a plain-JSON representation and the JSON-LD representation
 at the *same* url, plus a resource-scoped `link` advertising the JSON-LD alternate.
 

@@ -50,6 +50,24 @@ let private gameDoc (baseUri: string) (id: string) (name: string) : Doc =
 // see `selectRepresentation` in NegotiateBuilder.fs. Each representation does its own game lookup
 // and 404 handling, independently -- matching Frank.OpenApi.Sample's
 // `getProductNegotiated` pattern (deliberately not factored out).
+//
+// Each handler below is wrapped in an explicit `RequestDelegate(...)` rather than passed as a
+// bare lambda -- this is load-bearing, not gratuitous ceremony. Both handlers write their own
+// response directly and return no value, so a bare `fun (ctx: HttpContext) -> task { ... }`
+// with no final `return` infers as `HttpContext -> Task<unit>`, which F# overload resolution
+// silently prefers over `NegotiateBuilder.Accepts`'s `RequestDelegate` overload (a direct type
+// match beats the implicit function-to-delegate conversion the `RequestDelegate` overload
+// needs). That misroutes the handler through the auto-format (`viaOutputFormatter`) overload
+// instead of `Negotiation.dispatch`, which tries to set `ContentType` and serialize a return
+// value *after* the handler already wrote the response itself -- throwing
+// `InvalidOperationException: Headers are read-only, response has already started` and
+// aborting the transfer mid-stream. This is exactly the bug that shipped here once; the
+// explicit `RequestDelegate` forces resolution to `Negotiation.dispatch`, which sets
+// `ContentType` before invoking the handler. See
+// https://github.com/frank-fs/frank/issues/492 for the underlying overload-ambiguity in
+// `NegotiateBuilder` -- until that's resolved, removing the `RequestDelegate` wrapper here
+// (e.g. "simplifying" back to a bare lambda) reintroduces the bug silently at compile time,
+// only surfacing as a runtime mid-transfer abort.
 let private getGame =
     negotiate {
         accepts "application/json" (RequestDelegate(fun (ctx: HttpContext) -> task {
