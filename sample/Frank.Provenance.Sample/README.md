@@ -15,6 +15,13 @@ this sample -- see `Frank.Auth`'s sample for that), and `ActivityType = https://
 `GET /provenance?resource={iri}` queries `ProvenanceQuery.ByResource` for that IRI and
 serializes the resulting dotNetRDF graph as JSON-LD.
 
+`GET /provenance/lineage` returns a hand-authored PROV-O relationship that the record model
+above can't express: `IProvenanceStore.Append` only accepts a `ProvenanceRecord`, and
+`ProvenanceRecord.toDoc` only ever emits `wasGeneratedBy`/`wasAssociatedWith`/`startedAtTime`/
+`endedAtTime`. This endpoint builds a `Description` directly via `Frank.Provenance`'s `ProvBuilder`
+CE (`entity ... { wasDerivedFrom ... }`) asserting that Connect Four was derived from Tic-tac-toe,
+and serves it as JSON-LD independent of the store.
+
 ## Run it
 
 ```bash
@@ -52,6 +59,12 @@ curl -s "http://localhost:5000/provenance?resource=http://localhost:5000/games/2
 # The response is genuinely JSON-LD -- the Content-Type says so.
 curl -i "http://localhost:5000/provenance?resource=http://localhost:5000/games/2" | grep -i Content-Type
 # Content-Type: application/ld+json
+
+# GET /provenance/lineage is unrelated to the store above -- it's a hand-authored relationship,
+# served the same way on every request, not something that accumulates from Append calls.
+curl -s http://localhost:5000/provenance/lineage | jq
+# [{"@id":"http://localhost:5000/games/2","@type":["http://www.w3.org/ns/prov#Entity"],
+#   "http://www.w3.org/ns/prov#wasDerivedFrom":[{"@id":"http://localhost:5000/games/1"}]}]
 
 # A resource that was never viewed also comes back as an empty graph, not a 404 or a 500 --
 # querying provenance is independent of whether the resource id itself is "real".

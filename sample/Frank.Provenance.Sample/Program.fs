@@ -111,12 +111,34 @@ let private getProvenance =
 
 let private provenanceResource = resource "/provenance" { get getProvenance }
 
+// ProvBuilder demo: IProvenanceStore.Append only accepts a ProvenanceRecord, and
+// ProvenanceRecord.toDoc only ever emits wasGeneratedBy/wasAssociatedWith/startedAtTime/endedAtTime
+// -- there is no way to record a wasDerivedFrom relationship through the store. This endpoint
+// hand-authors that relationship directly via ProvBuilder, served independently of the store, to
+// show the one PROV-O shape the record model can't produce: Connect Four (games/2) wasDerivedFrom
+// Tic-tac-toe (games/1).
+let private catalogLineage (baseUri: string) : Doc =
+    rdf {
+        about (entity (Node.Iri $"{baseUri}/games/2") { wasDerivedFrom (Node.Iri $"{baseUri}/games/1") })
+    }
+
+let private getCatalogLineage =
+    fun (ctx: HttpContext) ->
+        task {
+            let baseUri = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
+            ctx.Response.ContentType <- "application/ld+json"
+            do! ctx.Response.WriteAsync(catalogLineage baseUri |> Doc.toJsonLd)
+        }
+
+let private lineageResource = resource "/provenance/lineage" { get getCatalogLineage }
+
 [<EntryPoint>]
 let main args =
     webHost args {
         useDefaults
         resource gameResource
         resource provenanceResource
+        resource lineageResource
     }
 
     0
