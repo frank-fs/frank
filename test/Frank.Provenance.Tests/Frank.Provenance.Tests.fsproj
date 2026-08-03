@@ -13,6 +13,7 @@
     <Compile Include="ProvTests.fs" />
     <Compile Include="ProvenanceRecordTests.fs" />
     <Compile Include="ProvenanceQueryTests.fs" />
+    <Compile Include="MailboxProcessorProvenanceStoreTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -20,6 +21,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
     <PackageReference Include="Expecto" Version="10.*" />
     <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.14.*" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.*" />
   </ItemGroup>
 
   <ItemGroup>

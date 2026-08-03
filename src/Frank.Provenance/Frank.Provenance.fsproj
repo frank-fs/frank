@@ -22,6 +22,8 @@
     <Compile Include="ProvenanceRecord.fs" />
     <Compile Include="ProvenanceStore.fsi" />
     <Compile Include="ProvenanceStore.fs" />
+    <Compile Include="MailboxProcessorProvenanceStore.fsi" />
+    <Compile Include="MailboxProcessorProvenanceStore.fs" />
   </ItemGroup>
 
   <ItemGroup>
