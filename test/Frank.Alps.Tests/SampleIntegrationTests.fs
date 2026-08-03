@@ -167,7 +167,17 @@ let tests =
 
               Expect.equal (int response.StatusCode) 200 "GET /games/1 with Accept: application/alps+json succeeds"
 
-              // Assert: response body parses as ALPS JSON and contains a descriptor with id "makeMove".
+              // Assert: response body parses as ALPS JSON and contains EXACTLY the two descriptors
+              // bound to this route's endpoints -- "viewGame" (GET, bound inside negotiate {}'s
+              // "application/json" accepts case) and "makeMove" (POST, bound on a plain handler {
+              // } outside negotiate {}). Exact-set equality, not Expect.contains "makeMove": a bare
+              // "contains makeMove" assertion is satisfied by the POST endpoint's own binds alone,
+              // regardless of whether negotiate {} propagates the GET-side HandlerDefinition's
+              // Metadata at all -- it would not catch a regression where NegotiateBuilder.Accepts's
+              // HandlerDefinition overload silently dropped binds's Descriptor, since "viewGame"
+              // could vanish from this list and the assertion would still pass. Requiring the exact
+              // set also catches descriptorsForRoute degenerating to allDescriptors (which would
+              // pull in every other resource's descriptors too).
               let! (body: string) = response.Content.ReadAsStringAsync()
               let root = JsonDocument.Parse(body).RootElement
               let descriptors = root.GetProperty("alps").GetProperty("descriptor")
@@ -175,7 +185,10 @@ let tests =
               let ids =
                   [ for d in descriptors.EnumerateArray() -> d.GetProperty("id").GetString() ]
 
-              Expect.contains ids "makeMove" "Excerpt for /games/1 contains the makeMove descriptor"
+              Expect.equal
+                  (Set.ofList ids)
+                  (Set.ofList [ "viewGame"; "makeMove" ])
+                  "Excerpt for /games/1 contains exactly the GET (negotiate{}-routed) and POST descriptors"
           }
 
           testTask "GET /.well-known/alps.json returns the full profile including openState/closedState/game" {
