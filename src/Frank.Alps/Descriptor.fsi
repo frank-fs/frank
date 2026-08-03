@@ -56,3 +56,16 @@ module DescriptorFunctions =
     /// -- any descriptor may nest under any other. Replaces any previously-set `Descriptors`, unlike the
     /// append-only `tag`/`ext`/`link` -- there is exactly one nested-descriptor array per parent.
     val contains: children: Descriptor list -> Descriptor -> Descriptor
+
+    /// Sets `rt` -- the target resource type/state for a safe/unsafe/idempotent transition (draft-07
+    /// §2.2.13). Descriptor-typed: a dangling reference is a compile error, not a wrong document.
+    val rt: target: Descriptor -> Descriptor -> Descriptor
+
+    /// Sets `href` (inheritance) to a descriptor value in this process. Compile-checked, same discipline
+    /// as `rt`. Neither this nor `hrefExternal` has a real caller until multi-document profiles exist
+    /// (frank-fs/frank#488) -- both exist now so `Descriptor` doesn't need a breaking field change later.
+    val href: target: Descriptor -> Descriptor -> Descriptor
+
+    /// Sets `href` (inheritance) to a URI into a document this codebase doesn't own. Nothing to check
+    /// against, so a bare string/URI -- the same reasoning that makes a descriptor's own `id` a string.
+    val hrefExternal: uri: string -> Descriptor -> Descriptor

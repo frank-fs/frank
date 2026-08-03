@@ -67,3 +67,13 @@ module DescriptorFunctions =
     let linkWith (link: Link) (d: Descriptor) : Descriptor = { d with Link = d.Link @ [ link ] }
 
     let contains (children: Descriptor list) (d: Descriptor) : Descriptor = { d with Descriptors = children }
+
+    let rt (target: Descriptor) (d: Descriptor) : Descriptor = { d with Rt = Some target }
+
+    let href (target: Descriptor) (d: Descriptor) : Descriptor =
+        { d with
+            InheritsFrom = Some(DescriptorRef.Local target) }
+
+    let hrefExternal (uri: string) (d: Descriptor) : Descriptor =
+        { d with
+            InheritsFrom = Some(DescriptorRef.External(Uri uri)) }
