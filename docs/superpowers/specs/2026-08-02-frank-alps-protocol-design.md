@@ -57,13 +57,14 @@ Confirmed against the actual spec text (fetched during design, not assumed from 
 ### Descriptor type
 
 ```fsharp
-[<RequireQualifiedAccess>]
+[<Struct; RequireQualifiedAccess>]
 type DescriptorType =
     | Semantic
     | Safe
     | Unsafe
     | Idempotent
 
+[<Struct>]
 type DocFormat =
     | Text
     | Html
@@ -124,6 +125,12 @@ Field-by-field mapping from draft-07 §2.2 to combinators:
 | `rt` | `rt (target: Descriptor)` | descriptor-typed, dangling references are compile errors |
 | `tag` | `tag "x y z"` | |
 | nested `descriptor` | `contains [ children ]` | deliberately untyped by child `DescriptorType` — see *Nesting* |
+
+### `[<Struct>]`
+
+`DescriptorType` and `DocFormat` are `[<Struct>]` — data-free enumerations, identical reasoning to `Frank.Provenance`'s `ProvClass`/`ProvRelation`: no payload on any case, no allocation, nothing to trade off against.
+
+`Descriptor`, `Doc`, `Link`, `Ext`, `DescriptorRef`, `ProtocolTransition`, and `StateComposition` are deliberately *not* marked `[<Struct>]` here. `Descriptor` especially is a poor candidate on its face — an 11-field, self-referential record threaded through every `|>` chain and every `descriptor { }` custom operation, where struct semantics would mean copying the whole record at each step rather than passing one reference; that's a plausible regression, not just an unmeasured upside. The smaller types are more plausible candidates but still unmeasured. This rides on #485 (open: "evaluate `[<Struct>]` for small DUs and records, measure before adopting") once there's real `Frank.Alps` code to benchmark, rather than deciding blind here.
 
 ### Two authoring surfaces — plain combinators and a CE
 
