@@ -3,12 +3,12 @@ namespace Frank.Provenance
 open System
 open Frank.Rdf
 
-/// Builds a `Description` via computation expression, as an alternative to plain `|>` combinators
-/// over `Prov`'s functions -- both produce identical `Description` values. Mirrors `Frank.Rdf`'s
-/// `DescribeBuilder`/`describe` and `Frank.Alps`'s `DescriptorBuilder`/`descriptor`: one accumulator,
-/// no `Combine`/`Delay`, `Run` returns a plain value.
 [<AutoOpen>]
 module ProvBuilderModule =
+    /// Builds a `Description` via computation expression, as an alternative to plain `|>` combinators
+    /// over `Prov`'s functions -- both produce identical `Description` values. Mirrors `Frank.Rdf`'s
+    /// `DescribeBuilder`/`describe` and `Frank.Alps`'s `DescriptorBuilder`/`descriptor`: one accumulator,
+    /// no `Combine`/`Delay`, `Run` returns a plain value.
     [<Sealed>]
     type ProvBuilder =
         new: initial: Description -> ProvBuilder
