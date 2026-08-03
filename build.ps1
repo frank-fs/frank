@@ -34,6 +34,9 @@ dotnet pack -c Release src/Frank.JsonHome /p:Version=$version$versionSuffix -o $
 dotnet test test/Frank.Rdf.Tests
 dotnet pack -c Release src/Frank.Rdf /p:Version=$version$versionSuffix -o $psscriptroot/bin
 
+dotnet test test/Frank.Alps.Tests
+dotnet pack -c Release src/Frank.Alps /p:Version=$version$versionSuffix -o $psscriptroot/bin
+
 dotnet build -c Release Frank.Datastar.sln /p:Version=$version$versionSuffix
 dotnet test test/Frank.Datastar.Tests
 dotnet pack -c Release src/Frank.Datastar /p:Version=$version$versionSuffix -o $psscriptroot/bin
