@@ -110,4 +110,27 @@ let tests =
               Expect.isFalse (json.TryGetProperty("link") |> fst) ""
               Expect.isFalse (json.TryGetProperty("descriptor") |> fst) ""
               Expect.isFalse (json.TryGetProperty("ext") |> fst) ""
+          }
+
+          test "authored ext and from-projected ext pairs coexist without corruption" {
+              let a = semantic "a"
+              let b = semantic "b"
+              let t = unsafe "t"
+                       |> ext "https://example.org/custom" "custom-value"
+                       |> from [ a; b ]
+
+              let json = findById "t" (descriptorArray (Serialization.toJson [ a; b; t ] |> parse))
+              let extArray = json.GetProperty("ext").EnumerateArray() |> List.ofSeq
+              let extIds = extArray |> List.map (fun e -> e.GetProperty("id").GetString())
+
+              Expect.equal (List.length extIds) 5 "should have 5 ext entries (1 authored + 2 pairs for 2 from states)"
+
+              let customExt = extArray |> List.find (fun e -> e.GetProperty("id").GetString() = "https://example.org/custom")
+              Expect.equal (customExt.GetProperty("value").GetString()) "custom-value" "authored ext value should be preserved"
+
+              let protocolStatePairs = extIds |> List.filter (fun id -> id = ProtocolStateExtId) |> List.length
+              let availableInStatesPairs = extIds |> List.filter (fun id -> id = AvailableInStatesExtId) |> List.length
+
+              Expect.equal protocolStatePairs 2 "should have 2 protocolState entries"
+              Expect.equal availableInStatesPairs 2 "should have 2 availableInStates entries"
           } ]
