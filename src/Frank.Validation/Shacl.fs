@@ -93,6 +93,18 @@ module Shacl =
         | PropertyConstraint.MinInclusive lit -> [ stmt propNode "sh:minInclusive" (Value.Literal lit) ]
         | PropertyConstraint.MaxExclusive lit -> [ stmt propNode "sh:maxExclusive" (Value.Literal lit) ]
         | PropertyConstraint.MaxInclusive lit -> [ stmt propNode "sh:maxInclusive" (Value.Literal lit) ]
+        | PropertyConstraint.MinLength n -> [ stmt propNode "sh:minLength" (Value.Literal(Literal.Int n)) ]
+        | PropertyConstraint.MaxLength n -> [ stmt propNode "sh:maxLength" (Value.Literal(Literal.Int n)) ]
+        | PropertyConstraint.Pattern(pattern, flags) ->
+            stmt propNode "sh:pattern" (Value.Literal(Literal.String pattern))
+            :: (flags
+                |> Option.map (fun f -> stmt propNode "sh:flags" (Value.Literal(Literal.String f)))
+                |> Option.toList)
+        | PropertyConstraint.LanguageIn tags ->
+            let items = NonEmptyList.toList tags |> List.map (Literal.String >> Value.Literal)
+            let head, listStmts = rdfList items
+            stmt propNode "sh:languageIn" (Value.Node head) :: listStmts
+        | PropertyConstraint.UniqueLang b -> [ stmt propNode "sh:uniqueLang" (Value.Literal(Literal.Bool b)) ]
         | _ -> []
 
     and private propertyShapeStatements (spec: PropertyShapeSpec) : Node * (Node * string * Value) list =

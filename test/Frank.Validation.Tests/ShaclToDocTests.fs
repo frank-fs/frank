@@ -316,4 +316,95 @@ let tests =
                         doc.Statements
                         (fun (_, p, v) -> p = "sh:minInclusive" && v = Value.Literal(Literal.DateTime t))
                         "sh:minInclusive with a DateTime literal"
+                } ]
+
+          testList
+              "string-based constraints"
+              [ test "sh:minLength and sh:maxLength" {
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/name"))
+                        |> addConstraint (PropertyConstraint.MinLength 1)
+                        |> addConstraint (PropertyConstraint.MaxLength 200)
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:minLength" && v = Value.Literal(Literal.Int 1))
+                        "sh:minLength"
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:maxLength" && v = Value.Literal(Literal.Int 200))
+                        "sh:maxLength"
+                }
+
+                test "sh:pattern without flags omits sh:flags entirely" {
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/email"))
+                        |> addConstraint (PropertyConstraint.Pattern(@"^\S+@\S+$", None))
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:pattern" && v = Value.Literal(Literal.String @"^\S+@\S+$"))
+                        "sh:pattern"
+
+                    Expect.all doc.Statements (fun (_, p, _) -> p <> "sh:flags") "no sh:flags when None"
+                }
+
+                test "sh:pattern with Some flags also emits sh:flags" {
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/email"))
+                        |> addConstraint (PropertyConstraint.Pattern(@"^\S+$", Some "i"))
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:flags" && v = Value.Literal(Literal.String "i"))
+                        "sh:flags present"
+                }
+
+                test "sh:languageIn is a well-formed rdf:list of string literals" {
+                    let tags = NonEmptyList.ofList [ "en"; "fr" ] |> Option.get
+
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/name"))
+                        |> addConstraint (PropertyConstraint.LanguageIn tags)
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    Expect.exists doc.Statements (fun (_, p, _) -> p = "sh:languageIn") "sh:languageIn present"
+
+                    let listHead =
+                        doc.Statements
+                        |> List.pick (fun (_, p, v) -> if p = "sh:languageIn" then Some v else None)
+
+                    match listHead with
+                    | Value.Node headNode ->
+                        Expect.exists
+                            doc.Statements
+                            (fun (s, p, _) -> s = headNode && p = "rdf:first")
+                            "list head has rdf:first"
+                    | other -> failtestf "expected a node, got %A" other
+                }
+
+                test "sh:uniqueLang as a boolean literal" {
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/name"))
+                        |> addConstraint (PropertyConstraint.UniqueLang true)
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:uniqueLang" && v = Value.Literal(Literal.Bool true))
+                        "sh:uniqueLang"
                 } ] ]
