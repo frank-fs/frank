@@ -407,4 +407,24 @@ let tests =
                         doc.Statements
                         (fun (_, p, v) -> p = "sh:uniqueLang" && v = Value.Literal(Literal.Bool true))
                         "sh:uniqueLang"
+                } ]
+
+          testList
+              "property pair constraints"
+              [ test "sh:equals, sh:disjoint, sh:lessThan, sh:lessThanOrEquals each point at the given property IRI" {
+                    let cases =
+                        [ PropertyConstraint.Equals(Uri "https://schema.org/a"), "sh:equals"
+                          PropertyConstraint.Disjoint(Uri "https://schema.org/b"), "sh:disjoint"
+                          PropertyConstraint.LessThan(Uri "https://schema.org/c"), "sh:lessThan"
+                          PropertyConstraint.LessThanOrEquals(Uri "https://schema.org/d"), "sh:lessThanOrEquals" ]
+
+                    for constr, predicate in cases do
+                        let prop =
+                            ofPath (PropertyPath.Predicate(Uri "https://schema.org/x"))
+                            |> addConstraint constr
+
+                        let doc =
+                            Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                        Expect.exists doc.Statements (fun (_, p, _) -> p = predicate) $"{predicate} present"
                 } ] ]

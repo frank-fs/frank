@@ -105,6 +105,11 @@ module Shacl =
             let head, listStmts = rdfList items
             stmt propNode "sh:languageIn" (Value.Node head) :: listStmts
         | PropertyConstraint.UniqueLang b -> [ stmt propNode "sh:uniqueLang" (Value.Literal(Literal.Bool b)) ]
+        | PropertyConstraint.Equals uri -> [ stmt propNode "sh:equals" (Value.Node(Node.Iri uri.AbsoluteUri)) ]
+        | PropertyConstraint.Disjoint uri -> [ stmt propNode "sh:disjoint" (Value.Node(Node.Iri uri.AbsoluteUri)) ]
+        | PropertyConstraint.LessThan uri -> [ stmt propNode "sh:lessThan" (Value.Node(Node.Iri uri.AbsoluteUri)) ]
+        | PropertyConstraint.LessThanOrEquals uri ->
+            [ stmt propNode "sh:lessThanOrEquals" (Value.Node(Node.Iri uri.AbsoluteUri)) ]
         | _ -> []
 
     and private propertyShapeStatements (spec: PropertyShapeSpec) : Node * (Node * string * Value) list =
