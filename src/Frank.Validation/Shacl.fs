@@ -1,6 +1,7 @@
 namespace Frank.Validation
 
 open System
+open System.Collections.Generic
 open Frank.Rdf
 
 module Shacl =
@@ -88,7 +89,15 @@ module Shacl =
     /// One case added per Task 5-13; the wildcard's scope is documented at each task that narrows it.
     /// Mutually recursive with propertyShapeStatements/shapeStatements from this task on, because
     /// Task 9's PropertyConstraint.Node/QualifiedValueShape cases call back into shapeStatements.
-    let rec private constraintStatements (propNode: Node) (c: PropertyConstraint) : (Node * string * Value) list =
+    ///
+    /// `memo` maps a ShapeDecl value already emitted (in this toDoc call) to the subject node it was
+    /// emitted under -- see shapeStatements below for why this exists. Threaded through here purely
+    /// because Node/QualifiedValueShape recurse into shapeStatements and must share the same table.
+    let rec private constraintStatements
+        (memo: Dictionary<ShapeDecl, Node>)
+        (propNode: Node)
+        (c: PropertyConstraint)
+        : (Node * string * Value) list =
         match c with
         | PropertyConstraint.Class uri -> [ stmt propNode "sh:class" (Value.Node(Node.Iri uri.AbsoluteUri)) ]
         | PropertyConstraint.Datatype dt -> [ stmt propNode "sh:datatype" (Value.Node(Node.Iri(xsdCurie dt))) ]
@@ -117,10 +126,10 @@ module Shacl =
         | PropertyConstraint.LessThanOrEquals uri ->
             [ stmt propNode "sh:lessThanOrEquals" (Value.Node(Node.Iri uri.AbsoluteUri)) ]
         | PropertyConstraint.Node inner ->
-            let innerSubject, innerStmts = shapeStatements inner
+            let innerSubject, innerStmts = shapeStatements memo inner
             stmt propNode "sh:node" (Value.Node innerSubject) :: innerStmts
         | PropertyConstraint.QualifiedValueShape(inner, minC, maxC, disjoint) ->
-            let innerSubject, innerStmts = shapeStatements inner
+            let innerSubject, innerStmts = shapeStatements memo inner
 
             [ stmt propNode "sh:qualifiedValueShape" (Value.Node innerSubject) ]
             @ (minC
@@ -156,10 +165,15 @@ module Shacl =
                 |> Option.map (fun m -> stmt bn "sh:message" (Value.Literal(Literal.String m)))
                 |> Option.toList)
 
-    and private propertyShapeStatements (spec: PropertyShapeSpec) : Node * (Node * string * Value) list =
+    and private propertyShapeStatements
+        (memo: Dictionary<ShapeDecl, Node>)
+        (spec: PropertyShapeSpec)
+        : Node * (Node * string * Value) list =
         let bn = Node.blank ()
         let pathHead, pathStmts = pathNode spec.Path
-        let constraintStmts = spec.Constraints |> List.collect (constraintStatements bn)
+
+        let constraintStmts =
+            spec.Constraints |> List.collect (constraintStatements memo bn)
 
         let severityStmt =
             spec.Severity
@@ -177,87 +191,120 @@ module Shacl =
         @ severityStmt
         @ messageStmt
 
-    and private shapeStatements (decl: ShapeDecl) : Node * (Node * string * Value) list =
-        match decl with
-        | ShapeDecl.RecordShape spec ->
-            let subject =
-                spec.Targets
-                |> List.tryPick (function
-                    | TargetSpec.Class uri -> Some(Node.Iri uri.AbsoluteUri)
-                    | _ -> None)
-                |> Option.defaultWith Node.blank
+    /// `memo` maps a ShapeDecl value already emitted earlier in this toDoc call to the subject node
+    /// it was emitted under. Without this, a shape referenced BOTH as a top-level toDoc list entry
+    /// AND nested via another shape's sh:node/sh:qualifiedValueShape/And/Or/Xone/Not constraint --
+    /// the "validates standalone AND nests" pattern the design doc itself recommends -- got emitted
+    /// once per reference site, each with its own freshly-minted sh:property blank nodes. Simple
+    /// literal/IRI triples on the shared subject collapsed harmlessly via RDF set semantics, but the
+    /// duplicate sh:property blank nodes did not (each is unique by construction), so dotNetRDF's
+    /// SHACL engine saw two distinct-but-content-identical property shapes and raised every
+    /// violation on that shape twice. `ShapeDecl` and everything it transitively contains use F#'s
+    /// default structural equality (no [<CustomEquality>] anywhere in ShapeTypes.fs), so memoizing by
+    /// value -- not by reference -- is safe: two structurally-identical shapes (whether the exact
+    /// same value reused, or two independently-constructed values that happen to match) are
+    /// semantically the same SHACL shape regardless of how they were built, and collapsing them to
+    /// one shared subject changes nothing about what a data graph validates against. Memoized BEFORE
+    /// recursing into a shape's own children (properties/members), which would also stop a
+    /// self-referential shape graph from looping -- not reachable today since ShapeDecl is an
+    /// ordinary immutable tree with no way to construct a true cycle, but cheap insurance regardless.
+    and private shapeStatements
+        (memo: Dictionary<ShapeDecl, Node>)
+        (decl: ShapeDecl)
+        : Node * (Node * string * Value) list =
+        match memo.TryGetValue decl with
+        | true, subject -> subject, []
+        | false, _ ->
+            match decl with
+            | ShapeDecl.RecordShape spec ->
+                let subject =
+                    spec.Targets
+                    |> List.tryPick (function
+                        | TargetSpec.Class uri -> Some(Node.Iri uri.AbsoluteUri)
+                        | _ -> None)
+                    |> Option.defaultWith Node.blank
 
-            let typeStmt = stmt subject RdfTypeIri (Value.Node(Node.Iri "sh:NodeShape"))
-            let targetStmts = spec.Targets |> List.collect (targetStatements subject)
+                memo.[decl] <- subject
 
-            let propertyStmts =
-                spec.Properties
-                |> List.collect (fun p ->
-                    let bn, stmts = propertyShapeStatements p
-                    stmt subject "sh:property" (Value.Node bn) :: stmts)
+                let typeStmt = stmt subject RdfTypeIri (Value.Node(Node.Iri "sh:NodeShape"))
+                let targetStmts = spec.Targets |> List.collect (targetStatements subject)
 
-            let closedStmts =
-                if spec.Closed then
-                    let ignoredValues =
-                        spec.IgnoredProperties |> List.map (fun u -> Value.Node(Node.Iri u.AbsoluteUri))
+                let propertyStmts =
+                    spec.Properties
+                    |> List.collect (fun p ->
+                        let bn, stmts = propertyShapeStatements memo p
+                        stmt subject "sh:property" (Value.Node bn) :: stmts)
 
-                    let ignoredHead, ignoredListStmts = rdfList ignoredValues
+                let closedStmts =
+                    if spec.Closed then
+                        let ignoredValues =
+                            spec.IgnoredProperties |> List.map (fun u -> Value.Node(Node.Iri u.AbsoluteUri))
 
-                    stmt subject "sh:closed" (Value.Literal(Literal.Bool true))
-                    :: stmt subject "sh:ignoredProperties" (Value.Node ignoredHead)
-                    :: ignoredListStmts
-                else
-                    []
+                        let ignoredHead, ignoredListStmts = rdfList ignoredValues
 
-            let severityStmt =
-                spec.Severity
-                |> Option.map (fun s -> stmt subject "sh:severity" (Value.Node(Node.Iri(severityCurie s))))
-                |> Option.toList
+                        stmt subject "sh:closed" (Value.Literal(Literal.Bool true))
+                        :: stmt subject "sh:ignoredProperties" (Value.Node ignoredHead)
+                        :: ignoredListStmts
+                    else
+                        []
 
-            let messageStmt =
-                spec.Message
-                |> Option.map (fun m -> stmt subject "sh:message" (Value.Literal(Literal.String m)))
-                |> Option.toList
+                let severityStmt =
+                    spec.Severity
+                    |> Option.map (fun s -> stmt subject "sh:severity" (Value.Node(Node.Iri(severityCurie s))))
+                    |> Option.toList
 
-            subject,
-            typeStmt :: targetStmts
-            @ propertyStmts
-            @ closedStmts
-            @ severityStmt
-            @ messageStmt
-        | ShapeDecl.And members ->
-            let items = NonEmptyList.toList members |> List.map shapeStatements
-            let head, listStmts = rdfList (items |> List.map (fst >> Value.Node))
-            let bn = Node.blank ()
-            bn, (stmt bn "sh:and" (Value.Node head) :: (items |> List.collect snd)) @ listStmts
-        | ShapeDecl.Or members ->
-            let items = NonEmptyList.toList members |> List.map shapeStatements
-            let head, listStmts = rdfList (items |> List.map (fst >> Value.Node))
-            let bn = Node.blank ()
-            bn, (stmt bn "sh:or" (Value.Node head) :: (items |> List.collect snd)) @ listStmts
-        | ShapeDecl.Xone members ->
-            let items = NonEmptyList.toList members |> List.map shapeStatements
-            let head, listStmts = rdfList (items |> List.map (fst >> Value.Node))
-            let bn = Node.blank ()
-            bn, (stmt bn "sh:xone" (Value.Node head) :: (items |> List.collect snd)) @ listStmts
-        | ShapeDecl.Not inner ->
-            let innerSubject, innerStmts = shapeStatements inner
-            let bn = Node.blank ()
-            bn, stmt bn "sh:not" (Value.Node innerSubject) :: innerStmts
-        | ShapeDecl.EnumShape(targetClassUri, cases) ->
-            let subject = Node.Iri targetClassUri.AbsoluteUri
-            let typeStmt = stmt subject RdfTypeIri (Value.Node(Node.Iri "sh:NodeShape"))
-            let targetStmt = stmt subject "sh:targetClass" (Value.Node subject)
+                let messageStmt =
+                    spec.Message
+                    |> Option.map (fun m -> stmt subject "sh:message" (Value.Literal(Literal.String m)))
+                    |> Option.toList
 
-            let items =
-                NonEmptyList.toList cases
-                |> List.map (fun u -> Value.Node(Node.Iri u.AbsoluteUri))
+                subject,
+                typeStmt :: targetStmts
+                @ propertyStmts
+                @ closedStmts
+                @ severityStmt
+                @ messageStmt
+            | ShapeDecl.And members ->
+                let bn = Node.blank ()
+                memo.[decl] <- bn
+                let items = NonEmptyList.toList members |> List.map (shapeStatements memo)
+                let head, listStmts = rdfList (items |> List.map (fst >> Value.Node))
+                bn, (stmt bn "sh:and" (Value.Node head) :: (items |> List.collect snd)) @ listStmts
+            | ShapeDecl.Or members ->
+                let bn = Node.blank ()
+                memo.[decl] <- bn
+                let items = NonEmptyList.toList members |> List.map (shapeStatements memo)
+                let head, listStmts = rdfList (items |> List.map (fst >> Value.Node))
+                bn, (stmt bn "sh:or" (Value.Node head) :: (items |> List.collect snd)) @ listStmts
+            | ShapeDecl.Xone members ->
+                let bn = Node.blank ()
+                memo.[decl] <- bn
+                let items = NonEmptyList.toList members |> List.map (shapeStatements memo)
+                let head, listStmts = rdfList (items |> List.map (fst >> Value.Node))
+                bn, (stmt bn "sh:xone" (Value.Node head) :: (items |> List.collect snd)) @ listStmts
+            | ShapeDecl.Not inner ->
+                let bn = Node.blank ()
+                memo.[decl] <- bn
+                let innerSubject, innerStmts = shapeStatements memo inner
+                bn, stmt bn "sh:not" (Value.Node innerSubject) :: innerStmts
+            | ShapeDecl.EnumShape(targetClassUri, cases) ->
+                let subject = Node.Iri targetClassUri.AbsoluteUri
+                memo.[decl] <- subject
+                let typeStmt = stmt subject RdfTypeIri (Value.Node(Node.Iri "sh:NodeShape"))
+                let targetStmt = stmt subject "sh:targetClass" (Value.Node subject)
 
-            let listHead, listStmts = rdfList items
-            subject, [ typeStmt; targetStmt; stmt subject "sh:in" (Value.Node listHead) ] @ listStmts
+                let items =
+                    NonEmptyList.toList cases
+                    |> List.map (fun u -> Value.Node(Node.Iri u.AbsoluteUri))
+
+                let listHead, listStmts = rdfList items
+                subject, [ typeStmt; targetStmt; stmt subject "sh:in" (Value.Node listHead) ] @ listStmts
 
     let toDoc (shapes: ShapeDecl list) : Doc =
-        let statements = shapes |> List.collect (shapeStatements >> snd)
+        // Fresh per call -- dedup only applies within a single toDoc invocation's shape list, never
+        // across separate calls.
+        let memo = Dictionary<ShapeDecl, Node>(HashIdentity.Structural)
+        let statements = shapes |> List.collect (shapeStatements memo >> snd)
 
         { Prefixes = shaclPrefixes
           Statements = statements }

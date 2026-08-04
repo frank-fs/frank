@@ -457,6 +457,37 @@ let tests =
                 }
 
                 test
+                    "a shape referenced both in toDoc's top-level list AND nested via sh:node is emitted exactly once (no duplicate sh:property blank nodes)" {
+                    // The exact "shared shape" pattern the design doc recommends and
+                    // Frank.Validation.Sample uses: personShape validates standalone (as a top-level
+                    // list entry) AND nests inside moveShape's agent property via sh:node.
+                    let personShape =
+                        recordShape
+                            (targetClass (Uri "https://schema.org/Person"))
+                            [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/name"))
+                              |> addConstraint (PropertyConstraint.MinCount 1) ]
+
+                    let agentProp =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/agent"))
+                        |> addConstraint (PropertyConstraint.Node personShape)
+
+                    let moveShape =
+                        recordShape (targetClass (Uri "https://schema.org/MoveAction")) [ agentProp ]
+
+                    let doc = Shacl.toDoc [ moveShape; personShape ]
+                    let personSubject = Node.Iri "https://schema.org/Person"
+
+                    let personPropertyStatements =
+                        doc.Statements
+                        |> List.filter (fun (s, p, _) -> s = personSubject && p = "sh:property")
+
+                    Expect.hasLength
+                        personPropertyStatements
+                        1
+                        "Person has exactly one sh:property (for schema:name) -- emitted once, not once per reference site"
+                }
+
+                test
                     "sh:qualifiedValueShape carries the shape plus qualifiedMinCount/qualifiedMaxCount/qualifiedValueShapesDisjoint" {
                     let inner = recordShape [] []
 
