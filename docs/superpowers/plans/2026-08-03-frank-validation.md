@@ -1599,11 +1599,10 @@ testList "EnumShape, sh:hasValue, sh:in" [
         Expect.exists doc.Statements (fun (_, p, _) -> p = "sh:in") "sh:in present"
     }
 
-    test "constraintStatements is now exhaustive over every PropertyConstraint case except Sparql (Task 11)" {
-        // Compile-time proof, not a runtime assertion: if this test file compiles, the match in
-        // Shacl.fs handles every case reached from here. Sparql is exercised in Task 11's tests.
-        Expect.isTrue true "compiles"
-    }
+    // No test for "constraintStatements is now exhaustive except Sparql" -- that guarantee is
+    // compiler-checked (FS0025 -> error under this repo's TreatWarningsAsErrors) the moment the
+    // wildcard narrows to just Sparql; a runtime assertion would add nothing. Sparql itself is
+    // exercised in Task 11's tests.
 ]
 ```
 
