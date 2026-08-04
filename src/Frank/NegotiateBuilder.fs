@@ -244,6 +244,21 @@ type NegotiateBuilder() =
             Representations = spec.Representations @ [ mediaType, handlerDef.Handler ]
             Metadata = spec.Metadata @ handlerDef.Metadata }
 
+    /// A `Task<unit>`-returning handler -- what an ordinary `task { ... }` computation
+    /// expression with no `return` infers as -- is self-writing, the async counterpart
+    /// of the `HttpContext -> unit` overload above, NOT a value-returning handler whose
+    /// `unit` "value" should be handed to `viaOutputFormatter`. This overload exists
+    /// specifically so F#'s overload resolution has a non-generic, exact match to prefer
+    /// over `HttpContext -> Task<'a>` below for this shape -- without it, F# prefers the
+    /// generic `Task<'a>` overload (a direct match requiring no delegate conversion) over
+    /// the `RequestDelegate` overload, silently routing a self-writing handler through
+    /// `viaOutputFormatter`, which then throws when it tries to set `ContentType` after
+    /// the handler has already started the response (frank-fs/frank#492).
+    [<CustomOperation("accepts")>]
+    member _.Accepts(spec: NegotiateSpec, mediaType: string, handler: HttpContext -> Task<unit>) =
+        let producer = RequestDelegate(fun ctx -> handler ctx :> Task)
+        { spec with Representations = spec.Representations @ [ mediaType, producer ] }
+
     [<CustomOperation("accepts")>]
     member _.Accepts(spec: NegotiateSpec, mediaType: string, handler: HttpContext -> Task<'a>) =
         Negotiation.rejectWildcardAutoFormat mediaType
