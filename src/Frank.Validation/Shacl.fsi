@@ -24,3 +24,7 @@ module Shacl =
     /// A typed wrapper over VDS.RDF.Shacl.Validation.Report -- never exposes the raw dotNetRDF
     /// Result type to callers.
     val validate: shapesGraph: VDS.RDF.Shacl.ShapesGraph -> dataGraph: VDS.RDF.IGraph -> ValidationOutcome
+
+    /// Projects a Violation list back onto a Doc as a real sh:ValidationReport -- the inverse
+    /// direction of toDoc/validate, used by the 422 application/ld+json response path.
+    val reportToDoc: violations: Violation list -> Doc

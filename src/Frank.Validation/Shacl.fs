@@ -327,3 +327,34 @@ module Shacl =
                 |> List.ofSeq
 
             ValidationOutcome.Violates violations
+
+    let reportToDoc (violations: Violation list) : Doc =
+        let reportNode = Node.blank ()
+
+        let resultStatements =
+            violations
+            |> List.collect (fun v ->
+                let resultNode = Node.blank ()
+
+                let pathStmt =
+                    v.ResultPath
+                    |> Option.map (fun u -> stmt resultNode "sh:resultPath" (Value.Node(Node.Iri u.AbsoluteUri)))
+                    |> Option.toList
+
+                [ stmt reportNode "sh:result" (Value.Node resultNode)
+                  stmt resultNode RdfTypeIri (Value.Node(Node.Iri "sh:ValidationResult"))
+                  stmt resultNode "sh:focusNode" (Value.Node v.FocusNode)
+                  stmt resultNode "sh:resultSeverity" (Value.Node(Node.Iri(severityCurie v.Severity)))
+                  stmt resultNode "sh:resultMessage" (Value.Literal(Literal.String v.Message))
+                  stmt
+                      resultNode
+                      "sh:sourceConstraintComponent"
+                      (Value.Node(Node.Iri v.ConstraintComponent.AbsoluteUri))
+                  stmt resultNode "sh:sourceShape" (Value.Node v.SourceShape) ]
+                @ pathStmt)
+
+        { Prefixes = shaclPrefixes
+          Statements =
+            stmt reportNode RdfTypeIri (Value.Node(Node.Iri "sh:ValidationReport"))
+            :: stmt reportNode "sh:conforms" (Value.Literal(Literal.Bool(List.isEmpty violations)))
+            :: resultStatements }
