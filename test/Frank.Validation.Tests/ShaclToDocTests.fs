@@ -427,4 +427,103 @@ let tests =
                             Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
 
                         Expect.exists doc.Statements (fun (_, p, _) -> p = predicate) $"{predicate} present"
+                } ]
+
+          testList
+              "recursive shape-based constraints and logical combinators"
+              [ test "sh:node embeds the referenced shape's own subject and statements" {
+                    let personShape =
+                        recordShape
+                            (targetClass (Uri "https://schema.org/Person"))
+                            [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/email"))
+                              |> addConstraint (PropertyConstraint.MinCount 1) ]
+
+                    let agentProp =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/agent"))
+                        |> addConstraint (PropertyConstraint.Node personShape)
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/MoveAction")) [ agentProp ] ]
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:node" && v = Value.Node(Node.Iri "https://schema.org/Person"))
+                        "sh:node points at Person's own IRI"
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/Person" && p = RdfTypeIri)
+                        "Person's own sh:NodeShape triples are present too"
+                }
+
+                test
+                    "sh:qualifiedValueShape carries the shape plus qualifiedMinCount/qualifiedMaxCount/qualifiedValueShapesDisjoint" {
+                    let inner = recordShape [] []
+
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/x"))
+                        |> addConstraint (PropertyConstraint.QualifiedValueShape(inner, Some 1, Some 2, true))
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, _) -> p = "sh:qualifiedValueShape")
+                        "sh:qualifiedValueShape present"
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:qualifiedMinCount" && v = Value.Literal(Literal.Int 1))
+                        "sh:qualifiedMinCount"
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:qualifiedMaxCount" && v = Value.Literal(Literal.Int 2))
+                        "sh:qualifiedMaxCount"
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:qualifiedValueShapesDisjoint" && v = Value.Literal(Literal.Bool true))
+                        "sh:qualifiedValueShapesDisjoint"
+                }
+
+                test "sh:qualifiedMinCount/MaxCount are omitted when None, not emitted as absent literals" {
+                    let inner = recordShape [] []
+
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/x"))
+                        |> addConstraint (PropertyConstraint.QualifiedValueShape(inner, None, None, false))
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    Expect.all
+                        doc.Statements
+                        (fun (_, p, _) -> p <> "sh:qualifiedMinCount")
+                        "no sh:qualifiedMinCount when None"
+
+                    Expect.all
+                        doc.Statements
+                        (fun (_, p, _) -> p <> "sh:qualifiedMaxCount")
+                        "no sh:qualifiedMaxCount when None"
+                }
+
+                test "And/Or/Xone are well-formed rdf:lists of member shape nodes; Not is a single shape reference" {
+                    let a = recordShape (targetClass (Uri "https://schema.org/A")) []
+                    let b = recordShape (targetClass (Uri "https://schema.org/B")) []
+
+                    let andDoc = Shacl.toDoc [ ShapeDecl.And { Head = a; Tail = [ b ] } ]
+                    let orDoc = Shacl.toDoc [ ShapeDecl.Or { Head = a; Tail = [ b ] } ]
+                    let xoneDoc = Shacl.toDoc [ ShapeDecl.Xone { Head = a; Tail = [ b ] } ]
+                    let notDoc = Shacl.toDoc [ ShapeDecl.Not a ]
+
+                    Expect.exists andDoc.Statements (fun (_, p, _) -> p = "sh:and") "sh:and present"
+                    Expect.exists orDoc.Statements (fun (_, p, _) -> p = "sh:or") "sh:or present"
+                    Expect.exists xoneDoc.Statements (fun (_, p, _) -> p = "sh:xone") "sh:xone present"
+
+                    Expect.exists
+                        notDoc.Statements
+                        (fun (_, p, v) -> p = "sh:not" && v = Value.Node(Node.Iri "https://schema.org/A"))
+                        "sh:not points directly at the negated shape"
                 } ] ]

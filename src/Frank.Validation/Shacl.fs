@@ -110,6 +110,21 @@ module Shacl =
         | PropertyConstraint.LessThan uri -> [ stmt propNode "sh:lessThan" (Value.Node(Node.Iri uri.AbsoluteUri)) ]
         | PropertyConstraint.LessThanOrEquals uri ->
             [ stmt propNode "sh:lessThanOrEquals" (Value.Node(Node.Iri uri.AbsoluteUri)) ]
+        | PropertyConstraint.Node inner ->
+            let innerSubject, innerStmts = shapeStatements inner
+            stmt propNode "sh:node" (Value.Node innerSubject) :: innerStmts
+        | PropertyConstraint.QualifiedValueShape(inner, minC, maxC, disjoint) ->
+            let innerSubject, innerStmts = shapeStatements inner
+
+            [ stmt propNode "sh:qualifiedValueShape" (Value.Node innerSubject) ]
+            @ (minC
+               |> Option.map (fun n -> stmt propNode "sh:qualifiedMinCount" (Value.Literal(Literal.Int n)))
+               |> Option.toList)
+            @ (maxC
+               |> Option.map (fun n -> stmt propNode "sh:qualifiedMaxCount" (Value.Literal(Literal.Int n)))
+               |> Option.toList)
+            @ [ stmt propNode "sh:qualifiedValueShapesDisjoint" (Value.Literal(Literal.Bool disjoint)) ]
+            @ innerStmts
         | _ -> []
 
     and private propertyShapeStatements (spec: PropertyShapeSpec) : Node * (Node * string * Value) list =
@@ -138,6 +153,25 @@ module Shacl =
                     stmt subject "sh:property" (Value.Node bn) :: stmts)
 
             subject, typeStmt :: targetStmts @ propertyStmts
+        | ShapeDecl.And members ->
+            let items = NonEmptyList.toList members |> List.map shapeStatements
+            let head, listStmts = rdfList (items |> List.map (fst >> Value.Node))
+            let bn = Node.blank ()
+            bn, (stmt bn "sh:and" (Value.Node head) :: (items |> List.collect snd)) @ listStmts
+        | ShapeDecl.Or members ->
+            let items = NonEmptyList.toList members |> List.map shapeStatements
+            let head, listStmts = rdfList (items |> List.map (fst >> Value.Node))
+            let bn = Node.blank ()
+            bn, (stmt bn "sh:or" (Value.Node head) :: (items |> List.collect snd)) @ listStmts
+        | ShapeDecl.Xone members ->
+            let items = NonEmptyList.toList members |> List.map shapeStatements
+            let head, listStmts = rdfList (items |> List.map (fst >> Value.Node))
+            let bn = Node.blank ()
+            bn, (stmt bn "sh:xone" (Value.Node head) :: (items |> List.collect snd)) @ listStmts
+        | ShapeDecl.Not inner ->
+            let innerSubject, innerStmts = shapeStatements inner
+            let bn = Node.blank ()
+            bn, stmt bn "sh:not" (Value.Node innerSubject) :: innerStmts
         | _ -> Node.blank (), []
 
     let toDoc (shapes: ShapeDecl list) : Doc =
