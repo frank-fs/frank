@@ -260,4 +260,37 @@ let tests =
                         Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
 
                     Expect.exists doc.Statements (fun (_, p, _) -> p = "sh:path") "sh:path still present"
+                } ]
+
+          testList
+              "cardinality and value range constraints"
+              [ test "sh:minCount and sh:maxCount as xsd:integer literals" {
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/position"))
+                        |> addConstraint (PropertyConstraint.MinCount 1)
+                        |> addConstraint (PropertyConstraint.MaxCount 1)
+
+                    let doc = Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+                    Expect.exists doc.Statements (fun (_, p, v) -> p = "sh:minCount" && v = Value.Literal(Literal.Int 1)) "sh:minCount"
+                    Expect.exists doc.Statements (fun (_, p, v) -> p = "sh:maxCount" && v = Value.Literal(Literal.Int 1)) "sh:maxCount"
+                }
+
+                test "sh:minExclusive/minInclusive/maxExclusive/maxInclusive carry the given Literal unchanged" {
+                    let cases =
+                        [ PropertyConstraint.MinExclusive(Literal.Int 0), "sh:minExclusive"
+                          PropertyConstraint.MinInclusive(Literal.Int 0), "sh:minInclusive"
+                          PropertyConstraint.MaxExclusive(Literal.Int 100), "sh:maxExclusive"
+                          PropertyConstraint.MaxInclusive(Literal.Int 100), "sh:maxInclusive" ]
+
+                    for constr, predicate in cases do
+                        let prop = ofPath (PropertyPath.Predicate(Uri "https://schema.org/x")) |> addConstraint constr
+                        let doc = Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+                        Expect.exists doc.Statements (fun (_, p, _) -> p = predicate) $"{predicate} present"
+                }
+
+                test "range constraints work with DateTime literals too, not just Int" {
+                    let t = DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+                    let prop = ofPath (PropertyPath.Predicate(Uri "https://schema.org/x")) |> addConstraint (PropertyConstraint.MinInclusive(Literal.DateTime t))
+                    let doc = Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+                    Expect.exists doc.Statements (fun (_, p, v) -> p = "sh:minInclusive" && v = Value.Literal(Literal.DateTime t)) "sh:minInclusive with a DateTime literal"
                 } ] ]
