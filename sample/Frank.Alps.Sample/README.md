@@ -56,13 +56,35 @@ Notice too that `makeMove` carries `protocolState`/`availableInStates` `ext` ele
 pointing at `#open`. Those are projected automatically from its `from [ openState ]`
 declaration at serialization time; they are not authored separately.
 
-## What this sample deliberately doesn't do
+## `CurrentStateResolver`, backed by `Frank.Provenance` (frank-fs/frank#493)
 
-**No `CurrentStateResolver`.** The sample passes `Alps.excerpt None`, so `makeMove`'s
-`from [ openState ]` declaration is serialized but never enforced -- there is no provenance
-or event store here to ask "what state is *this* game in". Passing
-`Alps.excerpt (Some resolver)` is what makes the excerpt drop `makeMove` for a finished
-game; see `Excerpt.fsi` and the README's *State-based filtering* section.
+This sample passes `Alps.excerpt (Some stateResolver)` -- a real `CurrentStateResolver`
+backed by a `MailboxProcessorProvenanceStore` (`Frank.Provenance`), so `makeMove`'s
+`from [ openState ]` declaration is genuinely enforced, not just serialized. `POST
+/games/{id}` records a provenance activity typed `Catalog.closedState`'s own `def` IRI;
+`stateResolver` answers "what state is this game in" by asking the store for the most
+recently recorded activity against that resource (`ProvenanceQuery.Latest`) and reading
+its domain type back off the returned graph.
+
+This wiring is glue code that lives in this sample, not in either package: `Frank.Alps`
+has no reference to `Frank.Provenance` and vice versa (see both packages' design docs) --
+only this application depends on both, matching how a real consumer would compose them.
+
+```bash
+# Before any move: the excerpt still offers makeMove -- no provenance recorded yet, so
+# stateResolver returns [] and state-filtering does not apply (same as CurrentStateResolver
+# absent entirely).
+curl -s -H "Accept: application/alps+json" http://localhost:5000/games/1 | jq '.alps.descriptor[].id'
+
+# Record a move.
+curl -s -X POST http://localhost:5000/games/1 -o /dev/null
+
+# After the move: makeMove is gone. stateResolver now reports "closed" (the ActivityType
+# recorded above), which does not satisfy makeMove's from [ openState ] guard.
+curl -s -H "Accept: application/alps+json" http://localhost:5000/games/1 | jq '.alps.descriptor[].id'
+```
+
+## What this sample still doesn't do
 
 **No authorization.** Every endpoint is public, so both exposures serve the same document
 to every caller and neither emits `Cache-Control: private, no-cache` / `Vary: Authorization`

@@ -4,12 +4,14 @@ open System
 open VDS.RDF
 open VDS.RDF.Parsing
 open VDS.RDF.Query
+open Frank.Rdf
 
 [<RequireQualifiedAccess>]
 type ProvenanceQuery =
     | ByResource of resourceIri: string
     | ByAgent of agentIri: string
     | ByActivityId of activityIri: string
+    | Latest of resourceIri: string
 
 [<RequireQualifiedAccess>]
 type SparqlQueryResult =
@@ -66,3 +68,32 @@ module ProvenanceStore =
                 agentIri
 
         | ProvenanceQuery.ByActivityId activityIri -> render "DESCRIBE @activity" "activity" activityIri
+
+        | ProvenanceQuery.Latest resourceIri ->
+            // The resource IRI can be prov:wasGeneratedBy several activities over its lifetime (one per
+            // ProvenanceRecord appended for it) -- unlike ByResource, this picks exactly the one whose
+            // endedAtTime is most recent, via a subquery (SELECT ... ORDER BY DESC LIMIT 1) that resolves
+            // ?activity to a single binding before the outer pattern pulls in the rest of that activity's
+            // triples. Doing the ORDER BY/LIMIT directly in the outer CONSTRUCT WHERE would instead cap the
+            // number of ?ap/?ao rows returned, truncating the winning activity's own properties.
+            render
+                $"""
+                CONSTRUCT {{
+                    @resource <{RdfTypeIri}> <{ProvClass.toIri ProvClass.Entity}> .
+                    @resource <{ProvRelation.toIri ProvRelation.WasGeneratedBy}> ?activity .
+                    ?activity ?ap ?ao .
+                }}
+                WHERE {{
+                    {{
+                        SELECT ?activity WHERE {{
+                            @resource <{ProvRelation.toIri ProvRelation.WasGeneratedBy}> ?activity .
+                            ?activity <{ProvRelation.toIri ProvRelation.EndedAtTime}> ?ended .
+                        }}
+                        ORDER BY DESC(?ended)
+                        LIMIT 1
+                    }}
+                    ?activity ?ap ?ao .
+                }}
+                """
+                "resource"
+                resourceIri

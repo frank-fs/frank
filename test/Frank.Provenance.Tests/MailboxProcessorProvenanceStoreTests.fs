@@ -20,6 +20,21 @@ let private record (activityIri: string) (resourceIri: string) (agentIri: string
 let private newStore (config: ProvenanceStoreConfig) : IProvenanceStore =
     new MailboxProcessorProvenanceStore(config, NullLogger.Instance) :> IProvenanceStore
 
+let private recordEndingAt
+    (activityIri: string)
+    (resourceIri: string)
+    (agentIri: string)
+    (endedAt: DateTimeOffset)
+    (activityType: string)
+    : ProvenanceRecord =
+    { Activity = Node.Iri activityIri
+      Resource = Node.Iri resourceIri
+      Agent = Node.Iri agentIri
+      StartedAt = endedAt.AddSeconds(-1.0)
+      EndedAt = endedAt
+      ActivityType = Some(Uri activityType)
+      Properties = [] }
+
 [<Tests>]
 let tests =
     testList
@@ -65,6 +80,74 @@ let tests =
               | SparqlQueryResult.Graph g ->
                   let activityYNode = g.CreateUriNode(Uri "https://example.org/activities/y1")
                   Expect.equal (g.GetTriplesWithSubject(activityYNode) |> Seq.length) 0 "No cross-contamination from games/y"
+              | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
+          }
+
+          test "Latest returns only the most-recently-ended activity's data, regardless of append order" {
+              let store = newStore ProvenanceStoreConfig.defaults
+              let resourceIri = "https://example.org/games/latest-1"
+              let baseTime = DateTimeOffset.UtcNow
+
+              // Appended in reverse chronological order (newest first) so this only passes if Latest
+              // genuinely orders by endedAtTime rather than by append/insertion order.
+              store.Append(
+                  recordEndingAt
+                      "https://example.org/activities/latest-1-newer"
+                      resourceIri
+                      "https://example.org/users/1"
+                      (baseTime.AddMinutes(5.0))
+                      "https://tictactoe.example/states/closed"
+              )
+
+              store.Append(
+                  recordEndingAt
+                      "https://example.org/activities/latest-1-older"
+                      resourceIri
+                      "https://example.org/users/1"
+                      baseTime
+                      "https://tictactoe.example/states/open"
+              )
+
+              match store.Query(ProvenanceQuery.Latest resourceIri) with
+              | SparqlQueryResult.Graph g ->
+                  let newerActivity = g.CreateUriNode(Uri "https://example.org/activities/latest-1-newer")
+                  let olderActivity = g.CreateUriNode(Uri "https://example.org/activities/latest-1-older")
+
+                  Expect.isGreaterThan
+                      (g.GetTriplesWithSubject(newerActivity) |> Seq.length)
+                      0
+                      "The more-recently-ended activity's triples are present"
+
+                  Expect.equal
+                      (g.GetTriplesWithSubject(olderActivity) |> Seq.length)
+                      0
+                      "The older activity's triples are excluded"
+              | SparqlQueryResult.Bindings _ -> failwith "Expected a graph, Latest is a CONSTRUCT query"
+          }
+
+          test "Latest for a resource with only one recorded activity returns that activity" {
+              let store = newStore ProvenanceStoreConfig.defaults
+              let resourceIri = "https://example.org/games/latest-2"
+
+              store.Append(
+                  recordEndingAt
+                      "https://example.org/activities/latest-2-only"
+                      resourceIri
+                      "https://example.org/users/1"
+                      DateTimeOffset.UtcNow
+                      "https://tictactoe.example/states/open"
+              )
+
+              match store.Query(ProvenanceQuery.Latest resourceIri) with
+              | SparqlQueryResult.Graph g -> Expect.isGreaterThan g.Triples.Count 0 "The only recorded activity comes back"
+              | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
+          }
+
+          test "Latest for an unknown resource returns an empty graph, not an error" {
+              let store = newStore ProvenanceStoreConfig.defaults
+
+              match store.Query(ProvenanceQuery.Latest "https://example.org/games/does-not-exist") with
+              | SparqlQueryResult.Graph g -> Expect.equal g.Triples.Count 0 "Nothing recorded for this resource"
               | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
           }
 
