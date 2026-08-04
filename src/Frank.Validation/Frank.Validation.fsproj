@@ -18,6 +18,8 @@
     <Compile Include="ShapeTypes.fs" />
     <Compile Include="ShapeSpec.fsi" />
     <Compile Include="ShapeSpec.fs" />
+    <Compile Include="Validation.fsi" />
+    <Compile Include="Validation.fs" />
     <Compile Include="Shacl.fsi" />
     <Compile Include="Shacl.fs" />
   </ItemGroup>

@@ -20,3 +20,7 @@ module Shacl =
 
     /// toDoc >> Doc.toGraph >> ShapesGraph -- what Validation.fs's `validate` consumes.
     val toShapesGraph: shapes: ShapeDecl list -> VDS.RDF.Shacl.ShapesGraph
+
+    /// A typed wrapper over VDS.RDF.Shacl.Validation.Report -- never exposes the raw dotNetRDF
+    /// Result type to callers.
+    val validate: shapesGraph: VDS.RDF.Shacl.ShapesGraph -> dataGraph: VDS.RDF.IGraph -> ValidationOutcome

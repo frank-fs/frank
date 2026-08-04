@@ -264,3 +264,66 @@ module Shacl =
 
     let toShapesGraph (shapes: ShapeDecl list) : VDS.RDF.Shacl.ShapesGraph =
         new VDS.RDF.Shacl.ShapesGraph(Doc.toGraph (toDoc shapes))
+
+    // NOTE on the helpers below: dotNetRdf.Shacl's Path/Shape wrapper types (e.g.
+    // VDS.RDF.Shacl.Paths.Predicate, VDS.RDF.Shacl.Shapes.Property) derive from WrapperNode, which
+    // structurally implements EVERY node marker interface (IUriNode, IBlankNode, ILiteralNode, ...)
+    // regardless of what kind of node is actually wrapped. That means `:? IUriNode` always matches
+    // for these types -- even when the wrapped node is a blank node -- and calling `.Uri` on the
+    // resulting (mis)match throws InvalidCastException at runtime instead of the type test failing.
+    // Verified live against dotNetRdf.Shacl 3.5.1 (see task-13-report.md): every node-kind dispatch
+    // below switches on the real `.NodeType` enum first and only then downcasts, rather than
+    // pattern-matching on interface type as the original sketch assumed.
+    let private nodeOf (n: VDS.RDF.INode) : Node =
+        match n.NodeType with
+        | VDS.RDF.NodeType.Uri -> Node.Iri (n :?> VDS.RDF.IUriNode).Uri.AbsoluteUri
+        | VDS.RDF.NodeType.Blank -> Node.Blank (n :?> VDS.RDF.IBlankNode).InternalID
+        | _ -> Node.Iri(n.ToString())
+
+    let private severityOf (n: VDS.RDF.INode) : Severity =
+        match n.NodeType with
+        | VDS.RDF.NodeType.Uri ->
+            let uri = (n :?> VDS.RDF.IUriNode).Uri.AbsoluteUri
+
+            if uri.EndsWith "Warning" then Severity.Warning
+            elif uri.EndsWith "Info" then Severity.Info
+            else Severity.Violation
+        | _ -> Severity.Violation
+
+    let private uriOf (n: VDS.RDF.INode) : Uri =
+        match n.NodeType with
+        | VDS.RDF.NodeType.Uri -> Uri (n :?> VDS.RDF.IUriNode).Uri.AbsoluteUri
+        | _ -> Uri "urn:frank:validation:unknown-constraint-component"
+
+    /// Result.ResultPath is a nullable VDS.RDF.Shacl.Path (null for node-shape-level violations that
+    /// have no sh:path, e.g. sh:in on the shape itself). Some uri for the common simple-predicate
+    /// case; None for a null path or a complex (non-IRI) path structure -- see Violation.ResultPath's
+    /// doc comment in Validation.fsi for the disclosed round-trip simplification.
+    let private resultPathOf (path: VDS.RDF.Shacl.Path) : Uri option =
+        match box path with
+        | null -> None
+        | _ ->
+            match path.NodeType with
+            | VDS.RDF.NodeType.Uri -> Some(Uri (box path :?> VDS.RDF.IUriNode).Uri.AbsoluteUri)
+            | _ -> None
+
+    /// A typed wrapper over VDS.RDF.Shacl.Validation.Report -- never exposes the raw dotNetRDF
+    /// Result type to callers.
+    let validate (shapesGraph: VDS.RDF.Shacl.ShapesGraph) (dataGraph: VDS.RDF.IGraph) : ValidationOutcome =
+        let report = shapesGraph.Validate(dataGraph)
+
+        if report.Conforms then
+            ValidationOutcome.Conforms
+        else
+            let violations =
+                report.Results
+                |> Seq.map (fun r ->
+                    { FocusNode = nodeOf r.FocusNode
+                      ResultPath = resultPathOf r.ResultPath
+                      Severity = severityOf r.Severity
+                      Message = if isNull (box r.Message) then "" else r.Message.Value
+                      ConstraintComponent = uriOf r.SourceConstraintComponent
+                      SourceShape = nodeOf r.SourceShape })
+                |> List.ofSeq
+
+            ValidationOutcome.Violates violations
