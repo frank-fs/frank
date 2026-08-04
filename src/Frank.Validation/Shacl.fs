@@ -504,14 +504,20 @@ module Shacl =
         | VDS.RDF.NodeType.Literal -> Value.Literal(literalOf (n :?> VDS.RDF.ILiteralNode))
         | _ -> Value.Literal(Literal.String(n.ToString()))
 
+    [<Literal>]
+    let private ShaclNs = "http://www.w3.org/ns/shacl#"
+
+    /// Exact IRI comparison, not `uri.EndsWith "Warning"`/`"Info"` (final-review minor item): a
+    /// suffix test would misread any severity term from another vocabulary that merely ends in those
+    /// words, and silently downgrade or upgrade a result's severity. Anything that is not one of
+    /// SHACL's own three terms falls back to sh:Violation, SHACL's own default.
     let private severityOf (n: VDS.RDF.INode) : Severity =
         match n.NodeType with
         | VDS.RDF.NodeType.Uri ->
-            let uri = (n :?> VDS.RDF.IUriNode).Uri.AbsoluteUri
-
-            if uri.EndsWith "Warning" then Severity.Warning
-            elif uri.EndsWith "Info" then Severity.Info
-            else Severity.Violation
+            match (n :?> VDS.RDF.IUriNode).Uri.AbsoluteUri with
+            | uri when uri = ShaclNs + "Warning" -> Severity.Warning
+            | uri when uri = ShaclNs + "Info" -> Severity.Info
+            | _ -> Severity.Violation
         | _ -> Severity.Violation
 
     let private uriOf (n: VDS.RDF.INode) : Uri =
@@ -534,6 +540,15 @@ module Shacl =
     /// A typed wrapper over VDS.RDF.Shacl.Validation.Report -- never exposes the raw dotNetRDF
     /// Result type to callers.
     let validate (shapesGraph: VDS.RDF.Shacl.ShapesGraph) (dataGraph: VDS.RDF.IGraph) : ValidationOutcome =
+        // NOTE on concurrency (final-review finding I7): one ShapesGraph shared across concurrent
+        // Validate calls was suspected of being the cause of a measured multi-second stall on the
+        // first parallel burst. It is not -- a shared instance, a fresh ShapesGraph wrapper per call,
+        // a cloned shapes graph per call and a rebuilt toShapesGraph per call all measured the same,
+        // and the stall turned out to be .NET ThreadPool thread-injection latency in the benchmark's
+        // own Task.Run fan-out. Sharing is therefore left as-is (and covered by a concurrency
+        // correctness test); see test/Frank.Validation.Tests/ValidationConcurrencyTests.fs for the
+        // full measurements. The middleware's exception boundary catches an RdfQueryTimeoutException
+        // from any source regardless.
         let report = shapesGraph.Validate(dataGraph)
 
         if report.Conforms then
