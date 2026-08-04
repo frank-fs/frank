@@ -16,6 +16,8 @@
   <ItemGroup>
     <Compile Include="ShapeTypes.fsi" />
     <Compile Include="ShapeTypes.fs" />
+    <Compile Include="ShapeSpec.fsi" />
+    <Compile Include="ShapeSpec.fs" />
   </ItemGroup>
 
   <ItemGroup>

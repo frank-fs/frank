@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <Compile Include="ShapeTypesTests.fs" />
+    <Compile Include="ShapeSpecTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
