@@ -134,26 +134,56 @@ module WebHostBuilderExtensions =
                         then
                             ctx.Response.StatusCode <- 413
                         else
-                            ctx.Request.EnableBuffering()
+                            // EnableBuffering(bufferThreshold, bufferLimit) -- not the parameterless
+                            // overload -- is what actually bounds memory use. The parameterless
+                            // EnableBuffering() defaults bufferLimit to null (unlimited), so a
+                            // chunked-transfer request with no Content-Length header sails past the
+                            // fast-path check above and gets fully materialized into a managed string
+                            // by reader.ReadToEndAsync() before the post-read byte-count check below
+                            // ever runs -- the ContentLength check is honest-header-only, not a real
+                            // bound (the design doc calls for checking "against a running byte count
+                            // while reading" for exactly this reason). Verified directly via a
+                            // `dotnet fsi` repro against the underlying
+                            // Microsoft.AspNetCore.WebUtilities.FileBufferingReadStream (what
+                            // EnableBuffering wires up internally): feeding it an unbounded source
+                            // stream with bufferLimit = MaxBodyBytes + 1L throws `IOException: Buffer
+                            // limit exceeded.` after reading right around that many bytes -- so the
+                            // read itself is capped, not merely checked afterward.
+                            ctx.Request.EnableBuffering(bufferThreshold = 32 * 1024, bufferLimit = MaxBodyBytes + 1L)
 
                             use reader =
                                 new System.IO.StreamReader(ctx.Request.Body, Encoding.UTF8, leaveOpen = true)
 
-                            let! bodyText = reader.ReadToEndAsync()
-                            ctx.Request.Body.Position <- 0L
+                            let! bodyTextOrOversized =
+                                task {
+                                    try
+                                        let! text = reader.ReadToEndAsync()
+                                        return Ok text
+                                    with :? System.IO.IOException ->
+                                        return Error()
+                                }
 
-                            if int64 (Encoding.UTF8.GetByteCount bodyText) > MaxBodyBytes then
-                                ctx.Response.StatusCode <- 413
-                            else
-                                match parseGraph bodyText with
-                                | Error message -> do! writeProblemJson ctx 400 "Malformed JSON-LD" message
-                                | Ok dataGraph ->
-                                    match Shacl.validate shapesGraph dataGraph with
-                                    | ValidationOutcome.Conforms ->
-                                        ctx.Items.[ValidatedGraphKey] <- box dataGraph
-                                        do! next.Invoke ctx
-                                    | ValidationOutcome.Violates violations ->
-                                        do! writeViolationResponse ctx violations
+                            match bodyTextOrOversized with
+                            | Error() -> ctx.Response.StatusCode <- 413
+                            | Ok bodyText ->
+                                ctx.Request.Body.Position <- 0L
+
+                                // Belt-and-braces: EnableBuffering's bufferLimit already caps the read
+                                // itself (see above), but keep this as the final authoritative gate in
+                                // case the buffered stream's throw boundary ever admits a body a few
+                                // bytes over MaxBodyBytes before throwing.
+                                if int64 (Encoding.UTF8.GetByteCount bodyText) > MaxBodyBytes then
+                                    ctx.Response.StatusCode <- 413
+                                else
+                                    match parseGraph bodyText with
+                                    | Error message -> do! writeProblemJson ctx 400 "Malformed JSON-LD" message
+                                    | Ok dataGraph ->
+                                        match Shacl.validate shapesGraph dataGraph with
+                                        | ValidationOutcome.Conforms ->
+                                            ctx.Items.[ValidatedGraphKey] <- box dataGraph
+                                            do! next.Invoke ctx
+                                        | ValidationOutcome.Violates violations ->
+                                            do! writeViolationResponse ctx violations
             }
             :> Task)
 
