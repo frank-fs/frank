@@ -13,6 +13,7 @@
     <Compile Include="ShapeSpecTests.fs" />
     <Compile Include="ShaclToDocTests.fs" />
     <Compile Include="ValidationTests.fs" />
+    <Compile Include="ValidateConformanceTests.fs" />
     <Compile Include="ShapeBuilderTests.fs" />
     <Compile Include="ReportRoundTripTests.fs" />
     <Compile Include="ResourceBuilderExtensionsTests.fs" />
