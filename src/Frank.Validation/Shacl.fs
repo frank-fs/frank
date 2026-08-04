@@ -344,7 +344,52 @@ module Shacl =
         match n.NodeType with
         | VDS.RDF.NodeType.Uri -> Node.Iri (n :?> VDS.RDF.IUriNode).Uri.AbsoluteUri
         | VDS.RDF.NodeType.Blank -> Node.Blank (n :?> VDS.RDF.IBlankNode).InternalID
-        | _ -> Node.Iri(n.ToString())
+        // Only reachable for a node kind that can never legally appear where this is used
+        // (Violation.SourceShape, always an IRI or blank node). A urn: placeholder, NOT
+        // `Node.Iri (n.ToString())` -- the latter fabricates an IRI Frank.Rdf's resolveIri rejects,
+        // turning a would-be degenerate report into an unhandled 500 (final-review finding C1).
+        | _ -> Node.Iri "urn:frank:validation:unknown-node"
+
+    [<Literal>]
+    let private XsdNs = "http://www.w3.org/2001/XMLSchema#"
+
+    /// Maps a dotNetRDF literal node back onto Frank.Rdf's Literal. Frank.Rdf.Literal has no
+    /// Decimal/Double/Float/Short/... cases, so any datatype outside the five it does model comes
+    /// back as Literal.String carrying the lexical form -- a disclosed narrowing, documented on
+    /// Violation.FocusNode in Validation.fsi rather than silently swallowed.
+    let private literalOf (n: VDS.RDF.ILiteralNode) : Literal =
+        if not (String.IsNullOrEmpty n.Language) then
+            Literal.LangString(n.Value, n.Language)
+        else
+            match n.DataType with
+            | null -> Literal.String n.Value
+            | dt ->
+                match dt.AbsoluteUri with
+                | u when u = XsdNs + "integer" || u = XsdNs + "int" || u = XsdNs + "long" ->
+                    match Int32.TryParse n.Value with
+                    | true, i -> Literal.Int i
+                    | _ -> Literal.String n.Value
+                | u when u = XsdNs + "boolean" ->
+                    match Boolean.TryParse n.Value with
+                    | true, b -> Literal.Bool b
+                    | _ -> Literal.String n.Value
+                | u when u = XsdNs + "dateTime" ->
+                    match DateTimeOffset.TryParse(n.Value, Globalization.CultureInfo.InvariantCulture) with
+                    | true, dt -> Literal.DateTime dt
+                    | _ -> Literal.String n.Value
+                | _ -> Literal.String n.Value
+
+    /// A SHACL focus node is NOT always an IRI or blank node -- sh:targetObjectsOf targets the
+    /// objects of a predicate, which are routinely literals. Mapping one onto Node.Iri (n.ToString())
+    /// fabricated an IRI like `Alice^^http://www.w3.org/2001/XMLSchema#string`, which then raised out
+    /// of Frank.Rdf's resolveIri the moment reportToDoc's output was serialized for the 422
+    /// application/ld+json response (final-review finding C1).
+    let private valueOf (n: VDS.RDF.INode) : Value =
+        match n.NodeType with
+        | VDS.RDF.NodeType.Uri -> Value.Node(Node.Iri (n :?> VDS.RDF.IUriNode).Uri.AbsoluteUri)
+        | VDS.RDF.NodeType.Blank -> Value.Node(Node.Blank (n :?> VDS.RDF.IBlankNode).InternalID)
+        | VDS.RDF.NodeType.Literal -> Value.Literal(literalOf (n :?> VDS.RDF.ILiteralNode))
+        | _ -> Value.Literal(Literal.String(n.ToString()))
 
     let private severityOf (n: VDS.RDF.INode) : Severity =
         match n.NodeType with
@@ -384,7 +429,7 @@ module Shacl =
             let violations =
                 report.Results
                 |> Seq.map (fun r ->
-                    { FocusNode = nodeOf r.FocusNode
+                    { FocusNode = valueOf r.FocusNode
                       ResultPath = resultPathOf r.ResultPath
                       Severity = severityOf r.Severity
                       Message = if isNull (box r.Message) then "" else r.Message.Value
@@ -409,7 +454,7 @@ module Shacl =
 
                 [ stmt reportNode "sh:result" (Value.Node resultNode)
                   stmt resultNode RdfTypeIri (Value.Node(Node.Iri "sh:ValidationResult"))
-                  stmt resultNode "sh:focusNode" (Value.Node v.FocusNode)
+                  stmt resultNode "sh:focusNode" v.FocusNode
                   stmt resultNode "sh:resultSeverity" (Value.Node(Node.Iri(severityCurie v.Severity)))
                   stmt resultNode "sh:resultMessage" (Value.Literal(Literal.String v.Message))
                   stmt

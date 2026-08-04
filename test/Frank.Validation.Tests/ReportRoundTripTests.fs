@@ -30,7 +30,7 @@ let tests =
 
           test "one violation produces sh:conforms false and one sh:result carrying every field" {
               let v: Violation =
-                  { FocusNode = Node.Iri "https://example.org/move1"
+                  { FocusNode = Value.Node(Node.Iri "https://example.org/move1")
                     ResultPath = Some(Uri "https://schema.org/position")
                     Severity = Severity.Violation
                     Message = "position is required"
@@ -66,7 +66,7 @@ let tests =
 
           test "a violation with ResultPath=None omits sh:resultPath entirely" {
               let v: Violation =
-                  { FocusNode = Node.Iri "https://example.org/move1"
+                  { FocusNode = Value.Node(Node.Iri "https://example.org/move1")
                     ResultPath = None
                     Severity = Severity.Violation
                     Message = "complex-path violation"
@@ -79,7 +79,7 @@ let tests =
 
           test "round-trip: reportToDoc |> Doc.toJsonLd, reparsed via dotNetRDF's own JSON-LD reader, is isomorphic" {
               let v: Violation =
-                  { FocusNode = Node.Iri "https://example.org/move1"
+                  { FocusNode = Value.Node(Node.Iri "https://example.org/move1")
                     ResultPath = Some(Uri "https://schema.org/position")
                     Severity = Severity.Warning
                     Message = "check this"

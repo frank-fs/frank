@@ -32,7 +32,7 @@ let private violatingBody =
 /// Wires useValidationMiddleware exactly where WebHostBuilder.Run places it -- after UseRouting,
 /// before UseEndpoints -- without going through the webHost{ } CE, since Run blocks. Mirrors
 /// test/Frank.Tests/ResponseLinkTests.fs's createTestServer.
-let private createTestServer (validated: bool) =
+let private createTestServerWith (shapesGraph: VDS.RDF.Shacl.ShapesGraph option) =
     let builder =
         Host
             .CreateDefaultBuilder([||])
@@ -52,16 +52,18 @@ let private createTestServer (validated: bool) =
                                         Func<HttpContext, Task>(fun ctx -> ctx.Response.WriteAsync "handled")
                                     )
 
-                                if validated then
-                                    mapping.WithMetadata(ValidationMetadata moveShapesGraph) |> ignore
-                                else
-                                    ())
+                                match shapesGraph with
+                                | Some sg -> mapping.WithMetadata(ValidationMetadata sg) |> ignore
+                                | None -> ())
                             |> ignore)
                 |> ignore)
 
     let host = builder.Build()
     host.Start()
     host.GetTestClient()
+
+let private createTestServer (validated: bool) =
+    createTestServerWith (if validated then Some moveShapesGraph else None)
 
 [<Tests>]
 let tests =
@@ -150,4 +152,75 @@ let tests =
                   client.PostAsync("/moves", new StringContent(huge, Encoding.UTF8, "application/ld+json"))
 
               Expect.equal response.StatusCode (enum 413) "413 Payload Too Large"
+
+              // Final-review minor item: 413 used to return a bare status with an empty body and no
+              // Content-Type, inconsistent with the 400/422 paths.
+              Expect.equal
+                  response.Content.Headers.ContentType.MediaType
+                  "application/problem+json"
+                  "413 is problem+json, same as 400/422"
+          }
+
+          // Final-review finding C1, end to end: a literal focus node (TargetSpec.ObjectsOf) used to
+          // fabricate a garbage IRI that crashed Frank.Rdf's resolveIri while serializing the 422
+          // ld+json report -- surfacing as an unhandled 500 with a torn response.
+          testTask "a violation on a LITERAL focus node returns a real 422 ld+json report, not a 500" {
+              let literalTargetShapes =
+                  Shacl.toShapesGraph
+                      [ recordShape
+                            [ TargetSpec.ObjectsOf(Uri "https://schema.org/name") ]
+                            [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/x"))
+                              |> addConstraint (PropertyConstraint.MinCount 1) ] ]
+
+              let client = createTestServerWith (Some literalTargetShapes)
+
+              let body =
+                  """[{"@id":"https://example.org/p1","https://schema.org/name":[{"@value":"Alice"}]}]"""
+
+              let req = new HttpRequestMessage(HttpMethod.Post, "/moves")
+              req.Content <- new StringContent(body, Encoding.UTF8, "application/ld+json")
+              req.Headers.Accept.ParseAdd("application/ld+json")
+              let! (response: HttpResponseMessage) = client.SendAsync(req)
+
+              Expect.equal response.StatusCode (enum 422) "422, not an unhandled 500"
+              let! text = response.Content.ReadAsStringAsync()
+              Expect.stringContains text "Alice" "the literal focus node is in the report"
+          }
+
+          // Final-review findings C1/I1/I7 share one defence: nothing dotNetRDF raises during
+          // request handling may escape as an unhandled exception. Provoked here with a shapes graph
+          // built OUTSIDE toShapesGraph (so it skips the build-time SPARQL check I1 adds) carrying a
+          // syntactically broken sh:select -- dotNetRDF raises RdfParseException at validate time.
+          testTask "an unexpected validation-engine exception becomes a logged 500 problem+json" {
+              let brokenDoc =
+                  let sparqlNode = Node.blank ()
+                  let propNode = Node.blank ()
+                  let shapeNode = Node.Iri "https://example.org/BrokenShape"
+
+                  { Prefixes =
+                      [ "sh", "http://www.w3.org/ns/shacl#"
+                        "rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#" ]
+                    Statements =
+                      [ shapeNode, RdfTypeIri, Value.Node(Node.Iri "sh:NodeShape")
+                        shapeNode, "sh:targetObjectsOf", Value.Node(Node.Iri "https://schema.org/name")
+                        shapeNode, "sh:property", Value.Node propNode
+                        propNode, "sh:path", Value.Node(Node.Iri "https://schema.org/x")
+                        propNode, "sh:sparql", Value.Node sparqlNode
+                        sparqlNode, "sh:select", Value.Literal(Literal.String "SELECT $this WHERE { <<< }") ] }
+
+              let brokenShapes = new VDS.RDF.Shacl.ShapesGraph(Doc.toGraph brokenDoc)
+              let client = createTestServerWith (Some brokenShapes)
+
+              let body =
+                  """[{"@id":"https://example.org/p1","https://schema.org/name":[{"@value":"Alice"}]}]"""
+
+              let! (response: HttpResponseMessage) =
+                  client.PostAsync("/moves", new StringContent(body, Encoding.UTF8, "application/ld+json"))
+
+              Expect.equal response.StatusCode HttpStatusCode.InternalServerError "500, not an unhandled crash"
+
+              Expect.equal
+                  response.Content.Headers.ContentType.MediaType
+                  "application/problem+json"
+                  "a real problem+json body, not a torn/empty response"
           } ]
