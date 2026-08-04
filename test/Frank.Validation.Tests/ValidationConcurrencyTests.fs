@@ -115,24 +115,33 @@ let private makeDataGraph (i: int) (conforming: bool) : IGraph =
 let private burst (shapesGraph: VDS.RDF.Shacl.ShapesGraph) (count: int) (conforming: bool) =
     // Give the pool enough resident workers up front. Without this the measurement is dominated by
     // .NET's ~2-threads-per-second injection rate -- which IS the finding's stall, reproduced and
-    // root-caused above, but is a property of the ThreadPool rather than of this package, and makes
-    // the number swing between 1.6s and 52s depending on what else has run first. Raising the floor
-    // isolates the thing actually under test: whether concurrent validation is correct and whether
-    // dotNetRDF raises under load.
+    // root-caused above, but is a property of the ThreadPool rather than of this package. A cold
+    // process paying this cost on its first concurrent burst is real and NOT mitigated by anything
+    // in this file -- see the "known limitation" note in src/Frank.Validation/README.md and raise the
+    // floor at your own process's startup if you expect concurrent validated traffic immediately.
+    // Raising it here (and restoring it afterward) isolates what these tests actually check:
+    // correctness under concurrency and whether dotNetRDF raises under load -- NOT cold-start latency.
+    // The HTTP-level tests below inherit whatever floor is in effect when they run; because `burst`
+    // never restored the floor before, they were silently measuring an already-warmed process and
+    // could not have caught a cold-start regression. Restoring it here fixes that.
     let mutable minWorkers = 0
     let mutable minIo = 0
     ThreadPool.GetMinThreads(&minWorkers, &minIo)
-    ThreadPool.SetMinThreads(max minWorkers (count + 32), minIo) |> ignore
 
-    let graphs = Array.init count (fun i -> makeDataGraph i conforming)
-    let outcomes = Array.zeroCreate count
-    let sw = Stopwatch.StartNew()
+    try
+        ThreadPool.SetMinThreads(max minWorkers (count + 32), minIo) |> ignore
 
-    Parallel.For(0, count, (fun i -> outcomes.[i] <- Shacl.validate shapesGraph graphs.[i]))
-    |> ignore
+        let graphs = Array.init count (fun i -> makeDataGraph i conforming)
+        let outcomes = Array.zeroCreate count
+        let sw = Stopwatch.StartNew()
 
-    sw.Stop()
-    sw.ElapsedMilliseconds, outcomes
+        Parallel.For(0, count, (fun i -> outcomes.[i] <- Shacl.validate shapesGraph graphs.[i]))
+        |> ignore
+
+        sw.Stop()
+        sw.ElapsedMilliseconds, outcomes
+    finally
+        ThreadPool.SetMinThreads(minWorkers, minIo) |> ignore
 
 // --- the HTTP-level tests, which are the shape a real server actually has -------------------------
 

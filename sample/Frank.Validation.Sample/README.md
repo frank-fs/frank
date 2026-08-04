@@ -89,8 +89,8 @@ curl -s -X POST http://localhost:5000/games/1/moves \
           "@type":["https://schema.org/Person"],
           "https://schema.org/name":[{"@value":"Bob"}],
           "https://schema.org/telephone":[{"@value":"555-0100"}]}]}]' | jq '.violations[].constraintComponent'
-# "http://www.w3.org/ns/shacl#NodeConstraintComponent"      <- moveShape: the agent does not conform
 # "http://www.w3.org/ns/shacl#ClosedConstraintComponent"    <- personShape: schema:telephone is not allowed
+# "http://www.w3.org/ns/shacl#NodeConstraintComponent"      <- moveShape: the agent does not conform
 # Both are reported, at two different focus nodes (the move, and the person) -- the recursive
 # sh:node constraint and the closed shape it points at each raise their own result.
 

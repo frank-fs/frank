@@ -24,6 +24,12 @@ type Violation =
         Severity: Severity
         Message: string
         ConstraintComponent: Uri
+        /// The shape that raised this violation. Node shapes now always mint a fresh blank-node
+        /// subject (see Shacl.fs's RecordShape/EnumShape emission -- a shape's subject is no longer
+        /// its sh:targetClass IRI, so that two independently-authored shapes over the same class don't
+        /// collide onto one subject). This means SourceShape is an opaque blank node identifier with
+        /// no direct route back to the authored ShapeDecl or a human-readable name -- it identifies
+        /// *that* a shape fired, not *which* shape in your source code it was.
         SourceShape: Node
     }
 
