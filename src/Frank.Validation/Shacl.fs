@@ -79,6 +79,12 @@ module Shacl =
         | NodeKind.BlankNodeOrLiteral -> "sh:BlankNodeOrLiteral"
         | NodeKind.IriOrLiteral -> "sh:IRIOrLiteral"
 
+    let private severityCurie (s: Severity) : string =
+        match s with
+        | Severity.Violation -> "sh:Violation"
+        | Severity.Warning -> "sh:Warning"
+        | Severity.Info -> "sh:Info"
+
     /// One case added per Task 5-13; the wildcard's scope is documented at each task that narrows it.
     /// Mutually recursive with propertyShapeStatements/shapeStatements from this task on, because
     /// Task 9's PropertyConstraint.Node/QualifiedValueShape cases call back into shapeStatements.
@@ -154,7 +160,22 @@ module Shacl =
         let bn = Node.blank ()
         let pathHead, pathStmts = pathNode spec.Path
         let constraintStmts = spec.Constraints |> List.collect (constraintStatements bn)
-        bn, (stmt bn "sh:path" (Value.Node pathHead) :: pathStmts) @ constraintStmts
+
+        let severityStmt =
+            spec.Severity
+            |> Option.map (fun s -> stmt bn "sh:severity" (Value.Node(Node.Iri(severityCurie s))))
+            |> Option.toList
+
+        let messageStmt =
+            spec.Message
+            |> Option.map (fun m -> stmt bn "sh:message" (Value.Literal(Literal.String m)))
+            |> Option.toList
+
+        bn,
+        (stmt bn "sh:path" (Value.Node pathHead) :: pathStmts)
+        @ constraintStmts
+        @ severityStmt
+        @ messageStmt
 
     and private shapeStatements (decl: ShapeDecl) : Node * (Node * string * Value) list =
         match decl with
@@ -175,7 +196,35 @@ module Shacl =
                     let bn, stmts = propertyShapeStatements p
                     stmt subject "sh:property" (Value.Node bn) :: stmts)
 
-            subject, typeStmt :: targetStmts @ propertyStmts
+            let closedStmts =
+                if spec.Closed then
+                    let ignoredValues =
+                        spec.IgnoredProperties |> List.map (fun u -> Value.Node(Node.Iri u.AbsoluteUri))
+
+                    let ignoredHead, ignoredListStmts = rdfList ignoredValues
+
+                    stmt subject "sh:closed" (Value.Literal(Literal.Bool true))
+                    :: stmt subject "sh:ignoredProperties" (Value.Node ignoredHead)
+                    :: ignoredListStmts
+                else
+                    []
+
+            let severityStmt =
+                spec.Severity
+                |> Option.map (fun s -> stmt subject "sh:severity" (Value.Node(Node.Iri(severityCurie s))))
+                |> Option.toList
+
+            let messageStmt =
+                spec.Message
+                |> Option.map (fun m -> stmt subject "sh:message" (Value.Literal(Literal.String m)))
+                |> Option.toList
+
+            subject,
+            typeStmt :: targetStmts
+            @ propertyStmts
+            @ closedStmts
+            @ severityStmt
+            @ messageStmt
         | ShapeDecl.And members ->
             let items = NonEmptyList.toList members |> List.map shapeStatements
             let head, listStmts = rdfList (items |> List.map (fst >> Value.Node))
@@ -212,3 +261,6 @@ module Shacl =
 
         { Prefixes = shaclPrefixes
           Statements = statements }
+
+    let toShapesGraph (shapes: ShapeDecl list) : VDS.RDF.Shacl.ShapesGraph =
+        new VDS.RDF.Shacl.ShapesGraph(Doc.toGraph (toDoc shapes))

@@ -729,4 +729,92 @@ let tests =
                         doc.Statements
                         (fun (_, p, v) -> p = "sh:message" && v = Value.Literal(Literal.String "always fails"))
                         "sh:message present"
+                } ]
+
+          testList
+              "closed, severity, message, toShapesGraph"
+              [ test "sh:closed true plus sh:ignoredProperties as a well-formed rdf:list, when Closed is set" {
+                    let decl =
+                        recordShape (targetClass (Uri "https://schema.org/T")) []
+                        |> function
+                            | ShapeDecl.RecordShape n ->
+                                ShapeDecl.RecordShape
+                                    { n with
+                                        Closed = true
+                                        IgnoredProperties = [ Uri "https://schema.org/extra" ] }
+                            | other -> other
+
+                    let doc = Shacl.toDoc [ decl ]
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:closed" && v = Value.Literal(Literal.Bool true))
+                        "sh:closed"
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, _) -> p = "sh:ignoredProperties")
+                        "sh:ignoredProperties present"
+                }
+
+                test "sh:closed false emits no sh:closed triple at all (SHACL's own default, nothing to assert)" {
+                    let doc = Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [] ]
+
+                    Expect.all doc.Statements (fun (_, p, _) -> p <> "sh:closed") "no sh:closed when not closed"
+                }
+
+                test "NodeShapeSpec.Severity/Message become sh:severity/sh:message on the shape's own subject" {
+                    let decl =
+                        recordShape (targetClass (Uri "https://schema.org/T")) []
+                        |> function
+                            | ShapeDecl.RecordShape n ->
+                                ShapeDecl.RecordShape
+                                    { n with
+                                        Severity = Some Severity.Warning
+                                        Message = Some "be careful" }
+                            | other -> other
+
+                    let doc = Shacl.toDoc [ decl ]
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:severity" && v = Value.Node(Node.Iri "sh:Warning"))
+                        "sh:severity"
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:message" && v = Value.Literal(Literal.String "be careful"))
+                        "sh:message"
+                }
+
+                test
+                    "PropertyShapeSpec.Severity/Message become sh:severity/sh:message on that property's own blank node" {
+                    let prop =
+                        { ofPath (PropertyPath.Predicate(Uri "https://schema.org/x")) with
+                            Severity = Some Severity.Info
+                            Message = Some "informational" }
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:severity" && v = Value.Node(Node.Iri "sh:Info"))
+                        "sh:severity on property shape"
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:message" && v = Value.Literal(Literal.String "informational"))
+                        "sh:message on property shape"
+                }
+
+                test "toShapesGraph builds a real dotNetRDF ShapesGraph from a ShapeDecl list" {
+                    let decl =
+                        recordShape
+                            (targetClass (Uri "https://schema.org/MoveAction"))
+                            [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/position"))
+                              |> addConstraint (PropertyConstraint.Datatype XsdDatatype.Integer) ]
+
+                    let sg = Shacl.toShapesGraph [ decl ]
+                    Expect.isNotNull (box sg) "ShapesGraph constructed without throwing"
                 } ] ]

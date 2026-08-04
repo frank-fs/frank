@@ -17,3 +17,6 @@ module Shacl =
     /// Projects a ShapeDecl list onto a Doc: one sh:NodeShape/sh:PropertyShape pair per shape,
     /// blank nodes for anonymous property shapes and path expressions.
     val toDoc: shapes: ShapeDecl list -> Doc
+
+    /// toDoc >> Doc.toGraph >> ShapesGraph -- what Validation.fs's `validate` consumes.
+    val toShapesGraph: shapes: ShapeDecl list -> VDS.RDF.Shacl.ShapesGraph
