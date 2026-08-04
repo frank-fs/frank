@@ -22,6 +22,8 @@
     <Compile Include="Validation.fs" />
     <Compile Include="Shacl.fsi" />
     <Compile Include="Shacl.fs" />
+    <Compile Include="ShapeBuilder.fsi" />
+    <Compile Include="ShapeBuilder.fs" />
   </ItemGroup>
 
   <ItemGroup>
