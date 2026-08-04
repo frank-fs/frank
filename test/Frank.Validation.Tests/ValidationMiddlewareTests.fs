@@ -65,6 +65,41 @@ let private createTestServerWith (shapesGraph: VDS.RDF.Shacl.ShapesGraph option)
 let private createTestServer (validated: bool) =
     createTestServerWith (if validated then Some moveShapesGraph else None)
 
+/// A server whose handler reads the pre-parsed graph back out through the PUBLIC accessor -- the
+/// "handler doesn't re-parse" feature the design doc documents (final-review finding I4). Kept
+/// separate from createTestServerWith because the other tests assert on that handler's exact body.
+let private createGraphEchoServer () =
+    let builder =
+        Host
+            .CreateDefaultBuilder([||])
+            .ConfigureWebHost(fun webBuilder ->
+                webBuilder
+                    .UseTestServer()
+                    .ConfigureServices(fun services -> services.AddRouting() |> ignore)
+                    .Configure(fun app ->
+                        app
+                        |> fun app -> app.UseRouting()
+                        |> Frank.Validation.WebHostBuilderExtensions.useValidationMiddleware
+                        |> fun app ->
+                            app.UseEndpoints(fun endpoints ->
+                                endpoints
+                                    .MapPost(
+                                        "/moves",
+                                        Func<HttpContext, Task>(fun ctx ->
+                                            match Validation.tryGetValidatedGraph ctx with
+                                            | Some g ->
+                                                ctx.Response.WriteAsync(sprintf "triples=%d" g.Triples.Count)
+                                            | None -> ctx.Response.WriteAsync "no-graph")
+                                    )
+                                    .WithMetadata(ValidationMetadata moveShapesGraph)
+                                |> ignore)
+                            |> ignore)
+                |> ignore)
+
+    let host = builder.Build()
+    host.Start()
+    host.GetTestClient()
+
 [<Tests>]
 let tests =
     testList
@@ -159,6 +194,35 @@ let tests =
                   response.Content.Headers.ContentType.MediaType
                   "application/problem+json"
                   "413 is problem+json, same as 400/422"
+          }
+
+          // Final-review finding I4: the design doc documents stashing the parsed graph so a
+          // downstream handler -- in a CONSUMING application, a different assembly -- can read it
+          // back without re-parsing, and the sample's comment claims as much. ValidatedGraphKey is
+          // internal, so as shipped no external consumer could reach it at all. There is now a
+          // public accessor that doesn't leak the magic string either.
+          testTask "a handler can read the pre-parsed graph back through the public accessor" {
+              let client = createGraphEchoServer ()
+
+              let! (response: HttpResponseMessage) =
+                  client.PostAsync("/moves", new StringContent(conformingBody, Encoding.UTF8, "application/ld+json"))
+
+              Expect.equal response.StatusCode HttpStatusCode.OK "handler ran"
+              let! body = response.Content.ReadAsStringAsync()
+
+              Expect.equal
+                  body
+                  "triples=2"
+                  "the handler saw the graph the middleware already parsed (rdf:type + schema:position)"
+          }
+
+          testTask "tryGetValidatedGraph returns None when nothing was validated" {
+              let client = createTestServer false
+
+              let! (response: HttpResponseMessage) =
+                  client.PostAsync("/moves", new StringContent(violatingBody, Encoding.UTF8, "application/ld+json"))
+
+              Expect.equal response.StatusCode HttpStatusCode.OK "unvalidated pass-through"
           }
 
           // Final-review finding C1, end to end: a literal focus node (TargetSpec.ObjectsOf) used to

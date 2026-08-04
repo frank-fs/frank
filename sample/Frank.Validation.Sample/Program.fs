@@ -20,44 +20,61 @@ let private games = dict [ "1", "Tic-tac-toe"; "2", "Connect Four" ]
 // paired with sh:targetClass conventionally ignore rdf:type for exactly this reason.
 let private personShape =
     shape (targetClass (Uri "https://schema.org/Person")) {
-        properties [
-            property (PropertyPath.Predicate(Uri "https://schema.org/name")) { datatype XsdDatatype.String; minCount 1; maxCount 1 }
-            property (PropertyPath.Predicate(Uri "https://schema.org/email")) { datatype XsdDatatype.String; maxCount 1 }
-        ]
+        properties
+            [ property (PropertyPath.Predicate(Uri "https://schema.org/name")) {
+                  datatype XsdDatatype.String
+                  minCount 1
+                  maxCount 1
+              }
+              property (PropertyPath.Predicate(Uri "https://schema.org/email")) {
+                  datatype XsdDatatype.String
+                  maxCount 1
+              } ]
+
         closed [ Uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" ]
     }
 
 let private moveShape =
     shape (targetClass (Uri "https://schema.org/MoveAction")) {
-        properties [
-            property (PropertyPath.Predicate(Uri "https://schema.org/position")) {
-                datatype XsdDatatype.Integer
-                minCount 1
-                maxCount 1
-            }
-            property (PropertyPath.Predicate(Uri "https://schema.org/agent")) {
-                node personShape
-                minCount 1
-                maxCount 1
-            }
-        ]
+        properties
+            [ property (PropertyPath.Predicate(Uri "https://schema.org/position")) {
+                  datatype XsdDatatype.Integer
+                  minCount 1
+                  maxCount 1
+              }
+              property (PropertyPath.Predicate(Uri "https://schema.org/agent")) {
+                  node personShape
+                  minCount 1
+                  maxCount 1
+              } ]
     }
 
 let private moveShapesGraph = Shacl.toShapesGraph [ moveShape; personShape ]
 
 // Plain JSON confirmation of a move that already passed SHACL validation -- the middleware has
-// already buffered/parsed/validated the body by the time this handler runs; ctx.Items carries the
-// parsed graph (ValidatedGraphKey) if a handler wants it without re-parsing, though this sample's
-// handler is simple enough not to need it.
+// already buffered, parsed and validated the body by the time this handler runs.
+// `Validation.tryGetValidatedGraph ctx` hands back that already-parsed graph, so a handler never
+// re-parses the body it was just given; the triple count below is the one-line demonstration.
 let private postMove =
     fun (ctx: HttpContext) ->
         task {
             let id = string ctx.Request.RouteValues.["id"]
 
+            let triplesValidated =
+                match Validation.tryGetValidatedGraph ctx with
+                | Some graph -> graph.Triples.Count
+                | None -> 0
+
             match games.TryGetValue id with
             | true, _ ->
                 ctx.Response.StatusCode <- 201
-                do! ctx.Response.WriteAsJsonAsync({| gameId = id; accepted = true |})
+
+                do!
+                    ctx.Response.WriteAsJsonAsync(
+                        {| gameId = id
+                           accepted = true
+                           triplesValidated = triplesValidated |}
+                    )
             | false, _ ->
                 ctx.Response.StatusCode <- 404
                 do! ctx.Response.WriteAsJsonAsync({| error = $"no game with id {id}" |})

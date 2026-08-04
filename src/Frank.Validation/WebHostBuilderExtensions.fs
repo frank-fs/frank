@@ -260,3 +260,28 @@ module WebHostBuilderExtensions =
         member _.UseValidation(spec: WebHostSpec) : WebHostSpec =
             { spec with
                 Middleware = spec.Middleware >> useValidationMiddleware }
+
+/// The one piece of this package a downstream HANDLER (in a consuming application, a different
+/// assembly) needs at request time. Deliberately NOT [<AutoOpen>]: `Validation.tryGetValidatedGraph`
+/// reads better at the call site than a bare `tryGetValidatedGraph`, and the module has exactly one
+/// member, so there is nothing to gain from pulling it into scope implicitly.
+module Validation =
+    /// The graph the interceptor already parsed and validated for this request, if there was one.
+    ///
+    /// `Some graph` for a POST/PUT/PATCH `application/ld+json` request to a `useValidation`-declared
+    /// resource that CONFORMED -- so a handler never has to re-parse the body it was just handed.
+    /// `None` for every other request: an unvalidated resource, a non-matching method or
+    /// Content-Type, or a request that never reached the handler at all (a violating body 422s
+    /// before this could be asked).
+    ///
+    /// This exists because the graph is stashed under a private HttpContext.Items key. Consumers get
+    /// this function rather than the key itself, so the string stays an implementation detail
+    /// (final-review finding I4 -- as shipped the key was `internal`, making the whole
+    /// "handler doesn't re-parse" feature unreachable outside this assembly).
+    let tryGetValidatedGraph (ctx: HttpContext) : VDS.RDF.IGraph option =
+        match ctx.Items.TryGetValue WebHostBuilderExtensions.ValidatedGraphKey with
+        | true, value ->
+            match value with
+            | :? VDS.RDF.IGraph as graph -> Some graph
+            | _ -> None
+        | _ -> None
