@@ -16,6 +16,7 @@
     <Compile Include="ShapeBuilderTests.fs" />
     <Compile Include="ReportRoundTripTests.fs" />
     <Compile Include="ResourceBuilderExtensionsTests.fs" />
+    <Compile Include="ValidationMiddlewareTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
