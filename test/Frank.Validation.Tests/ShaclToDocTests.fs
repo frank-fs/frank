@@ -518,12 +518,87 @@ let tests =
                     let xoneDoc = Shacl.toDoc [ ShapeDecl.Xone { Head = a; Tail = [ b ] } ]
                     let notDoc = Shacl.toDoc [ ShapeDecl.Not a ]
 
+                    // Check And predicate and rdf:list structure
                     Expect.exists andDoc.Statements (fun (_, p, _) -> p = "sh:and") "sh:and present"
+
+                    let andFirsts = andDoc.Statements |> List.filter (fun (_, p, _) -> p = "rdf:first")
+
+                    Expect.isGreaterThanOrEqual
+                        andFirsts.Length
+                        2
+                        "And combinator list has at least 2 rdf:first cells (A and B shapes)"
+
+                    let andRests = andDoc.Statements |> List.filter (fun (_, p, _) -> p = "rdf:rest")
+                    Expect.isGreaterThanOrEqual andRests.Length 2 "And combinator list has at least 2 rdf:rest cells"
+
+                    let andNilRests =
+                        andRests
+                        |> List.filter (fun (_, _, v) ->
+                            v = Value.Node(Node.Iri "http://www.w3.org/1999/02/22-rdf-syntax-ns#nil"))
+
+                    Expect.isGreaterThanOrEqual andNilRests.Length 1 "And combinator list terminates in rdf:nil"
+
+                    Expect.exists
+                        andDoc.Statements
+                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/A" && p = RdfTypeIri)
+                        "Shape A's own rdf:type sh:NodeShape triple is present"
+
+                    Expect.exists
+                        andDoc.Statements
+                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/B" && p = RdfTypeIri)
+                        "Shape B's own rdf:type sh:NodeShape triple is present"
+
+                    // Check Or predicate and rdf:list structure
                     Expect.exists orDoc.Statements (fun (_, p, _) -> p = "sh:or") "sh:or present"
+
+                    let orFirsts = orDoc.Statements |> List.filter (fun (_, p, _) -> p = "rdf:first")
+                    Expect.isGreaterThanOrEqual orFirsts.Length 2 "Or combinator list has at least 2 rdf:first cells"
+
+                    let orRests = orDoc.Statements |> List.filter (fun (_, p, _) -> p = "rdf:rest")
+                    Expect.isGreaterThanOrEqual orRests.Length 2 "Or combinator list has at least 2 rdf:rest cells"
+
+                    Expect.exists
+                        orDoc.Statements
+                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/A" && p = RdfTypeIri)
+                        "Shape A's own rdf:type is present in Or"
+
+                    Expect.exists
+                        orDoc.Statements
+                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/B" && p = RdfTypeIri)
+                        "Shape B's own rdf:type is present in Or"
+
+                    // Check Xone predicate and rdf:list structure
                     Expect.exists xoneDoc.Statements (fun (_, p, _) -> p = "sh:xone") "sh:xone present"
 
+                    let xoneFirsts =
+                        xoneDoc.Statements |> List.filter (fun (_, p, _) -> p = "rdf:first")
+
+                    Expect.isGreaterThanOrEqual
+                        xoneFirsts.Length
+                        2
+                        "Xone combinator list has at least 2 rdf:first cells"
+
+                    let xoneRests = xoneDoc.Statements |> List.filter (fun (_, p, _) -> p = "rdf:rest")
+                    Expect.isGreaterThanOrEqual xoneRests.Length 2 "Xone combinator list has at least 2 rdf:rest cells"
+
+                    Expect.exists
+                        xoneDoc.Statements
+                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/A" && p = RdfTypeIri)
+                        "Shape A's own rdf:type is present in Xone"
+
+                    Expect.exists
+                        xoneDoc.Statements
+                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/B" && p = RdfTypeIri)
+                        "Shape B's own rdf:type is present in Xone"
+
+                    // Check Not predicate (single reference, no list)
                     Expect.exists
                         notDoc.Statements
                         (fun (_, p, v) -> p = "sh:not" && v = Value.Node(Node.Iri "https://schema.org/A"))
                         "sh:not points directly at the negated shape"
+
+                    Expect.exists
+                        notDoc.Statements
+                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/A" && p = RdfTypeIri)
+                        "Shape A's own rdf:type is present in Not"
                 } ] ]
