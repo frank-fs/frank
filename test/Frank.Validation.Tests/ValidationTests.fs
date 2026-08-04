@@ -258,6 +258,106 @@ let tests =
                       "reported as a SPARQL constraint component"
           }
 
+          // Final-review finding I2, the dangerous half: a CLOSED shape merging with an OPEN shape
+          // over the same class silently expanded the closed shape's allowed-property set with the
+          // open shape's paths -- data that must be rejected was accepted, with no diagnostic.
+          test "a closed shape is NOT widened by a second, independent shape over the same class" {
+              let closedToName =
+                  recordShape
+                      (targetClass (Uri "https://schema.org/Person"))
+                      [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/name"))
+                        |> addConstraint (PropertyConstraint.MinCount 1) ]
+                  |> function
+                      | ShapeDecl.RecordShape spec ->
+                          ShapeDecl.RecordShape
+                              { spec with
+                                  Closed = true
+                                  IgnoredProperties = [ Uri RdfTypeIri ] }
+                      | other -> other
+
+              let requiresEmail =
+                  recordShape
+                      (targetClass (Uri "https://schema.org/Person"))
+                      [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/email"))
+                        |> addConstraint (PropertyConstraint.MinCount 1) ]
+
+              let sg = Shacl.toShapesGraph [ closedToName; requiresEmail ]
+
+              let dataGraph =
+                  let g = Graph() :> IGraph
+                  let inst = g.CreateUriNode(UriFactory.Create "https://example.org/p1")
+
+                  g.Assert(
+                      Triple(
+                          inst,
+                          g.CreateUriNode(UriFactory.Create RdfTypeIri),
+                          g.CreateUriNode(UriFactory.Create "https://schema.org/Person")
+                      )
+                  )
+                  |> ignore
+
+                  g.Assert(
+                      Triple(
+                          inst,
+                          g.CreateUriNode(UriFactory.Create "https://schema.org/name"),
+                          g.CreateLiteralNode "Alice"
+                      )
+                  )
+                  |> ignore
+
+                  g.Assert(
+                      Triple(
+                          inst,
+                          g.CreateUriNode(UriFactory.Create "https://schema.org/email"),
+                          g.CreateLiteralNode "alice@example.org"
+                      )
+                  )
+                  |> ignore
+
+                  g
+
+              match Shacl.validate sg dataGraph with
+              | ValidationOutcome.Conforms ->
+                  failtest
+                      "expected Violates -- schema:email is outside the closed shape's allowed set; conforming here means the two shapes merged"
+              | ValidationOutcome.Violates violations ->
+                  Expect.isNonEmpty violations "the closed shape still rejects schema:email"
+
+                  Expect.isTrue
+                      (violations
+                       |> List.exists (fun v ->
+                           v.ConstraintComponent = Uri "http://www.w3.org/ns/shacl#ClosedConstraintComponent"))
+                      "and it is the closedness constraint that fires"
+          }
+
+          test "two independent shapes over one class are BOTH enforced" {
+              let requiresName =
+                  recordShape
+                      (targetClass (Uri "https://schema.org/Person"))
+                      [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/name"))
+                        |> addConstraint (PropertyConstraint.MinCount 1) ]
+
+              let requiresEmail =
+                  recordShape
+                      (targetClass (Uri "https://schema.org/Person"))
+                      [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/email"))
+                        |> addConstraint (PropertyConstraint.MinCount 1) ]
+
+              let sg = Shacl.toShapesGraph [ requiresName; requiresEmail ]
+
+              let dataGraph =
+                  dataGraphWithType "https://schema.org/Person" "https://example.org/p2" []
+
+              match Shacl.validate sg dataGraph with
+              | ValidationOutcome.Conforms -> failtest "expected Violates -- both name and email are missing"
+              | ValidationOutcome.Violates violations ->
+                  Expect.hasLength violations 2 "one violation per shape, neither swallowed by the other"
+
+                  Expect.isTrue
+                      (violations |> List.map (fun v -> v.SourceShape) |> List.distinct |> List.length = 2)
+                      "reported against two DISTINCT source shapes"
+          }
+
           test "an empty data graph conforms trivially against a targetClass shape (nothing to target)" {
               let shape =
                   recordShape

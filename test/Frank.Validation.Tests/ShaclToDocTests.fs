@@ -21,6 +21,20 @@ let private captureInvalidOp (f: unit -> unit) : InvalidOperationException =
     | Some ex -> ex
     | None -> failtest "expected an InvalidOperationException, but none was raised"
 
+/// A shape's RDF subject is a freshly minted blank node, NOT its target class's IRI (final-review
+/// finding I2), so tests locate a shape by the target triple that points AT the class.
+let private subjectOfTarget (doc: Doc) (predicate: string) (targetIri: string) : Node =
+    doc.Statements
+    |> List.tryPick (fun (s, p, v) ->
+        if p = predicate && v = Value.Node(Node.Iri targetIri) then
+            Some s
+        else
+            None)
+    |> Option.defaultWith (fun () -> failtestf "no %s statement pointing at %s" predicate targetIri)
+
+let private subjectOfTargetClass (doc: Doc) (classIri: string) : Node =
+    subjectOfTarget doc "sh:targetClass" classIri
+
 let private hasTriple (doc: Doc) (predicateSuffix: string) : bool =
     doc.Statements
     |> List.exists (fun (_, p, _) -> p.EndsWith(predicateSuffix: string))
@@ -129,12 +143,115 @@ let tests =
                         "sh:alternativePath present"
                 } ]
 
+          // Final-review finding I2. A RecordShape's RDF subject used to be DERIVED from its first
+          // TargetSpec.Class, so two structurally different, independently constructed shapes over
+          // the same class collided onto one subject and merged. Task 19's reference-identity memo
+          // does not catch this -- it only dedupes the SAME object reached twice. The merge was
+          // silently dangerous: a closed shape's allowed-property set grew by the other shape's
+          // paths. Shape subjects are now always freshly minted, and sh:targetClass is an ordinary
+          // triple pointing FROM the shape TO the class, exactly like the other three TargetSpec
+          // cases already did.
+          testList
+              "two shapes over one target class"
+              [ test "two independently-constructed shapes with the same targetClass get DISTINCT subjects" {
+                    let withName =
+                        recordShape
+                            (targetClass (Uri "https://schema.org/Person"))
+                            [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/name"))
+                              |> addConstraint (PropertyConstraint.MinCount 1) ]
+
+                    let withEmail =
+                        recordShape
+                            (targetClass (Uri "https://schema.org/Person"))
+                            [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/email"))
+                              |> addConstraint (PropertyConstraint.MinCount 1) ]
+
+                    let doc = Shacl.toDoc [ withName; withEmail ]
+
+                    let shapeSubjects =
+                        doc.Statements
+                        |> List.filter (fun (_, p, v) ->
+                            p = "sh:targetClass" && v = Value.Node(Node.Iri "https://schema.org/Person"))
+                        |> List.map (fun (s, _, _) -> s)
+
+                    Expect.hasLength shapeSubjects 2 "two sh:targetClass triples, one per shape"
+
+                    Expect.isTrue
+                        (shapeSubjects |> List.distinct |> List.length = 2)
+                        "and they sit on two DISTINCT subjects, so neither shape's constraints leak into the other"
+
+                    for subject in shapeSubjects do
+                        let props =
+                            doc.Statements
+                            |> List.filter (fun (s, p, _) -> s = subject && p = "sh:property")
+
+                        Expect.hasLength props 1 "each shape keeps exactly its own one property shape"
+                }
+
+                test "a shape's subject is a blank node, never its target class's IRI" {
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/Person")) [] ]
+
+                    let subject = subjectOfTargetClass doc "https://schema.org/Person"
+
+                    match subject with
+                    | Node.Blank _ -> ()
+                    | Node.Iri iri ->
+                        failtestf
+                            "shape subject is the class IRI (%s) -- that is what makes two shapes over one class collide"
+                            iri
+
+                    Expect.all
+                        doc.Statements
+                        (fun (s, _, _) -> s <> Node.Iri "https://schema.org/Person")
+                        "nothing is asserted with the target class itself as subject"
+                }
+
+                test "an EnumShape's subject is a blank node too, with sh:targetClass pointing at the class" {
+                    let doc =
+                        Shacl.toDoc
+                            [ enumShape
+                                  (Uri "https://schema.org/GameStatusType")
+                                  (Uri "https://schema.org/Active")
+                                  [ Uri "https://schema.org/Completed" ] ]
+
+                    let subject = subjectOfTargetClass doc "https://schema.org/GameStatusType"
+
+                    match subject with
+                    | Node.Blank _ -> ()
+                    | Node.Iri iri -> failtestf "EnumShape subject is the class IRI (%s)" iri
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (s, p, _) -> s = subject && p = "sh:in")
+                        "sh:in hangs off the shape's own subject"
+                }
+
+                test "two EnumShapes over one class keep their sh:in lists apart" {
+                    let a =
+                        enumShape (Uri "https://schema.org/Status") (Uri "https://schema.org/Active") []
+
+                    let b =
+                        enumShape (Uri "https://schema.org/Status") (Uri "https://schema.org/Done") []
+
+                    let doc = Shacl.toDoc [ a; b ]
+
+                    let ins = doc.Statements |> List.filter (fun (_, p, _) -> p = "sh:in")
+
+                    Expect.hasLength ins 2 "two sh:in statements"
+
+                    Expect.isTrue
+                        (ins |> List.map (fun (s, _, _) -> s) |> List.distinct |> List.length = 2)
+                        "on two distinct subjects -- one shape must not see the other's allowed values"
+                } ]
+
           testList
               "RecordShape skeleton"
               [ test "an untyped, unconstrained RecordShape declares sh:NodeShape and its target class" {
                     let decl = recordShape (targetClass (Uri "https://schema.org/MoveAction")) []
                     let doc = Shacl.toDoc [ decl ]
-                    let subject = Node.Iri "https://schema.org/MoveAction"
+                    // The subject is a freshly minted blank node, not the class IRI -- finding I2.
+                    let subject = subjectOfTargetClass doc "https://schema.org/MoveAction"
 
                     Expect.exists
                         doc.Statements
@@ -143,15 +260,18 @@ let tests =
 
                     Expect.exists
                         doc.Statements
-                        (fun (s, p, v) -> s = subject && p = "sh:targetClass" && v = Value.Node subject)
-                        "sh:targetClass"
+                        (fun (s, p, v) ->
+                            s = subject
+                            && p = "sh:targetClass"
+                            && v = Value.Node(Node.Iri "https://schema.org/MoveAction"))
+                        "sh:targetClass points FROM the shape TO the class"
                 }
 
                 test "a property shape becomes a blank-node sh:property with sh:path -- no constraint triples yet" {
                     let prop = ofPath (PropertyPath.Predicate(Uri "https://schema.org/position"))
                     let decl = recordShape (targetClass (Uri "https://schema.org/MoveAction")) [ prop ]
                     let doc = Shacl.toDoc [ decl ]
-                    let subject = Node.Iri "https://schema.org/MoveAction"
+                    let subject = subjectOfTargetClass doc "https://schema.org/MoveAction"
 
                     let propertyBlankNodes =
                         doc.Statements
@@ -459,14 +579,16 @@ let tests =
                     let doc =
                         Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/MoveAction")) [ agentProp ] ]
 
-                    Expect.exists
-                        doc.Statements
-                        (fun (_, p, v) -> p = "sh:node" && v = Value.Node(Node.Iri "https://schema.org/Person"))
-                        "sh:node points at Person's own IRI"
+                    let personSubject = subjectOfTargetClass doc "https://schema.org/Person"
 
                     Expect.exists
                         doc.Statements
-                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/Person" && p = RdfTypeIri)
+                        (fun (_, p, v) -> p = "sh:node" && v = Value.Node personSubject)
+                        "sh:node points at Person's own shape subject"
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (s, p, _) -> s = personSubject && p = RdfTypeIri)
                         "Person's own sh:NodeShape triples are present too"
                 }
 
@@ -489,7 +611,7 @@ let tests =
                         recordShape (targetClass (Uri "https://schema.org/MoveAction")) [ agentProp ]
 
                     let doc = Shacl.toDoc [ moveShape; personShape ]
-                    let personSubject = Node.Iri "https://schema.org/Person"
+                    let personSubject = subjectOfTargetClass doc "https://schema.org/Person"
 
                     let personPropertyStatements =
                         doc.Statements
@@ -524,18 +646,14 @@ let tests =
 
                     let doc = Shacl.toDoc [ agentShape; activityShape ]
 
-                    let agentSubject = Node.Iri "http://www.w3.org/ns/prov#Agent"
-                    let activitySubject = Node.Iri "http://www.w3.org/ns/prov#Activity"
+                    let agentSubject = subjectOfTargetClass doc "http://www.w3.org/ns/prov#Agent"
 
-                    Expect.exists
-                        doc.Statements
-                        (fun (s, p, v) -> s = agentSubject && p = "sh:targetClass" && v = Value.Node agentSubject)
-                        "Agent's own sh:targetClass triple is present"
+                    let activitySubject = subjectOfTargetClass doc "http://www.w3.org/ns/prov#Activity"
 
-                    Expect.exists
-                        doc.Statements
-                        (fun (s, p, v) -> s = activitySubject && p = "sh:targetClass" && v = Value.Node activitySubject)
-                        "Activity's own sh:targetClass triple is present -- NOT silently dropped by a fragment hash collision"
+                    Expect.notEqual
+                        agentSubject
+                        activitySubject
+                        "Activity's shape is its OWN subject -- NOT silently dropped by a fragment hash collision"
 
                     let agentPropertyStatements =
                         doc.Statements
@@ -652,12 +770,12 @@ let tests =
 
                     Expect.exists
                         andDoc.Statements
-                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/A" && p = RdfTypeIri)
+                        (fun (s, p, _) -> s = subjectOfTargetClass andDoc "https://schema.org/A" && p = RdfTypeIri)
                         "Shape A's own rdf:type sh:NodeShape triple is present"
 
                     Expect.exists
                         andDoc.Statements
-                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/B" && p = RdfTypeIri)
+                        (fun (s, p, _) -> s = subjectOfTargetClass andDoc "https://schema.org/B" && p = RdfTypeIri)
                         "Shape B's own rdf:type sh:NodeShape triple is present"
 
                     // Check Or predicate and rdf:list structure
@@ -671,12 +789,12 @@ let tests =
 
                     Expect.exists
                         orDoc.Statements
-                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/A" && p = RdfTypeIri)
+                        (fun (s, p, _) -> s = subjectOfTargetClass orDoc "https://schema.org/A" && p = RdfTypeIri)
                         "Shape A's own rdf:type is present in Or"
 
                     Expect.exists
                         orDoc.Statements
-                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/B" && p = RdfTypeIri)
+                        (fun (s, p, _) -> s = subjectOfTargetClass orDoc "https://schema.org/B" && p = RdfTypeIri)
                         "Shape B's own rdf:type is present in Or"
 
                     // Check Xone predicate and rdf:list structure
@@ -695,23 +813,25 @@ let tests =
 
                     Expect.exists
                         xoneDoc.Statements
-                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/A" && p = RdfTypeIri)
+                        (fun (s, p, _) -> s = subjectOfTargetClass xoneDoc "https://schema.org/A" && p = RdfTypeIri)
                         "Shape A's own rdf:type is present in Xone"
 
                     Expect.exists
                         xoneDoc.Statements
-                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/B" && p = RdfTypeIri)
+                        (fun (s, p, _) -> s = subjectOfTargetClass xoneDoc "https://schema.org/B" && p = RdfTypeIri)
                         "Shape B's own rdf:type is present in Xone"
 
                     // Check Not predicate (single reference, no list)
                     Expect.exists
                         notDoc.Statements
-                        (fun (_, p, v) -> p = "sh:not" && v = Value.Node(Node.Iri "https://schema.org/A"))
+                        (fun (_, p, v) ->
+                            p = "sh:not"
+                            && v = Value.Node(subjectOfTargetClass notDoc "https://schema.org/A"))
                         "sh:not points directly at the negated shape"
 
                     Expect.exists
                         notDoc.Statements
-                        (fun (s, p, _) -> s = Node.Iri "https://schema.org/A" && p = RdfTypeIri)
+                        (fun (s, p, _) -> s = subjectOfTargetClass notDoc "https://schema.org/A" && p = RdfTypeIri)
                         "Shape A's own rdf:type is present in Not"
                 } ]
 
@@ -725,12 +845,15 @@ let tests =
                             [ Uri "https://schema.org/Completed" ]
 
                     let doc = Shacl.toDoc [ decl ]
-                    let subject = Node.Iri "https://schema.org/GameStatusType"
+                    let subject = subjectOfTargetClass doc "https://schema.org/GameStatusType"
 
                     Expect.exists
                         doc.Statements
-                        (fun (s, p, v) -> s = subject && p = "sh:targetClass" && v = Value.Node subject)
-                        "sh:targetClass"
+                        (fun (s, p, v) ->
+                            s = subject
+                            && p = "sh:targetClass"
+                            && v = Value.Node(Node.Iri "https://schema.org/GameStatusType"))
+                        "sh:targetClass points FROM the shape TO the class"
 
                     Expect.exists doc.Statements (fun (s, p, _) -> s = subject && p = "sh:in") "sh:in present"
                 }

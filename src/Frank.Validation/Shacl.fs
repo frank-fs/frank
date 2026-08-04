@@ -262,12 +262,21 @@ module Shacl =
         | false, _ ->
             match decl with
             | ShapeDecl.RecordShape spec ->
-                let subject =
-                    spec.Targets
-                    |> List.tryPick (function
-                        | TargetSpec.Class uri -> Some(Node.Iri uri.AbsoluteUri)
-                        | _ -> None)
-                    |> Option.defaultWith Node.blank
+                // ALWAYS a fresh subject -- never derived from a TargetSpec.Class (final-review
+                // finding I2). Deriving it made shape identity a function of the TARGET rather than
+                // of the shape, so two structurally different, independently constructed ShapeDecls
+                // over the same class landed on one subject and merged: duplicate violations at
+                // best, and at worst a closed shape whose allowed-property set silently grew by the
+                // other shape's paths, quietly accepting data it was written to reject. Two shapes
+                // over one class is ordinary, legal SHACL -- dotNetRDF runs both against every
+                // class-matched node, which is exactly what the author asked for. sh:targetClass is
+                // now just a triple pointing FROM the shape TO the class, the same way
+                // sh:targetNode/sh:targetSubjectsOf/sh:targetObjectsOf always worked.
+                //
+                // Shape identity is therefore purely the ShapeDecl VALUE, via the reference-identity
+                // memo below -- the "validates standalone AND nests" sharing pattern still emits
+                // once, because that really is one object reached twice.
+                let subject = Node.blank ()
 
                 memo.[decl] <- subject
 
@@ -333,10 +342,16 @@ module Shacl =
                 let innerSubject, innerStmts = shapeStatements memo inner
                 bn, stmt bn "sh:not" (Value.Node innerSubject) :: innerStmts
             | ShapeDecl.EnumShape(targetClassUri, cases) ->
-                let subject = Node.Iri targetClassUri.AbsoluteUri
+                // Fresh subject, same reasoning as RecordShape above (finding I2): two EnumShapes
+                // over one class used to collide onto the class IRI and have their sh:in lists
+                // merged onto a single subject -- two sh:in values on one shape, which SHACL does
+                // not define.
+                let subject = Node.blank ()
                 memo.[decl] <- subject
                 let typeStmt = stmt subject RdfTypeIri (Value.Node(Node.Iri "sh:NodeShape"))
-                let targetStmt = stmt subject "sh:targetClass" (Value.Node subject)
+
+                let targetStmt =
+                    stmt subject "sh:targetClass" (Value.Node(Node.Iri targetClassUri.AbsoluteUri))
 
                 let items =
                     NonEmptyList.toList cases
