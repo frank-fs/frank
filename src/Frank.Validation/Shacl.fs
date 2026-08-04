@@ -199,14 +199,31 @@ module Shacl =
     /// literal/IRI triples on the shared subject collapsed harmlessly via RDF set semantics, but the
     /// duplicate sh:property blank nodes did not (each is unique by construction), so dotNetRDF's
     /// SHACL engine saw two distinct-but-content-identical property shapes and raised every
-    /// violation on that shape twice. `ShapeDecl` and everything it transitively contains use F#'s
-    /// default structural equality (no [<CustomEquality>] anywhere in ShapeTypes.fs), so memoizing by
-    /// value -- not by reference -- is safe: two structurally-identical shapes (whether the exact
-    /// same value reused, or two independently-constructed values that happen to match) are
-    /// semantically the same SHACL shape regardless of how they were built, and collapsing them to
-    /// one shared subject changes nothing about what a data graph validates against. Memoized BEFORE
-    /// recursing into a shape's own children (properties/members), which would also stop a
-    /// self-referential shape graph from looping -- not reachable today since ShapeDecl is an
+    /// violation on that shape twice.
+    ///
+    /// The memo is keyed by REFERENCE identity (HashIdentity.Reference below), not structural
+    /// equality -- deliberately, after an earlier structural-equality version of this fix (fix round
+    /// 1) turned out to be a worse bug than the one it fixed. System.Uri.Equals/GetHashCode ignore
+    /// the URI fragment, so under F#'s generic structural equality two shapes differing only after a
+    /// `#` (e.g. targetClass "http://www.w3.org/ns/prov#Agent" vs "...#Activity" -- the DOMINANT IRI
+    /// convention for hand-authored RDF vocabularies: prov#, rdf#, rdfs#, owl#, skos#, sh#, and
+    /// virtually every ontology#Term namespace, including this very repo's own Frank.Provenance)
+    /// compared equal and collided in the Dictionary, silently dropping the second shape's triples
+    /// entirely (or misrouting a nested sh:node reference to the wrong shape) with no exception, no
+    /// warning. Reference identity has no such false-collapse risk: it only memo-hits when the exact
+    /// same ShapeDecl VALUE (the same `let`-bound object, as personShape is in both the sample and
+    /// this file's round-1 regression test) is reached a second time, which is precisely -- and only
+    /// -- the "validates standalone AND nests" pattern this fix targets. Two independently-
+    /// constructed shapes that happen to be structurally similar (or IRI-fragment-hash-colliding) are
+    /// never memoized together and each gets its own correct emission, exactly as before this whole
+    /// fix existed. NOTE: this means two independently-built-but-content-identical ShapeDecl values
+    /// are NOT deduplicated -- only genuinely shared (same-reference) shapes are. That is
+    /// deliberately the narrower, safer guarantee; broadening it to structural-equality-with-correct-
+    /// IRI-comparison (a custom IEqualityComparer<ShapeDecl> comparing Uri.AbsoluteUri strings rather
+    /// than Uri.Equals) would need its own design/test pass and isn't required by any task's spec.
+    ///
+    /// Memoized BEFORE recursing into a shape's own children (properties/members), which would also
+    /// stop a self-referential shape graph from looping -- not reachable today since ShapeDecl is an
     /// ordinary immutable tree with no way to construct a true cycle, but cheap insurance regardless.
     and private shapeStatements
         (memo: Dictionary<ShapeDecl, Node>)
@@ -302,8 +319,10 @@ module Shacl =
 
     let toDoc (shapes: ShapeDecl list) : Doc =
         // Fresh per call -- dedup only applies within a single toDoc invocation's shape list, never
-        // across separate calls.
-        let memo = Dictionary<ShapeDecl, Node>(HashIdentity.Structural)
+        // across separate calls. Reference identity, not structural equality -- see the doc comment
+        // on shapeStatements for why (structural equality silently collapsed shapes that differ only
+        // by IRI fragment, e.g. prov#Agent vs prov#Activity).
+        let memo = Dictionary<ShapeDecl, Node>(HashIdentity.Reference)
         let statements = shapes |> List.collect (shapeStatements memo >> snd)
 
         { Prefixes = shaclPrefixes

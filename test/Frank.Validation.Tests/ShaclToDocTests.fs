@@ -488,6 +488,73 @@ let tests =
                 }
 
                 test
+                    "two independently-constructed shapes differing only by IRI fragment (e.g. prov#Agent vs prov#Activity) both appear fully -- not silently dropped or hash-collided" {
+                    // System.Uri.Equals/GetHashCode ignore the URI fragment, so a memo keyed by naive
+                    // structural equality treats two shapes as equal whenever every field EXCEPT the
+                    // fragment portion of a targetClass Uri matches -- exactly what both shapes below
+                    // do (both require schema:name, differing only in whether their target class ends
+                    // in #Agent or #Activity). Hash-fragment IRIs (prov#, rdf#, rdfs#, owl#, skos#,
+                    // sh#, ...) are the dominant convention for hand-authored RDF vocabularies --
+                    // including this repo's own Frank.Provenance -- so this is not an exotic edge case.
+                    let agentShape =
+                        recordShape
+                            (targetClass (Uri "http://www.w3.org/ns/prov#Agent"))
+                            [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/name"))
+                              |> addConstraint (PropertyConstraint.MinCount 1) ]
+
+                    let activityShape =
+                        recordShape
+                            (targetClass (Uri "http://www.w3.org/ns/prov#Activity"))
+                            [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/name"))
+                              |> addConstraint (PropertyConstraint.MinCount 1) ]
+
+                    let doc = Shacl.toDoc [ agentShape; activityShape ]
+
+                    let agentSubject = Node.Iri "http://www.w3.org/ns/prov#Agent"
+                    let activitySubject = Node.Iri "http://www.w3.org/ns/prov#Activity"
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (s, p, v) -> s = agentSubject && p = "sh:targetClass" && v = Value.Node agentSubject)
+                        "Agent's own sh:targetClass triple is present"
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (s, p, v) -> s = activitySubject && p = "sh:targetClass" && v = Value.Node activitySubject)
+                        "Activity's own sh:targetClass triple is present -- NOT silently dropped by a fragment hash collision"
+
+                    let agentPropertyStatements =
+                        doc.Statements
+                        |> List.filter (fun (s, p, _) -> s = agentSubject && p = "sh:property")
+
+                    let activityPropertyStatements =
+                        doc.Statements
+                        |> List.filter (fun (s, p, _) -> s = activitySubject && p = "sh:property")
+
+                    Expect.hasLength
+                        agentPropertyStatements
+                        1
+                        "Agent has its own sh:property (schema:name) -- not silently dropped"
+
+                    Expect.hasLength
+                        activityPropertyStatements
+                        1
+                        "Activity has its own sh:property (schema:name) -- not silently dropped or merged into Agent's"
+
+                    // Both shapes constrain the same predicate (schema:name), so the meaningful check
+                    // here isn't "which path" but "did each shape get its OWN sh:property blank node"
+                    // -- a hash collision would either drop Activity's property entirely (asserted
+                    // above already) or, worse, have both shapes point at the very same blank node.
+                    match agentPropertyStatements, activityPropertyStatements with
+                    | [ (_, _, Value.Node agentPropBn) ], [ (_, _, Value.Node activityPropBn) ] ->
+                        Expect.notEqual
+                            agentPropBn
+                            activityPropBn
+                            "Agent's and Activity's sh:property blank nodes are distinct -- each shape's constraint is its own, not shared/misrouted"
+                    | other -> failtestf "expected exactly one sh:property statement per shape, got %A" other
+                }
+
+                test
                     "sh:qualifiedValueShape carries the shape plus qualifiedMinCount/qualifiedMaxCount/qualifiedValueShapesDisjoint" {
                     let inner = recordShape [] []
 
