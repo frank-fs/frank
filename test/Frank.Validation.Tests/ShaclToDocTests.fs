@@ -682,9 +682,11 @@ let tests =
                         (fun (_, p, v) ->
                             p = "sh:select"
                             && (match v with
-                                | Value.Literal(Literal.String s) -> s.Contains "FILTER"
+                                | Value.Literal(Literal.String s) -> s = sc.Query
                                 | _ -> false))
-                        "sh:select carries the query text"
+                        "sh:select carries the query text exactly (no prefix lines prepended)"
+
+                    Expect.all doc.Statements (fun (_, p, _) -> p <> "sh:message") "no sh:message when Message = None"
                 }
 
                 test "declared prefixes are prepended to the query text as PREFIX lines" {
