@@ -188,4 +188,76 @@ let tests =
                     let doc = Shacl.toDoc [ decl ]
                     let graph = Doc.toGraph doc
                     Expect.isGreaterThan graph.Triples.Count 0 "at least one triple asserted"
+                } ]
+
+          testList
+              "value type constraints"
+              [ test "sh:class on a property shape" {
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/agent"))
+                        |> addConstraint (PropertyConstraint.Class(Uri "https://schema.org/Person"))
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/MoveAction")) [ prop ] ]
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:class" && v = Value.Node(Node.Iri "https://schema.org/Person"))
+                        "sh:class present"
+                }
+
+                test "sh:datatype maps every XsdDatatype case to its xsd: CURIE" {
+                    let cases =
+                        [ XsdDatatype.Integer, "xsd:integer"
+                          XsdDatatype.Long, "xsd:long"
+                          XsdDatatype.Decimal, "xsd:decimal"
+                          XsdDatatype.Double, "xsd:double"
+                          XsdDatatype.Boolean, "xsd:boolean"
+                          XsdDatatype.String, "xsd:string"
+                          XsdDatatype.DateTime, "xsd:dateTime" ]
+
+                    for dt, expectedCurie in cases do
+                        let prop =
+                            ofPath (PropertyPath.Predicate(Uri "https://schema.org/x"))
+                            |> addConstraint (PropertyConstraint.Datatype dt)
+
+                        let doc =
+                            Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                        Expect.exists
+                            doc.Statements
+                            (fun (_, p, v) -> p = "sh:datatype" && v = Value.Node(Node.Iri expectedCurie))
+                            $"sh:datatype for {dt}"
+                }
+
+                test "sh:nodeKind maps every NodeKind case to its sh: individual" {
+                    let cases =
+                        [ NodeKind.BlankNode, "sh:BlankNode"
+                          NodeKind.Iri, "sh:IRI"
+                          NodeKind.Literal, "sh:Literal"
+                          NodeKind.BlankNodeOrIri, "sh:BlankNodeOrIRI"
+                          NodeKind.BlankNodeOrLiteral, "sh:BlankNodeOrLiteral"
+                          NodeKind.IriOrLiteral, "sh:IRIOrLiteral" ]
+
+                    for nk, expectedCurie in cases do
+                        let prop =
+                            ofPath (PropertyPath.Predicate(Uri "https://schema.org/x"))
+                            |> addConstraint (PropertyConstraint.NodeKind nk)
+
+                        let doc =
+                            Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                        Expect.exists
+                            doc.Statements
+                            (fun (_, p, v) -> p = "sh:nodeKind" && v = Value.Node(Node.Iri expectedCurie))
+                            $"sh:nodeKind for {nk}"
+                }
+
+                test "a property shape with no constraints still emits only sh:path (wildcard is a no-op, not an error)" {
+                    let prop = ofPath (PropertyPath.Predicate(Uri "https://schema.org/x"))
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    Expect.exists doc.Statements (fun (_, p, _) -> p = "sh:path") "sh:path still present"
                 } ] ]

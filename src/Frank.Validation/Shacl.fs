@@ -60,21 +60,44 @@ module Shacl =
         | TargetSpec.SubjectsOf uri -> [ stmt subject "sh:targetSubjectsOf" (Value.Node(Node.Iri uri.AbsoluteUri)) ]
         | TargetSpec.ObjectsOf uri -> [ stmt subject "sh:targetObjectsOf" (Value.Node(Node.Iri uri.AbsoluteUri)) ]
 
-    let private propertyShapeStatements (spec: PropertyShapeSpec) : Node * (Node * string * Value) list =
+    let private xsdCurie (dt: XsdDatatype) : string =
+        match dt with
+        | XsdDatatype.Integer -> "xsd:integer"
+        | XsdDatatype.Long -> "xsd:long"
+        | XsdDatatype.Decimal -> "xsd:decimal"
+        | XsdDatatype.Double -> "xsd:double"
+        | XsdDatatype.Boolean -> "xsd:boolean"
+        | XsdDatatype.String -> "xsd:string"
+        | XsdDatatype.DateTime -> "xsd:dateTime"
+
+    let private nodeKindCurie (nk: NodeKind) : string =
+        match nk with
+        | NodeKind.BlankNode -> "sh:BlankNode"
+        | NodeKind.Iri -> "sh:IRI"
+        | NodeKind.Literal -> "sh:Literal"
+        | NodeKind.BlankNodeOrIri -> "sh:BlankNodeOrIRI"
+        | NodeKind.BlankNodeOrLiteral -> "sh:BlankNodeOrLiteral"
+        | NodeKind.IriOrLiteral -> "sh:IRIOrLiteral"
+
+    /// One case added per Task 5-13; the wildcard's scope is documented at each task that narrows it.
+    /// Mutually recursive with propertyShapeStatements/shapeStatements from this task on, because
+    /// Task 9's PropertyConstraint.Node/QualifiedValueShape cases call back into shapeStatements.
+    let rec private constraintStatements (propNode: Node) (c: PropertyConstraint) : (Node * string * Value) list =
+        match c with
+        | PropertyConstraint.Class uri -> [ stmt propNode "sh:class" (Value.Node(Node.Iri uri.AbsoluteUri)) ]
+        | PropertyConstraint.Datatype dt -> [ stmt propNode "sh:datatype" (Value.Node(Node.Iri(xsdCurie dt))) ]
+        | PropertyConstraint.NodeKind nk -> [ stmt propNode "sh:nodeKind" (Value.Node(Node.Iri(nodeKindCurie nk))) ]
+        | _ -> []
+
+    and private propertyShapeStatements (spec: PropertyShapeSpec) : Node * (Node * string * Value) list =
         let bn = Node.blank ()
         let pathHead, pathStmts = pathNode spec.Path
-        bn, (stmt bn "sh:path" (Value.Node pathHead) :: pathStmts)
+        let constraintStmts = spec.Constraints |> List.collect (constraintStatements bn)
+        bn, (stmt bn "sh:path" (Value.Node pathHead) :: pathStmts) @ constraintStmts
 
-    /// The one place a ShapeDecl becomes a subject node plus its own statements. RecordShape is fully
-    /// handled here; EnumShape/And/Or/Not/Xone are added by Tasks 9-10 -- this wildcard is a real,
-    /// defined interim behavior (no triples for those cases yet), not a stub, and it narrows task by
-    /// task until Task 10 removes it and this becomes an exhaustive match.
-    let rec private shapeStatements (decl: ShapeDecl) : Node * (Node * string * Value) list =
+    and private shapeStatements (decl: ShapeDecl) : Node * (Node * string * Value) list =
         match decl with
         | ShapeDecl.RecordShape spec ->
-            // A RecordShape's subject is its own IRI when it has at least one TargetSpec.Class target
-            // (the common, directly-dereferenceable case); otherwise a fresh blank node, since a shape
-            // meant only to be nested via sh:node has no natural IRI of its own.
             let subject =
                 spec.Targets
                 |> List.tryPick (function
