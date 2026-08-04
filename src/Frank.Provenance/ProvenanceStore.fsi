@@ -12,6 +12,11 @@ type ProvenanceQuery =
     | ByResource of resourceIri: string
     | ByAgent of agentIri: string
     | ByActivityId of activityIri: string
+    /// The single most-recently-ended activity that prov:wasGeneratedBy the given resource, plus that
+    /// activity's own triples (including any domain ActivityType) -- everything ByResource returns for
+    /// this resource, narrowed to its latest generating activity when there have been several over the
+    /// resource's lifetime. An empty graph if the resource was never recorded.
+    | Latest of resourceIri: string
 
 /// SPARQL SELECT/ASK return bindings; CONSTRUCT/DESCRIBE return a graph. A store's Query can produce
 /// either, depending on the underlying SparqlQuery shape.

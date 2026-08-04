@@ -22,6 +22,11 @@ let tests =
               Expect.stringContains (query.ToString()) "https://example.org/activities/1" ""
           }
 
+          test "Latest produces a query naming the resource IRI" {
+              let query = toSparqlQuery (ProvenanceQuery.Latest "https://example.org/games/1")
+              Expect.stringContains (query.ToString()) "https://example.org/games/1" ""
+          }
+
           test "ProvenanceStoreConfig.defaults has a positive MaxRecords and EvictionBatchSize" {
               Expect.isGreaterThan ProvenanceStoreConfig.defaults.MaxRecords 0 ""
               Expect.isGreaterThan ProvenanceStoreConfig.defaults.EvictionBatchSize 0 ""
