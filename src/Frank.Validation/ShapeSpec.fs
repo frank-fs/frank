@@ -10,7 +10,8 @@ module ShapeSpecFunctions =
           Message = None }
 
     let addConstraint (constr: PropertyConstraint) (spec: PropertyShapeSpec) : PropertyShapeSpec =
-        { spec with Constraints = spec.Constraints @ [ constr ] }
+        { spec with
+            Constraints = spec.Constraints @ [ constr ] }
 
     let recordShape (targets: TargetSpec list) (properties: PropertyShapeSpec list) : ShapeDecl =
         ShapeDecl.RecordShape
