@@ -86,6 +86,42 @@ module Shacl =
         | Severity.Warning -> "sh:Warning"
         | Severity.Info -> "sh:Info"
 
+    /// The query text exactly as it is emitted into the shapes graph: the constraint's declared
+    /// prefixes rendered as PREFIX lines, then the author's query. Parsing anything else (finding I1)
+    /// would validate text that never reaches dotNetRDF's SHACL engine.
+    let private fullSparqlText (sc: SparqlConstraint) : string =
+        let prefixLines =
+            sc.Prefixes
+            |> List.map (fun (name, uri) -> sprintf "PREFIX %s: <%s>" name uri)
+            |> String.concat "\n"
+
+        if String.IsNullOrEmpty prefixLines then
+            sc.Query
+        else
+            prefixLines + "\n" + sc.Query
+
+    /// Parses a constraint's emitted query text with dotNetRDF's own SPARQL parser -- the same
+    /// grammar the SHACL engine will use at request time. A fresh parser per call: SparqlQueryParser
+    /// carries mutable per-parse state and is not documented thread-safe, and toShapesGraph is
+    /// reachable concurrently.
+    let internal parseSparqlConstraint (sc: SparqlConstraint) : Result<VDS.RDF.Query.SparqlQuery, string> =
+        try
+            Ok(VDS.RDF.Parsing.SparqlQueryParser().ParseFromString(fullSparqlText sc))
+        with ex ->
+            Error ex.Message
+
+    /// True for every SELECT-shaped SparqlQueryType (Select, SelectAll, SelectDistinct,
+    /// SelectAllDistinct, SelectReduced, SelectAllReduced) -- the only form sh:sparql accepts.
+    let private isSelectForm (queryType: VDS.RDF.Query.SparqlQueryType) : bool =
+        match queryType with
+        | VDS.RDF.Query.SparqlQueryType.Select
+        | VDS.RDF.Query.SparqlQueryType.SelectAll
+        | VDS.RDF.Query.SparqlQueryType.SelectDistinct
+        | VDS.RDF.Query.SparqlQueryType.SelectAllDistinct
+        | VDS.RDF.Query.SparqlQueryType.SelectReduced
+        | VDS.RDF.Query.SparqlQueryType.SelectAllReduced -> true
+        | _ -> false
+
     /// One case added per Task 5-13; the wildcard's scope is documented at each task that narrows it.
     /// Mutually recursive with propertyShapeStatements/shapeStatements from this task on, because
     /// Task 9's PropertyConstraint.Node/QualifiedValueShape cases call back into shapeStatements.
@@ -146,21 +182,13 @@ module Shacl =
             let head, listStmts = rdfList items
             stmt propNode "sh:in" (Value.Node head) :: listStmts
         | PropertyConstraint.Sparql sc ->
-            let prefixLines =
-                sc.Prefixes
-                |> List.map (fun (name, uri) -> sprintf "PREFIX %s: <%s>" name uri)
-                |> String.concat "\n"
-
-            let fullQuery =
-                if String.IsNullOrEmpty prefixLines then
-                    sc.Query
-                else
-                    prefixLines + "\n" + sc.Query
-
             let bn = Node.blank ()
 
+            // Always sh:select, never sh:ask -- see toShapesGraph's build-time form check for the
+            // full reasoning (SHACL's sh:sparql is SELECT-based by definition; dotNetRDF's
+            // Constraint.cs maps sh:sparql to its Select validator unconditionally).
             stmt propNode "sh:sparql" (Value.Node bn)
-            :: stmt bn "sh:select" (Value.Literal(Literal.String fullQuery))
+            :: stmt bn "sh:select" (Value.Literal(Literal.String(fullSparqlText sc)))
             :: (sc.Message
                 |> Option.map (fun m -> stmt bn "sh:message" (Value.Literal(Literal.String m)))
                 |> Option.toList)
@@ -328,7 +356,77 @@ module Shacl =
         { Prefixes = shaclPrefixes
           Statements = statements }
 
+    /// Every sh:sparql constraint reachable from a shape, including through nested
+    /// sh:node/sh:qualifiedValueShape references and the logical combinators.
+    let rec private sparqlConstraintsOf (decl: ShapeDecl) : SparqlConstraint list =
+        match decl with
+        | ShapeDecl.RecordShape spec ->
+            spec.Properties
+            |> List.collect (fun p -> p.Constraints |> List.collect sparqlConstraintsOfConstraint)
+        | ShapeDecl.EnumShape _ -> []
+        | ShapeDecl.And members
+        | ShapeDecl.Or members
+        | ShapeDecl.Xone members -> NonEmptyList.toList members |> List.collect sparqlConstraintsOf
+        | ShapeDecl.Not inner -> sparqlConstraintsOf inner
+
+    and private sparqlConstraintsOfConstraint (c: PropertyConstraint) : SparqlConstraint list =
+        match c with
+        | PropertyConstraint.Sparql sc -> [ sc ]
+        | PropertyConstraint.Node inner -> sparqlConstraintsOf inner
+        | PropertyConstraint.QualifiedValueShape(inner, _, _, _) -> sparqlConstraintsOf inner
+        | _ -> []
+
+    /// Two build-time gates over every reachable sh:sparql constraint, both closing "the shape is
+    /// silently wrong and you find out never" holes the final review found:
+    ///
+    /// 1. (finding I1, and the design doc's error-handling table) The query must PARSE. "A Sparql
+    ///    constraint's query failing to parse is raised at toShapesGraph build time
+    ///    (shape-authoring time), never deferred to request-validation time -- a malformed
+    ///    author-supplied query is a shape bug, not a per-request condition." Before this, a typo'd
+    ///    query produced an RdfParseException on EVERY subsequent request to the guarded resource.
+    ///
+    /// 2. (finding C2) The query must be a SELECT. SHACL's sh:sparql is SELECT-based BY DEFINITION:
+    ///    a SPARQL-based constraint is a SHACL instance of sh:SPARQLConstraint, which has exactly one
+    ///    sh:select whose value is a valid SPARQL SELECT query (SHACL §5.2); sh:ask belongs to
+    ///    sh:SPARQLAskValidator, reachable only through sh:validator on a custom
+    ///    sh:ConstraintComponent (SHACL §6.2.3.2) -- a construct this package doesn't emit.
+    ///    dotNetRDF agrees unconditionally: Constraints/Constraint.cs dispatches
+    ///    `case INode t when t.Equals(Vocabulary.Sparql): return new Select(shape, value)`, and its
+    ///    Select validator raises `A sh:SPARQLSelectValidator must have exactly one sh:select
+    ///    property` if handed sh:ask instead.
+    ///
+    ///    So an ASK-shaped query cannot be honoured, only rejected. Left alone it was WORSE than
+    ///    rejected: emitted under sh:select, an ASK executes to a SparqlResultSet with no bindings,
+    ///    which the Select validator reads as "no results, therefore conforming" -- the constraint
+    ///    silently never fires and non-conforming data passes. The review reported this as "always
+    ///    emitted as sh:select" and asked for sh:ask emission; the spec and the engine both make that
+    ///    impossible, so the silent bypass is closed at the other end instead -- loudly, at
+    ///    shape-authoring time, with a message naming the SELECT rewrite.
     let toShapesGraph (shapes: ShapeDecl list) : VDS.RDF.Shacl.ShapesGraph =
+        for sc in shapes |> List.collect sparqlConstraintsOf do
+            match parseSparqlConstraint sc with
+            | Error message ->
+                invalidOp (
+                    "Frank.Validation: a sh:sparql constraint's query does not parse as SPARQL, so the shapes "
+                    + "graph cannot be built. Fix the query text -- deferring this to request time would fail "
+                    + "every request to the resource it guards.\nParser error: "
+                    + message
+                    + "\nQuery:\n"
+                    + fullSparqlText sc
+                )
+            | Ok query when not (isSelectForm query.QueryType) ->
+                invalidOp (
+                    "Frank.Validation: a sh:sparql constraint's query is a "
+                    + string query.QueryType
+                    + " query, but SHACL's sh:sparql accepts only SELECT queries (SHACL "
+                    + "§5.2 -- sh:ask belongs to sh:SPARQLAskValidator inside a custom constraint "
+                    + "component, which this package does not emit). Rewrite it as a SELECT returning one row "
+                    + "per violation: an `ASK { P }` that must hold becomes "
+                    + "`SELECT $this WHERE { FILTER NOT EXISTS { P } }`.\nQuery:\n"
+                    + fullSparqlText sc
+                )
+            | Ok _ -> ()
+
         new VDS.RDF.Shacl.ShapesGraph(Doc.toGraph (toDoc shapes))
 
     // NOTE on the helpers below: dotNetRdf.Shacl's Path/Shape wrapper types (e.g.

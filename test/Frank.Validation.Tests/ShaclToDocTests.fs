@@ -7,6 +7,20 @@ open Frank.Rdf
 open Frank.Validation
 open Frank.Validation.ShapeSpecFunctions
 
+/// Expecto's Expect.throwsT returns unit, and these tests assert on the raised message (the whole
+/// point of finding I1/C2 is that the failure is DESCRIPTIVE), so capture it here instead.
+let private captureInvalidOp (f: unit -> unit) : InvalidOperationException =
+    let mutable captured = None
+
+    try
+        f ()
+    with :? InvalidOperationException as ex ->
+        captured <- Some ex
+
+    match captured with
+    | Some ex -> ex
+    | None -> failtest "expected an InvalidOperationException, but none was raised"
+
 let private hasTriple (doc: Doc) (predicateSuffix: string) : bool =
     doc.Statements
     |> List.exists (fun (_, p, _) -> p.EndsWith(predicateSuffix: string))
@@ -808,6 +822,131 @@ let tests =
                                 | Value.Literal(Literal.String s) -> s.Contains "PREFIX schema: <https://schema.org/>"
                                 | _ -> false))
                         "PREFIX line prepended"
+                }
+
+                // Final-review finding C2. The review reported "documented as ASK, always emitted as
+                // sh:select" and asked for sh:ask emission. Verified against both the spec and the
+                // engine, that is not implementable: SHACL's sh:sparql is SELECT-based by definition
+                // (5.2 -- sh:ask belongs to sh:SPARQLAskValidator under a custom constraint
+                // component, 6.2.3.2), and dotNetRDF's Constraints/Constraint.cs dispatches
+                // `Vocabulary.Sparql -> new Select(shape, value)` unconditionally, its Select
+                // validator raising "A sh:SPARQLSelectValidator must have exactly one sh:select
+                // property" when handed sh:ask. So the SILENT BYPASS the finding is really about
+                // (an ASK executes to zero bindings, which the Select validator reads as
+                // "conforming") is closed at the other end: rejected loudly, at shape-build time.
+                test "an ASK-form query is rejected at toShapesGraph build time, not silently ignored" {
+                    let sc =
+                        { Query = "ASK { $this <https://schema.org/position> ?p . FILTER (?p > 0) }"
+                          Message = None
+                          Prefixes = [] }
+
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/position"))
+                        |> addConstraint (PropertyConstraint.Sparql sc)
+
+                    let shapes = [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    let ex = captureInvalidOp (fun () -> Shacl.toShapesGraph shapes |> ignore)
+
+                    Expect.stringContains ex.Message "only SELECT queries" "the message says what is wrong"
+
+                    Expect.stringContains
+                        ex.Message
+                        "FILTER NOT EXISTS"
+                        "the message shows the SELECT rewrite, so the author is not left guessing"
+                }
+
+                test "toDoc itself stays total -- an ASK query still projects (as sh:select), it just cannot build" {
+                    let sc =
+                        { Query = "ASK { $this <https://schema.org/position> ?p }"
+                          Message = None
+                          Prefixes = [] }
+
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/position"))
+                        |> addConstraint (PropertyConstraint.Sparql sc)
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    Expect.exists doc.Statements (fun (_, p, _) -> p = "sh:select") "toDoc does not raise"
+                    Expect.all doc.Statements (fun (_, p, _) -> p <> "sh:ask") "sh:ask is never emitted"
+                }
+
+                // Final-review finding I1: the design doc's error-handling table says a Sparql
+                // constraint's query failing to parse is "raised at toShapesGraph build time (shape-
+                // authoring time), never deferred to request-validation time". It was not checked at
+                // all, so a typo produced an unhandled RdfParseException on every request instead.
+                test "a malformed SPARQL query raises at toShapesGraph time, not at validate time" {
+                    let sc =
+                        { Query = "SELECT $this WHERE { <<< not sparql"
+                          Message = None
+                          Prefixes = [] }
+
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/position"))
+                        |> addConstraint (PropertyConstraint.Sparql sc)
+
+                    let shapes = [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    // toDoc stays total: only the ShapesGraph build rejects it.
+                    Shacl.toDoc shapes |> ignore
+
+                    let ex = captureInvalidOp (fun () -> Shacl.toShapesGraph shapes |> ignore)
+
+                    Expect.stringContains ex.Message "does not parse as SPARQL" "descriptive message"
+                }
+
+                test "a malformed SPARQL query nested behind sh:node and a combinator is still caught" {
+                    let sc =
+                        { Query = "SELECT $this WHERE { }}}}"
+                          Message = None
+                          Prefixes = [] }
+
+                    let inner =
+                        recordShape
+                            []
+                            [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/x"))
+                              |> addConstraint (PropertyConstraint.Sparql sc) ]
+
+                    let outer =
+                        recordShape
+                            (targetClass (Uri "https://schema.org/T"))
+                            [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/agent"))
+                              |> addConstraint (PropertyConstraint.Node inner) ]
+
+                    let combined =
+                        ShapeDecl.And
+                            { Head = outer
+                              Tail = [ recordShape (targetClass (Uri "https://schema.org/U")) [] ] }
+
+                    captureInvalidOp (fun () -> Shacl.toShapesGraph [ combined ] |> ignore)
+                    |> ignore
+                }
+
+                test "a prefix declared on the constraint is part of what gets parsed, not just what gets emitted" {
+                    // Without the PREFIX line prepended this query does not parse at all -- proof
+                    // that toShapesGraph validates the text it actually emits.
+                    let sc =
+                        { Query = "SELECT $this WHERE { $this a schema:Person }"
+                          Message = None
+                          Prefixes = [ "schema", "https://schema.org/" ] }
+
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/x"))
+                        |> addConstraint (PropertyConstraint.Sparql sc)
+
+                    Shacl.toShapesGraph [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+                    |> ignore
+
+                    let brokenShapes =
+                        [ recordShape
+                              (targetClass (Uri "https://schema.org/T"))
+                              [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/x"))
+                                |> addConstraint (PropertyConstraint.Sparql { sc with Prefixes = [] }) ] ]
+
+                    captureInvalidOp (fun () -> Shacl.toShapesGraph brokenShapes |> ignore)
+                    |> ignore
                 }
 
                 test "an author message on the sh:sparql constraint becomes sh:message on the same blank node" {

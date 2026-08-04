@@ -59,8 +59,29 @@ type PropertyPath =
     | OneOrMore of PropertyPath
     | ZeroOrOne of PropertyPath
 
-/// An author-supplied SPARQL ASK query as a SHACL-SPARQL constraint (sh:sparql). The query text is
-/// written by the shape's author (a developer), never derived from request input.
+/// An author-supplied SPARQL **SELECT** query as a SHACL-SPARQL constraint (sh:sparql). The query
+/// text is written by the shape's author (a developer), never derived from request input.
+///
+/// SEMANTICS: `$this` is pre-bound to the focus node, and every result ROW the query returns is
+/// reported as a violation -- so a CONFORMING focus node is one the query returns no rows for. Write
+/// the query to select what is WRONG, not what is right.
+///
+/// ```fsharp
+/// { Query = "SELECT $this WHERE { $this <https://schema.org/position> ?p . FILTER (?p <= 0) }"
+///   Message = Some "position must be positive"
+///   Prefixes = [] }
+/// ```
+///
+/// SELECT ONLY -- an `ASK { ... }` query is REJECTED (an InvalidOperationException out of
+/// `Shacl.toShapesGraph`, at shape-authoring time). SHACL's sh:sparql is SELECT-based by definition
+/// (§5.2); `sh:ask` belongs to `sh:SPARQLAskValidator` inside a custom `sh:ConstraintComponent`
+/// (§6.2.3.2), which this package does not emit, and dotNetRDF maps sh:sparql to its SELECT
+/// validator unconditionally. Invert an ASK to get the equivalent SELECT: an `ASK { P }` that must
+/// hold becomes `SELECT $this WHERE { FILTER NOT EXISTS { P } }`.
+///
+/// `Prefixes` are rendered as `PREFIX name: <uri>` lines prepended to `Query`. The whole text must
+/// parse as a SPARQL SELECT: `Shacl.toShapesGraph` parses it and raises at shape-build time if it
+/// does not, rather than letting a typo fail every request to the guarded resource.
 type SparqlConstraint =
     { Query: string
       Message: string option

@@ -14,11 +14,23 @@ module Shacl =
     /// sh:zeroOrOnePath/rdf:list-of-paths structure for the other six cases.
     val internal pathNode: path: PropertyPath -> Node * (Node * string * Value) list
 
+    /// Parses a SPARQL constraint's query text exactly as it is emitted into the shapes graph (the
+    /// constraint's declared prefixes rendered as PREFIX lines, then the author's query), using
+    /// dotNetRDF's own SPARQL parser. Internal: callers get this enforced for them by toShapesGraph.
+    val internal parseSparqlConstraint: sc: SparqlConstraint -> Result<VDS.RDF.Query.SparqlQuery, string>
+
     /// Projects a ShapeDecl list onto a Doc: one sh:NodeShape/sh:PropertyShape pair per shape,
-    /// blank nodes for anonymous property shapes and path expressions.
+    /// blank nodes for anonymous property shapes and path expressions. A total projection -- it never
+    /// raises, including for a sh:sparql query that doesn't parse (toShapesGraph is where that is
+    /// rejected).
     val toDoc: shapes: ShapeDecl list -> Doc
 
     /// toDoc >> Doc.toGraph >> ShapesGraph -- what Validation.fs's `validate` consumes.
+    ///
+    /// Raises InvalidOperationException if any reachable sh:sparql constraint's query fails to parse
+    /// as SPARQL. That is deliberate and matches the design doc's error-handling table: a malformed
+    /// author-supplied query is a shape bug, surfaced once at shape-authoring time, never deferred to
+    /// fail every request to the resource it guards.
     val toShapesGraph: shapes: ShapeDecl list -> VDS.RDF.Shacl.ShapesGraph
 
     /// A typed wrapper over VDS.RDF.Shacl.Validation.Report -- never exposes the raw dotNetRDF

@@ -38,6 +38,20 @@ let private graphWithLiteralObject (predicate: string) (literal: string) : IGrap
 
     g
 
+/// An instance of `classIri` carrying one xsd:integer-typed property -- needed wherever a numeric
+/// SPARQL FILTER or range constraint has to see a real integer, not a plain string literal.
+let private graphWithIntProperty (classIri: string) (instanceIri: string) (position: int) : IGraph =
+    let g = Graph() :> IGraph
+    let inst = g.CreateUriNode(UriFactory.Create instanceIri)
+
+    g.Assert(Triple(inst, g.CreateUriNode(UriFactory.Create RdfTypeIri), g.CreateUriNode(UriFactory.Create classIri)))
+    |> ignore
+
+    g.Assert(Triple(inst, g.CreateUriNode(UriFactory.Create "https://schema.org/position"), position.ToLiteral g))
+    |> ignore
+
+    g
+
 [<Tests>]
 let tests =
     testList
@@ -187,6 +201,61 @@ let tests =
                       violations.Head.FocusNode
                       (Value.Literal(Literal.Int 3))
                       "xsd:integer literal maps back to Literal.Int"
+          }
+
+          // Final-review finding C2, the half that IS a behavioural gap: sh:sparql was emission-
+          // tested but never behaviour-tested, so nothing proved a SPARQL constraint fires at all.
+          // (The ASK half is rejected at build time -- see ShaclToDocTests -- because SHACL's
+          // sh:sparql is SELECT-based by definition and dotNetRDF maps it to its Select validator
+          // unconditionally.)
+          test "a SELECT-form sh:sparql constraint conforms when the query returns no rows" {
+              let sc =
+                  { Query = "SELECT $this WHERE { $this <https://schema.org/position> ?p . FILTER (?p <= 0) }"
+                    Message = Some "position must be positive"
+                    Prefixes = [] }
+
+              let shape =
+                  recordShape
+                      (targetClass (Uri "https://schema.org/MoveAction"))
+                      [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/position"))
+                        |> addConstraint (PropertyConstraint.Sparql sc) ]
+
+              let sg = Shacl.toShapesGraph [ shape ]
+
+              let dataGraph =
+                  graphWithIntProperty "https://schema.org/MoveAction" "https://example.org/move1" 3
+
+              match Shacl.validate sg dataGraph with
+              | ValidationOutcome.Conforms -> ()
+              | ValidationOutcome.Violates vs -> failtestf "expected Conforms, got %A" vs
+          }
+
+          test "a SELECT-form sh:sparql constraint violates once per row the query returns" {
+              let sc =
+                  { Query = "SELECT $this WHERE { $this <https://schema.org/position> ?p . FILTER (?p <= 0) }"
+                    Message = Some "position must be positive"
+                    Prefixes = [] }
+
+              let shape =
+                  recordShape
+                      (targetClass (Uri "https://schema.org/MoveAction"))
+                      [ ofPath (PropertyPath.Predicate(Uri "https://schema.org/position"))
+                        |> addConstraint (PropertyConstraint.Sparql sc) ]
+
+              let sg = Shacl.toShapesGraph [ shape ]
+
+              let dataGraph =
+                  graphWithIntProperty "https://schema.org/MoveAction" "https://example.org/move2" -1
+
+              match Shacl.validate sg dataGraph with
+              | ValidationOutcome.Conforms -> failtest "expected Violates -- the SELECT returns a row for position = -1"
+              | ValidationOutcome.Violates violations ->
+                  Expect.isNonEmpty violations "violation reported"
+
+                  Expect.equal
+                      violations.Head.ConstraintComponent
+                      (Uri "http://www.w3.org/ns/shacl#SPARQLConstraintComponent")
+                      "reported as a SPARQL constraint component"
           }
 
           test "an empty data graph conforms trivially against a targetClass shape (nothing to target)" {
