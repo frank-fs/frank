@@ -24,6 +24,8 @@
     <Compile Include="Shacl.fs" />
     <Compile Include="ShapeBuilder.fsi" />
     <Compile Include="ShapeBuilder.fs" />
+    <Compile Include="ResourceBuilderExtensions.fsi" />
+    <Compile Include="ResourceBuilderExtensions.fs" />
   </ItemGroup>
 
   <ItemGroup>
