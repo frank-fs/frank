@@ -46,16 +46,25 @@ That the earlier attempt also under-covered SHACL itself — a separate defect f
 `src/Frank.Validation/`, targeting `net8.0;net9.0;net10.0` (matching Frank core, `Frank.Rdf`, `Frank.Provenance`). Depends on `Frank`, `Frank.Rdf`, `dotNetRdf.Core` (transitive via `Frank.Rdf`), and `dotNetRdf.Shacl` 3.5.1 (the SHACL `ShapesGraph`/`Report`/constraint-component engine — confirmed present: `ClassConstraintComponent`, `DatatypeConstraintComponent`, `NodeKindConstraintComponent`, `MinCount`/`MaxCountConstraintComponent`, `MinExclusive`/`MinInclusive`/`MaxExclusive`/`MaxInclusiveConstraintComponent`, `MinLength`/`MaxLengthConstraintComponent`, `PatternConstraintComponent`, `LanguageInConstraintComponent`, `UniqueLangConstraintComponent`, `Equals`/`Disjoint`/`LessThan`/`LessThanOrEqualsConstraintComponent`, `NodeConstraintComponent`, `QualifiedValueShape(Disjoint)`, `HasValueConstraintComponent`, `InConstraintComponent`, `And`/`Or`/`Not`/`XoneConstraintComponent`, `ClosedConstraintComponent`, `SparqlConstraintComponent`/`SparqlAskValidator`, and `VDS.RDF.Shacl.Paths` — `SequencePath`/`AlternativePath`/`InversePath`/`ZeroOrMorePath`/`OneOrMorePath`/`ZeroOrOnePath` — all verified directly against the installed assembly).
 
 ```
-ShapeTypes.fs       XsdDatatype, NodeKind, Severity, TargetSpec, PropertyPath, PropertyConstraint,
-                     SparqlConstraint, PropertyShapeSpec, NodeShapeSpec, ShapeDecl, NonEmptyList
-ShapeSpec.fs         ShapeSpecFunctions -- plain curried functions, the real authoring model
-ShapeBuilder.fs      shape{ }/property{ } CEs -- sugar over ShapeSpecFunctions
-Shacl.fs             the interpreter: toDoc, toShapesGraph, reportToDoc
-Validation.fs        Violation, ValidationOutcome, validate
-ValidationMiddleware.fs   useValidation resource{} extension, dual-path 422
+ShapeTypes.fs               XsdDatatype, NodeKind, Severity, TargetSpec, PropertyPath, PropertyConstraint,
+                             SparqlConstraint, PropertyShapeSpec, NodeShapeSpec, ShapeDecl, NonEmptyList
+ShapeSpec.fs                ShapeSpecFunctions -- plain curried functions, the real authoring model
+ShapeBuilder.fs             shape{ }/property{ } CEs -- sugar over ShapeSpecFunctions
+Shacl.fs                    the interpreter: toDoc, toShapesGraph, reportToDoc
+Validation.fs                Violation, ValidationOutcome, validate
+ResourceBuilderExtensions.fs  `useValidation shapesGraph` on resource{ } -- attaches ValidationMetadata
+                               (internal, mirrors ResourceLinkProvider) via ResourceBuilder.AddMetadata.
+                               Type extension, not a Frank core change -- same mechanism Frank.JsonHome's
+                               ResourceBuilderExtensions.fs and Frank.OpenApi's WebHostBuilderExtensions.fs
+                               already use for rel/hrefVar/docs/useOpenApi.
+WebHostBuilderExtensions.fs   `useValidation` on webHost{ } -- registers the one app-wide interceptor
+                               middleware (app.Use(fun ctx next -> ...), mirroring WebLink.useResourceScopedLinks'
+                               ctx.GetEndpoint().Metadata.GetMetadata<T>() pattern) that actually buffers,
+                               parses, and validates POST/PUT/PATCH application/ld+json bodies against
+                               whichever resource's ValidationMetadata matched.
 ```
 
-Each `.fs` gets a matching `.fsi`, per `CLAUDE.md`.
+Each `.fs` gets a matching `.fsi`, per `CLAUDE.md`. `ResourceBuilder`/`WebHostBuilder` are both `[<Sealed>]` in Frank core, but F#'s `type X with [<CustomOperation>] member ...` extension syntax adds real custom operations to a sealed type from another assembly — confirmed against `Frank.JsonHome/ResourceBuilderExtensions.fs` (`rel`/`hrefVar`/`docs`/...) and `Frank.OpenApi/WebHostBuilderExtensions.fs` (`useOpenApi`). No Frank core change needed; `link`'s move into core itself was a deliberate exception because it was shared by `Frank.Rdf`, `Frank.JsonHome`, and more — not the default for a single package's own operation.
 
 ## The design
 
@@ -182,7 +191,7 @@ module ShapeSpecFunctions =
     val targetClass: Uri -> TargetSpec list
 ```
 
-**`ShapeBuilder.fs`** — CE sugar, mirroring `Frank.Alps`'s `DescriptorBuilder` precisely: one builder per node type, `Yield`/`Zero` seed to a valid default (using the constructor's identity parameter, same as `semantic id`), nesting via a plain list passed to one op (matching `contains`/`regions`/`from`, not a repeated single-item op). Following `DescriptorBuilder`'s own split, not every custom operation delegates to a named function: `properties`/`closed`/`severity`/`message` are simple field mutations, inlined directly in the member body (the same category as `DescriptorBuilder`'s `Semantic`/`Safe`/`Initial`, which have no `DescriptorFunctions` counterpart either), while every per-constraint operation is one line of `addConstraint`:
+**`ShapeBuilder.fs`** — CE sugar, mirroring `Frank.Alps`'s `DescriptorBuilder` and (even more directly — it lands on `origin/master` mid-design, rebased in) `Frank.Provenance`'s new `ProvBuilder`: one builder per node type, constructor takes the already-built `initial` value directly (`ProvBuilder(initial: Description)`, entry functions doing `ProvBuilder(Prov.activity id)`) rather than re-deriving a default from a raw identity parameter inside `Yield`/`Zero` — `Yield`/`Zero` both just return `initial`. Nesting is via a plain list passed to one op (matching `contains`/`regions`/`from`, not a repeated single-item op). Following `DescriptorBuilder`'s own split, not every custom operation delegates to a named function: `properties`/`closed`/`severity`/`message` are simple field mutations, inlined directly in the member body (the same category as `DescriptorBuilder`'s `Semantic`/`Safe`/`Initial`, which have no `DescriptorFunctions` counterpart either), while every per-constraint operation is one line of `addConstraint` (the same shape as `ProvBuilder`'s `d |> Prov.wasGeneratedBy activity`):
 
 ```fsharp
 [<CustomOperation("datatype")>]
@@ -216,7 +225,7 @@ Every other constraint operation (`ofClass`, `nodeKind`, `maxCount`, `minLength`
 ```fsharp
 [<Sealed>]
 type PropertyShapeBuilder =
-    new: path: PropertyPath -> PropertyShapeBuilder
+    new: initial: PropertyShapeSpec -> PropertyShapeBuilder
     member Yield: 'a -> PropertyShapeSpec
     member Zero: unit -> PropertyShapeSpec
     member Run: PropertyShapeSpec -> PropertyShapeSpec
@@ -248,11 +257,13 @@ type PropertyShapeBuilder =
     [<CustomOperation("severity")>]         member SeverityOp: PropertyShapeSpec * Severity -> PropertyShapeSpec
     [<CustomOperation("message")>]          member MessageOp: PropertyShapeSpec * string -> PropertyShapeSpec
 
+/// `property path { ... } = PropertyShapeBuilder(ofPath path) { ... }` -- mirrors `ProvBuilder`'s
+/// `let activity id = ProvBuilder(Prov.activity id)`.
 val property: path: PropertyPath -> PropertyShapeBuilder
 
 [<Sealed>]
 type ShapeBuilder =
-    new: targets: TargetSpec list -> ShapeBuilder
+    new: initial: ShapeDecl -> ShapeBuilder
     member Yield: 'a -> ShapeDecl
     member Zero: unit -> ShapeDecl
     member Run: ShapeDecl -> ShapeDecl
@@ -262,6 +273,7 @@ type ShapeBuilder =
     [<CustomOperation("severity")>]   member SeverityOp: ShapeDecl * Severity -> ShapeDecl
     [<CustomOperation("message")>]    member MessageOp: ShapeDecl * string -> ShapeDecl
 
+/// `shape targets { ... } = ShapeBuilder(recordShape targets []) { ... }`.
 val shape: targets: TargetSpec list -> ShapeBuilder
 ```
 
@@ -350,7 +362,12 @@ A typed wrapper over dotNetRDF's `Report`/`Validation.Result`, matching how `Fra
 
 ### HTTP surface
 
-`resource { useValidation shapesGraph }` — mirrors `useProvenance`. Applies only to POST/PUT/PATCH with `Content-Type: application/ld+json`; buffers the body once with this codebase's existing 413 guard convention; parses via `JsonLdParser().Load(store, reader)` (already proven in `RoundTripTests.fs` — no document loader needed, since expanded-form input carries no `@context` to resolve, see Non-goals); runs `Shacl.validate`. On `Conforms`, the parsed graph is stashed on `HttpContext.Items` (so the handler doesn't re-parse) and the pipeline continues. On `Violates`, short-circuits with 422, negotiated the same way `Frank.Rdf.Sample`'s `getGame` negotiates: `application/ld+json` gets `Shacl.reportToDoc violations |> Doc.writeJsonLd` (a real `sh:ValidationReport`), anything else gets `application/problem+json` with a flattened violations array (`focusNode`, `resultPath`, `severity`, `message`, `constraintComponent`).
+Two pieces, both type extensions living in `Frank.Validation` (no Frank core change — see *Package shape*):
+
+- **`resource { useValidation shapesGraph }`** — a `ResourceBuilder` extension. Attaches an internal `ValidationMetadata` (wrapping the `ShapesGraph`, mirroring `Frank`'s own internal `ResourceLinkProvider`) to the resource's endpoints via the existing public `ResourceBuilder.AddMetadata` static member — the same mechanism `Frank.JsonHome`'s `rel`/`hrefVar`/`docs` extensions already use. Declarative only; it does nothing at request time by itself.
+- **`webHost { useValidation }`** — a `WebHostBuilder` extension, called once at app startup. Registers the one app-wide interceptor: `app.Use(fun ctx next -> ...)`, reading `ctx.GetEndpoint().Metadata.GetMetadata<ValidationMetadata>()` exactly the way `Frank`'s own `WebLink.useResourceScopedLinks` reads `ResourceLinkProvider` off the matched endpoint. When present, and the request is POST/PUT/PATCH with `Content-Type: application/ld+json`: buffers the body once (`ctx.Request.EnableBuffering()`; checked against `Content-Length` up front, and against a running byte count while reading in case `Content-Length` is absent, since it's client-supplied and not trustworthy alone) with a 413 short-circuit over the configured max; parses via `JsonLdParser().Load(store, reader)` (already proven in `RoundTripTests.fs` — no document loader needed, since expanded-form input carries no `@context` to resolve, see Non-goals), 400 on parse failure; runs `Shacl.validate`. On `Conforms`, the parsed graph is stashed on `HttpContext.Items` (so the handler doesn't re-parse) and `next.Invoke ctx` continues the pipeline. On `Violates`, short-circuits with 422 — never calls `next` — negotiated the same way `Frank.Rdf.Sample`'s `getGame` negotiates: `application/ld+json` gets `Shacl.reportToDoc violations |> Doc.writeJsonLd` (a real `sh:ValidationReport`), anything else gets `application/problem+json` with a flattened violations array (`focusNode`, `resultPath`, `severity`, `message`, `constraintComponent`). When no `ValidationMetadata` is present on the matched endpoint, or the method/content-type don't match, the middleware is a no-op pass-through — every request still flows through it (it's app-wide), so this path must stay cheap.
+
+No existing body-buffering/413 helper exists anywhere in the current codebase to reuse (the earlier such helper was part of the rolled-back v7.3.0 work) — this is written fresh.
 
 ### Error handling and edge cases
 
@@ -397,6 +414,8 @@ Each stage independently verifiable, matching how `Frank.Rdf` and `Frank.Provena
 - W3C SHACL: https://www.w3.org/TR/shacl/
 - [Frank.Rdf design](2026-07-30-frank-rdf-design.md) — foundation this package builds on.
 - [Frank.Provenance design](2026-08-02-frank-provenance-design.md) — sibling package, architectural precedent (adjacent, not a dependency).
-- `src/Frank.Alps/DescriptorBuilder.fs`/`.fsi` — the CE-mirrors-plain-functions pattern this design's authoring surface follows.
+- `src/Frank.Alps/DescriptorBuilder.fs`/`.fsi` and `src/Frank.Provenance/ProvBuilder.fs`/`.fsi` — the CE-mirrors-plain-functions pattern this design's authoring surface follows; `ProvBuilder` landed on `origin/master` mid-design (rebased in) and is the more current instance of the same pattern.
+- `src/Frank.JsonHome/ResourceBuilderExtensions.fs`/`.fsi` and `src/Frank.OpenApi/WebHostBuilderExtensions.fs`/`.fsi` — the type-extension mechanism `useValidation`'s two pieces follow, confirming custom operations can be added to `Frank`'s sealed `ResourceBuilder`/`WebHostBuilder` from another package without a Frank core change.
+- `src/Frank/WebLink.fs` (`WebLink.useResourceScopedLinks`) — the app-wide-middleware-reads-endpoint-metadata pattern `useValidation`'s interceptor follows.
 - `docs/superpowers/plans/2026-06-22-v732-codegen-remediation-plan4-validation.md` (prior attempt, reference only, not a starting point) — credited for the `ShapeDecl`/interpreter shape; not credited for scope or for building codegen first.
 - Installed `dotNetRdf.Shacl` assembly — verified directly for constraint-component and property-path coverage (see *Package shape*).
