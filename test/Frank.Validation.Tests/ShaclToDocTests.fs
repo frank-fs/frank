@@ -601,4 +601,61 @@ let tests =
                         notDoc.Statements
                         (fun (s, p, _) -> s = Node.Iri "https://schema.org/A" && p = RdfTypeIri)
                         "Shape A's own rdf:type is present in Not"
-                } ] ]
+                } ]
+
+          testList
+              "EnumShape, sh:hasValue, sh:in"
+              [ test "EnumShape emits sh:targetClass and a well-formed sh:in list of the case IRIs" {
+                    let decl =
+                        enumShape
+                            (Uri "https://schema.org/GameStatusType")
+                            (Uri "https://schema.org/Active")
+                            [ Uri "https://schema.org/Completed" ]
+
+                    let doc = Shacl.toDoc [ decl ]
+                    let subject = Node.Iri "https://schema.org/GameStatusType"
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (s, p, v) -> s = subject && p = "sh:targetClass" && v = Value.Node subject)
+                        "sh:targetClass"
+
+                    Expect.exists doc.Statements (fun (s, p, _) -> s = subject && p = "sh:in") "sh:in present"
+                }
+
+                test "sh:hasValue carries the given Value (node or literal) unchanged" {
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/status"))
+                        |> addConstraint (PropertyConstraint.HasValue(Value.Node(Node.Iri "https://schema.org/Active")))
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:hasValue" && v = Value.Node(Node.Iri "https://schema.org/Active"))
+                        "sh:hasValue"
+                }
+
+                test "sh:in (AllowedValues) on a property shape is a well-formed rdf:list, mixing nodes and literals" {
+                    let values =
+                        NonEmptyList.ofList
+                            [ Value.Literal(Literal.String "a")
+                              Value.Node(Node.Iri "https://schema.org/b") ]
+                        |> Option.get
+
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/x"))
+                        |> addConstraint (PropertyConstraint.AllowedValues values)
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    Expect.exists doc.Statements (fun (_, p, _) -> p = "sh:in") "sh:in present"
+                }
+
+                // No test for "constraintStatements is now exhaustive except Sparql" -- that guarantee is
+                // compiler-checked (FS0025 -> error under this repo's TreatWarningsAsErrors) the moment the
+                // wildcard narrows to just Sparql; a runtime assertion would add nothing. Sparql itself is
+                // exercised in Task 11's tests.
+                ] ]

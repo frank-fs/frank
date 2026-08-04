@@ -125,7 +125,12 @@ module Shacl =
                |> Option.toList)
             @ [ stmt propNode "sh:qualifiedValueShapesDisjoint" (Value.Literal(Literal.Bool disjoint)) ]
             @ innerStmts
-        | _ -> []
+        | PropertyConstraint.HasValue value -> [ stmt propNode "sh:hasValue" value ]
+        | PropertyConstraint.AllowedValues values ->
+            let items = NonEmptyList.toList values
+            let head, listStmts = rdfList items
+            stmt propNode "sh:in" (Value.Node head) :: listStmts
+        | PropertyConstraint.Sparql _ -> []
 
     and private propertyShapeStatements (spec: PropertyShapeSpec) : Node * (Node * string * Value) list =
         let bn = Node.blank ()
@@ -172,7 +177,17 @@ module Shacl =
             let innerSubject, innerStmts = shapeStatements inner
             let bn = Node.blank ()
             bn, stmt bn "sh:not" (Value.Node innerSubject) :: innerStmts
-        | _ -> Node.blank (), []
+        | ShapeDecl.EnumShape(targetClassUri, cases) ->
+            let subject = Node.Iri targetClassUri.AbsoluteUri
+            let typeStmt = stmt subject RdfTypeIri (Value.Node(Node.Iri "sh:NodeShape"))
+            let targetStmt = stmt subject "sh:targetClass" (Value.Node subject)
+
+            let items =
+                NonEmptyList.toList cases
+                |> List.map (fun u -> Value.Node(Node.Iri u.AbsoluteUri))
+
+            let listHead, listStmts = rdfList items
+            subject, [ typeStmt; targetStmt; stmt subject "sh:in" (Value.Node listHead) ] @ listStmts
 
     let toDoc (shapes: ShapeDecl list) : Doc =
         let statements = shapes |> List.collect (shapeStatements >> snd)
