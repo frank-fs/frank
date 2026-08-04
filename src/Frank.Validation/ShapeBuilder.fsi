@@ -94,3 +94,25 @@ module ShapeBuilderModule =
 
     /// `property path { ... } = PropertyShapeBuilder(ofPath path) { ... }`.
     val property: path: PropertyPath -> PropertyShapeBuilder
+
+    [<Sealed>]
+    type ShapeBuilder =
+        new: initial: ShapeDecl -> ShapeBuilder
+        member Yield: 'a -> ShapeDecl
+        member Zero: unit -> ShapeDecl
+        member Run: d: ShapeDecl -> ShapeDecl
+
+        [<CustomOperation("properties")>]
+        member Properties: ShapeDecl * PropertyShapeSpec list -> ShapeDecl
+
+        [<CustomOperation("closed")>]
+        member Closed: ShapeDecl * ignoredProperties: Uri list -> ShapeDecl
+
+        [<CustomOperation("severity")>]
+        member SeverityOp: ShapeDecl * Severity -> ShapeDecl
+
+        [<CustomOperation("message")>]
+        member MessageOp: ShapeDecl * string -> ShapeDecl
+
+    /// `shape targets { ... } = ShapeBuilder(recordShape targets []) { ... }`.
+    val shape: targets: TargetSpec list -> ShapeBuilder

@@ -118,3 +118,42 @@ module ShapeBuilderModule =
         member _.MessageOp(p, msg: string) : PropertyShapeSpec = { p with Message = Some msg }
 
     let property (path: PropertyPath) = PropertyShapeBuilder(ofPath path)
+
+    [<Sealed>]
+    type ShapeBuilder(initial: ShapeDecl) =
+        member _.Yield(_) : ShapeDecl = initial
+        member _.Zero() : ShapeDecl = initial
+        member _.Run(d: ShapeDecl) : ShapeDecl = d
+
+        [<CustomOperation("properties")>]
+        member _.Properties(d, props: PropertyShapeSpec list) : ShapeDecl =
+            match d with
+            | RecordShape n ->
+                RecordShape
+                    { n with
+                        Properties = n.Properties @ props }
+            | other -> other
+
+        [<CustomOperation("closed")>]
+        member _.Closed(d, ignoredProperties: Uri list) : ShapeDecl =
+            match d with
+            | RecordShape n ->
+                RecordShape
+                    { n with
+                        Closed = true
+                        IgnoredProperties = ignoredProperties }
+            | other -> other
+
+        [<CustomOperation("severity")>]
+        member _.SeverityOp(d, sev: Severity) : ShapeDecl =
+            match d with
+            | RecordShape n -> RecordShape { n with Severity = Some sev }
+            | other -> other
+
+        [<CustomOperation("message")>]
+        member _.MessageOp(d, msg: string) : ShapeDecl =
+            match d with
+            | RecordShape n -> RecordShape { n with Message = Some msg }
+            | other -> other
+
+    let shape (targets: TargetSpec list) = ShapeBuilder(recordShape targets [])
