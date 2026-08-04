@@ -11,6 +11,7 @@
   <ItemGroup>
     <Compile Include="ShapeTypesTests.fs" />
     <Compile Include="ShapeSpecTests.fs" />
+    <Compile Include="ShaclToDocTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
