@@ -22,6 +22,7 @@ This project was inspired by @filipw's [Building Microservices with ASP.NET Core
 | **Frank.Rdf** | Hand-authored RDF triples via `rdf { }`, serialized to JSON-LD | [![NuGet](https://img.shields.io/nuget/v/Frank.Rdf)](https://www.nuget.org/packages/Frank.Rdf/) |
 | **Frank.Provenance** | PROV-O provenance recording and querying, built on Frank.Rdf | [![NuGet](https://img.shields.io/nuget/v/Frank.Provenance)](https://www.nuget.org/packages/Frank.Provenance/) |
 | **Frank.Alps** | Hand-authored ALPS profiles, filtered by authorization and state | [![NuGet](https://img.shields.io/nuget/v/Frank.Alps)](https://www.nuget.org/packages/Frank.Alps/) |
+| **Frank.Validation** | Hand-authored SHACL validation of `application/ld+json` request bodies | [![NuGet](https://img.shields.io/nuget/v/Frank.Validation)](https://www.nuget.org/packages/Frank.Validation/) |
 | **Frank.Analyzers** | F# Analyzers for compile-time error detection | [![NuGet](https://img.shields.io/nuget/v/Frank.Analyzers)](https://www.nuget.org/packages/Frank.Analyzers/) |
 
 ---
@@ -846,6 +847,80 @@ See `sample/Frank.Alps.Sample` for a runnable demonstration of both exposures an
 
 ---
 
+## Frank.Validation
+
+Frank.Validation validates `application/ld+json` request bodies against hand-authored [SHACL](https://www.w3.org/TR/shacl/) shapes -- SHACL Core in full, plus SPARQL-based constraints and the complete property-path grammar. Shapes are F# values (`ShapeDecl`), never derived from CLR types, and are interpreted onto `Frank.Rdf`'s `Doc`/`Node`/`Value` model; there is no codegen and no reflection. Built on `Frank.Rdf`; adds `dotNetRdf.Shacl` as its only new NuGet dependency.
+
+### Installation
+
+```bash
+dotnet add package Frank.Validation
+```
+
+### Example
+
+```fsharp
+open Frank.Builder
+open Frank.Rdf
+open Frank.Validation
+open Frank.Validation.ShapeSpecFunctions
+
+let personShape =
+    shape (targetClass (Uri "https://schema.org/Person")) {
+        properties [
+            property (PropertyPath.Predicate(Uri "https://schema.org/name")) {
+                datatype XsdDatatype.String
+                minCount 1
+            }
+        ]
+    }
+
+let moveShape =
+    shape (targetClass (Uri "https://schema.org/MoveAction")) {
+        properties [
+            property (PropertyPath.Predicate(Uri "https://schema.org/position")) {
+                datatype XsdDatatype.Integer
+                minCount 1
+                maxCount 1
+            }
+            property (PropertyPath.Predicate(Uri "https://schema.org/agent")) {
+                node personShape   // recursive: the value must conform to personShape
+                minCount 1
+            }
+        ]
+    }
+
+let shapesGraph = Shacl.toShapesGraph [ moveShape; personShape ]
+
+let movesResource =
+    resource "/games/{id}/moves" {
+        useValidation shapesGraph
+        post postMove
+    }
+
+webHost args {
+    useDefaults
+    useValidation          // registers the one app-wide interceptor -- required once
+    resource movesResource
+}
+```
+
+A `POST`/`PUT`/`PATCH` carrying `Content-Type: application/ld+json` to a `useValidation`-declared resource is buffered, parsed and validated before the handler runs. Conforming requests continue unchanged, and the handler can read the already-parsed graph back via `Validation.tryGetValidatedGraph ctx` instead of re-parsing. Violating requests get `422`, content-negotiated between a real `sh:ValidationReport` (`Accept: application/ld+json`) and `application/problem+json`.
+
+**Only that exact method/Content-Type combination is intercepted.** A request with `application/json`, or with no `Content-Type` at all, reaches the handler unvalidated -- see the [package README](src/Frank.Validation/README.md) for the full statement of what is and is not guarded.
+
+Shapes can also be validated directly, with no HTTP involved:
+
+```fsharp
+match Shacl.validate shapesGraph someDataGraph with
+| ValidationOutcome.Conforms -> ()
+| ValidationOutcome.Violates violations -> (* ... *)
+```
+
+See `sample/Frank.Validation.Sample` for a runnable demonstration, including the dual-path 422.
+
+---
+
 ## Frank.Analyzers
 
 Frank.Analyzers provides compile-time static analysis to catch common mistakes in Frank applications.
@@ -924,6 +999,7 @@ The `sample/` directory contains several example applications:
 | `Frank.Datastar.Oxpecker` | Datastar with [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/) |
 | `Frank.Rdf.Sample` | RDF triples authored via `rdf { }`, served as expanded-form JSON-LD |
 | `Frank.Alps.Sample` | ALPS profile served both app-wide and as a per-resource excerpt, each advertised by its own `Link` header |
+| `Frank.Validation.Sample` | SHACL-validated `POST` of a JSON-LD move, with a dual-path 422 validation report |
 | `Frank.Falco` | Frank with [Falco.Markup](https://github.com/pimbrouwers/Falco.Markup) |
 | `Frank.Giraffe` | Frank with [Giraffe.ViewEngine](https://github.com/giraffe-fsharp/Giraffe.ViewEngine) |
 | `Frank.Oxpecker` | Frank with [Oxpecker.ViewEngine](https://lanayx.github.io/Oxpecker/src/Oxpecker.ViewEngine/) |
