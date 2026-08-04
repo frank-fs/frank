@@ -130,7 +130,25 @@ module Shacl =
             let items = NonEmptyList.toList values
             let head, listStmts = rdfList items
             stmt propNode "sh:in" (Value.Node head) :: listStmts
-        | PropertyConstraint.Sparql _ -> []
+        | PropertyConstraint.Sparql sc ->
+            let prefixLines =
+                sc.Prefixes
+                |> List.map (fun (name, uri) -> sprintf "PREFIX %s: <%s>" name uri)
+                |> String.concat "\n"
+
+            let fullQuery =
+                if String.IsNullOrEmpty prefixLines then
+                    sc.Query
+                else
+                    prefixLines + "\n" + sc.Query
+
+            let bn = Node.blank ()
+
+            stmt propNode "sh:sparql" (Value.Node bn)
+            :: stmt bn "sh:select" (Value.Literal(Literal.String fullQuery))
+            :: (sc.Message
+                |> Option.map (fun m -> stmt bn "sh:message" (Value.Literal(Literal.String m)))
+                |> Option.toList)
 
     and private propertyShapeStatements (spec: PropertyShapeSpec) : Node * (Node * string * Value) list =
         let bn = Node.blank ()

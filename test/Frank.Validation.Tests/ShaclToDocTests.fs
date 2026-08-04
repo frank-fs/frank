@@ -658,4 +658,73 @@ let tests =
                 // compiler-checked (FS0025 -> error under this repo's TreatWarningsAsErrors) the moment the
                 // wildcard narrows to just Sparql; a runtime assertion would add nothing. Sparql itself is
                 // exercised in Task 11's tests.
-                ] ]
+                ]
+
+          testList
+              "sh:sparql"
+              [ test "sh:sparql is a blank node carrying sh:select with the author's query text" {
+                    let sc =
+                        { Query = "SELECT $this WHERE { $this <https://schema.org/position> ?p . FILTER (?p < 0) }"
+                          Message = None
+                          Prefixes = [] }
+
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/position"))
+                        |> addConstraint (PropertyConstraint.Sparql sc)
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    Expect.exists doc.Statements (fun (_, p, _) -> p = "sh:sparql") "sh:sparql present"
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) ->
+                            p = "sh:select"
+                            && (match v with
+                                | Value.Literal(Literal.String s) -> s.Contains "FILTER"
+                                | _ -> false))
+                        "sh:select carries the query text"
+                }
+
+                test "declared prefixes are prepended to the query text as PREFIX lines" {
+                    let sc =
+                        { Query = "SELECT $this WHERE { $this a schema:Person }"
+                          Message = None
+                          Prefixes = [ "schema", "https://schema.org/" ] }
+
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/x"))
+                        |> addConstraint (PropertyConstraint.Sparql sc)
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) ->
+                            p = "sh:select"
+                            && (match v with
+                                | Value.Literal(Literal.String s) -> s.Contains "PREFIX schema: <https://schema.org/>"
+                                | _ -> false))
+                        "PREFIX line prepended"
+                }
+
+                test "an author message on the sh:sparql constraint becomes sh:message on the same blank node" {
+                    let sc =
+                        { Query = "SELECT $this WHERE { FILTER (false) }"
+                          Message = Some "always fails"
+                          Prefixes = [] }
+
+                    let prop =
+                        ofPath (PropertyPath.Predicate(Uri "https://schema.org/x"))
+                        |> addConstraint (PropertyConstraint.Sparql sc)
+
+                    let doc =
+                        Shacl.toDoc [ recordShape (targetClass (Uri "https://schema.org/T")) [ prop ] ]
+
+                    Expect.exists
+                        doc.Statements
+                        (fun (_, p, v) -> p = "sh:message" && v = Value.Literal(Literal.String "always fails"))
+                        "sh:message present"
+                } ] ]
