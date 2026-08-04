@@ -295,6 +295,40 @@ let tests =
               Expect.stringStarts ctx.Response.ContentType "application/json" "Value should be written via viaOutputFormatter"
               Expect.stringContains (getResponseBody ctx) "Widget" "Serialized value should appear in the body"
 
+          testCase "an inline task { do! ... } handler with no return dispatches directly, not via viaOutputFormatter"
+          <| fun () ->
+              // Regression test for frank-fs/frank#492: an ordinary `task { ... }`
+              // computation expression with only `do!` statements (no `return`) infers
+              // as `HttpContext -> Task<unit>`. Before the dedicated overload existed,
+              // this was a direct match for `HttpContext -> Task<'a>` (no delegate
+              // conversion needed), which F# prefers over the `RequestDelegate`
+              // overload -- silently routing a self-writing handler through
+              // `viaOutputFormatter`. `viaOutputFormatter` sets `ContentType`
+              // unconditionally, which throws ("Headers are read-only, response has
+              // already started") once the handler has already written to the body,
+              // exactly the `getGame`/JSON-LD crash the issue reports. No
+              // RequestServices/formatter registration is configured here at all --
+              // if this silently fell through to viaOutputFormatter, resolving
+              // OutputFormatterSelector would itself throw, since AddMvcCore was never
+              // called on this context's (default, empty) service provider.
+              let ctx = createMockContext ()
+              setAccept ctx "application/ld+json"
+
+              let def =
+                  negotiate {
+                      accepts "application/ld+json" (fun (ctx: HttpContext) ->
+                          task {
+                              ctx.Response.ContentType <- "application/ld+json"
+                              do! ctx.Response.WriteAsync("jsonld-body")
+                          })
+                  }
+
+              def.Handler.Invoke(ctx).Wait()
+
+              Expect.equal ctx.Response.StatusCode 200 "Should not throw or 500"
+              Expect.equal ctx.Response.ContentType "application/ld+json" "The handler's own Content-Type assignment must survive, not be overwritten"
+              Expect.equal (getResponseBody ctx) "jsonld-body" "The handler's own body write must survive"
+
           testCase "an Async<'a>-returning accepts handler has its value auto-formatted"
           <| fun () ->
               let ctx = createMockContext ()

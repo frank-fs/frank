@@ -26,6 +26,11 @@ type NegotiateBuilder =
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> unit) -> NegotiateSpec
     [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handlerDef: HandlerDefinition -> NegotiateSpec
+    /// A self-writing async handler -- what a `task { ... }` block with no `return`
+    /// infers as. Dispatched directly, like `RequestDelegate`/`HttpContext -> unit`;
+    /// never routed through `viaOutputFormatter`. See frank-fs/frank#492.
+    [<CustomOperation("accepts")>]
+    member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> Task<unit>) -> NegotiateSpec
     [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> Task<'a>) -> NegotiateSpec
     [<CustomOperation("accepts")>]
