@@ -66,7 +66,7 @@ module AlpsDocument =
         |> List.filter (fun d -> d.Type <> DescriptorType.Semantic && not (Set.contains d.Id boundIds))
         |> List.distinctBy (fun d -> d.Id)
 
-    let private documentHandler (profile: Descriptor list) (ctx: HttpContext) : Task =
+    let private documentHandler (options: AlpsOptions) (profile: Descriptor list) (ctx: HttpContext) : Task =
         task {
             // Membership is tested against the WHOLE tree reachable from `profile`, not just its
             // top-level elements: `contains` nesting is general, so a `binds`-bound transition is
@@ -96,8 +96,7 @@ module AlpsDocument =
                 ctx.Response.Headers.Vary <- "Authorization"
 
             ctx.Response.ContentType <- MediaType
-            let rootUri = Uri(AlpsOptions.Default.Path, UriKind.Relative)
-            do! ctx.Response.WriteAsync(Serialization.toJson rootUri served)
+            do! ctx.Response.WriteAsync(Serialization.toJson (Uri(options.Path, UriKind.Relative)) served)
         }
 
     /// Wraps the private documentHandler into a Resource -- the same shape as
@@ -110,7 +109,7 @@ module AlpsDocument =
         // referenced as a bare identifier inside the computation expression below, hence the
         // rebinding before entering it -- same reasoning as JsonHome.documentResource.
         let alpsOptions = options
-        resource alpsOptions.Path { get (RequestDelegate(documentHandler profile)) }
+        resource alpsOptions.Path { get (RequestDelegate(documentHandler alpsOptions profile)) }
 
     /// Validates every registered resource's bound transitions during host startup -- after
     /// routing has fully built every endpoint, and before the app accepts its first request.
@@ -187,7 +186,8 @@ module WebHostBuilderExtensions =
             Services =
                 spec.Services
                 >> fun services ->
-                    services.AddSingleton<IStartupFilter>(AlpsDocument.ValidationStartupFilter profile)
+                    services.AddSingleton<IStartupFilter>(AlpsDocument.ValidationStartupFilter profile) |> ignore
+                    services.AddSingleton<AlpsOptions>(options)
             LinkProviders =
                 spec.LinkProviders
                 @ [ fun (_: HttpContext) -> Seq.singleton { Target = options.Path; Rel = options.Rel; Params = [] } ]

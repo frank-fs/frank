@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
+open Microsoft.Extensions.DependencyInjection
 
 type CurrentStateResolver = string -> Uri list
 
@@ -16,6 +17,19 @@ module Alps =
         match ctx.GetEndpoint() with
         | :? RouteEndpoint as re -> re.RoutePattern.RawText
         | _ -> failwith "Frank.Alps: Alps.excerpt requires a routed endpoint"
+
+    /// The root document's rootUri, read back from the AlpsOptions `useAlps` registered as a DI
+    /// singleton (WebHostBuilderExtensions.install in AlpsDocument.fs) -- so a served excerpt's
+    /// cross-document references point at wherever the app actually configured the full document to
+    /// live, not a hardcoded assumption. Falls back to AlpsOptions.Default when no `useAlps` was ever
+    /// composed: `Alps.excerpt` can be wired into a `negotiate { }` block on its own, with no app-wide
+    /// document registered at all, and still needs a working rootUri for descriptors it references
+    /// that aren't in this excerpt -- the default path is exactly where a full document would land if
+    /// one were added later, so a same-app cross-reference still resolves correctly once it is.
+    let private rootUriFor (ctx: HttpContext) : Uri =
+        let resolved = ctx.RequestServices.GetService<AlpsOptions>()
+        let options = if obj.ReferenceEquals(resolved, null) then AlpsOptions.Default else resolved
+        Uri(options.Path, UriKind.Relative)
 
     let excerpt (resolver: CurrentStateResolver option) : RequestDelegate =
         RequestDelegate(fun ctx ->
@@ -62,7 +76,6 @@ module Alps =
                     ctx.Response.Headers.Append("Vary", "Authorization")
 
                 ctx.Response.ContentType <- AlpsDocument.MediaType
-                let rootUri = Uri(AlpsOptions.Default.Path, UriKind.Relative)
-                return! ctx.Response.WriteAsync(Serialization.toJson rootUri served)
+                return! ctx.Response.WriteAsync(Serialization.toJson (rootUriFor ctx) served)
              })
             :> Task)
