@@ -8,7 +8,7 @@ open Frank.Validation.ShapeSpecFunctions
 open VDS.RDF
 
 let private dataGraphWithType (classIri: string) (instanceIri: string) (extraTriples: (string * string) list) : IGraph =
-    let g = Graph() :> IGraph
+    let g = new Graph() :> IGraph
     g.NamespaceMap.AddNamespace("rdf", UriFactory.Create "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
     let inst = g.CreateUriNode(UriFactory.Create instanceIri)
     let rdfType = g.CreateUriNode(g.ResolveQName "rdf:type")
@@ -25,7 +25,7 @@ let private dataGraphWithType (classIri: string) (instanceIri: string) (extraTri
 /// A one-triple graph whose object is a plain literal -- the data shape a TargetSpec.ObjectsOf shape
 /// needs to produce a LITERAL focus node (final-review finding C1).
 let private graphWithLiteralObject (predicate: string) (literal: string) : IGraph =
-    let g = Graph() :> IGraph
+    let g = new Graph() :> IGraph
 
     g.Assert(
         Triple(
@@ -41,7 +41,7 @@ let private graphWithLiteralObject (predicate: string) (literal: string) : IGrap
 /// An instance of `classIri` carrying one xsd:integer-typed property -- needed wherever a numeric
 /// SPARQL FILTER or range constraint has to see a real integer, not a plain string literal.
 let private graphWithIntProperty (classIri: string) (instanceIri: string) (position: int) : IGraph =
-    let g = Graph() :> IGraph
+    let g = new Graph() :> IGraph
     let inst = g.CreateUriNode(UriFactory.Create instanceIri)
 
     g.Assert(Triple(inst, g.CreateUriNode(UriFactory.Create RdfTypeIri), g.CreateUriNode(UriFactory.Create classIri)))
@@ -181,7 +181,7 @@ let tests =
               let sg = Shacl.toShapesGraph [ shape ]
 
               let dataGraph =
-                  let g = Graph() :> IGraph
+                  let g = new Graph() :> IGraph
 
                   g.Assert(
                       Triple(
@@ -284,7 +284,7 @@ let tests =
               let sg = Shacl.toShapesGraph [ closedToName; requiresEmail ]
 
               let dataGraph =
-                  let g = Graph() :> IGraph
+                  let g = new Graph() :> IGraph
                   let inst = g.CreateUriNode(UriFactory.Create "https://example.org/p1")
 
                   g.Assert(
@@ -366,7 +366,7 @@ let tests =
                         |> addConstraint (PropertyConstraint.MinCount 1) ]
 
               let sg = Shacl.toShapesGraph [ shape ]
-              let dataGraph = Graph() :> IGraph
+              let dataGraph = new Graph() :> IGraph
 
               match Shacl.validate sg dataGraph with
               | ValidationOutcome.Conforms -> ()

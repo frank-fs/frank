@@ -8,7 +8,7 @@ open VDS.RDF
 open VDS.RDF.Parsing
 
 let private parseBackToGraph (json: string) : IGraph =
-    let store = TripleStore()
+    let store = new TripleStore()
     use reader = new System.IO.StringReader(json)
     JsonLdParser().Load(store, reader)
     store.Graphs |> Seq.head

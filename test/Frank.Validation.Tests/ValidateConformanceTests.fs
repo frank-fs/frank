@@ -63,7 +63,7 @@ let rec private assertProps (g: IGraph) (subject: INode) (props: (string * Obj) 
 
 /// One instance of `T` carrying the given properties.
 let private data (props: (string * Obj) list) : IGraph =
-    let g = Graph() :> IGraph
+    let g = new Graph() :> IGraph
     let subject = g.CreateUriNode(UriFactory.Create Instance)
 
     g.Assert(Triple(subject, g.CreateUriNode(UriFactory.Create RdfTypeIri), g.CreateUriNode(UriFactory.Create T)))

@@ -85,7 +85,7 @@ let private moveShape =
 /// One data graph per concurrent call -- VDS.RDF.Graph is not safe for concurrent mutation, and
 /// sharing one would measure the fixture rather than the engine.
 let private makeDataGraph (i: int) (conforming: bool) : IGraph =
-    let g = Graph() :> IGraph
+    let g = new Graph() :> IGraph
     let move = g.CreateUriNode(UriFactory.Create $"https://example.org/move{i}")
     let agent = g.CreateUriNode(UriFactory.Create $"https://example.org/p{i}")
     let typ = g.CreateUriNode(UriFactory.Create RdfTypeIri)
