@@ -124,6 +124,59 @@ let private buildSampleServer () : HttpClient =
 
     createServer spec
 
+/// Regression coverage for the DI-threaded `rootUri` wiring (Frank.Alps multi-doc-linking plan, task
+/// 2): `WebHostBuilderExtensions.install` registers the `AlpsOptions` a `useAlps` call was actually
+/// composed with as a DI singleton, and `Excerpt.rootUriFor` reads it back from
+/// `ctx.RequestServices` at request time, falling back to `AlpsOptions.Default` when nothing is
+/// registered. Neither this file's `buildSampleServer` (always the default `Path`) nor
+/// `FilteringIntegrationTests.fs` (same) ever calls the `useAlps(profile, configure)` 3-arg overload
+/// with a non-default `Path`, nor wires `Alps.excerpt` into a host with no `useAlps` composed at all
+/// -- so a bug that always resolved `AlpsOptions.Default` regardless of DI registration, or an
+/// inverted null-check in `rootUriFor`, would still compile and pass every other test in this suite.
+module private RootUriWiring =
+    // `shared` is deliberately never added to the profile handed to `useAlps` in either test below --
+    // it exists only as an `href` target guaranteed absent from what's served, forcing
+    // Serialization.toJson's cross-document (`rootUri#id`) resolution branch rather than its local
+    // (`#id`) one.
+    let shared = semantic "shared"
+    let local = safe "local" |> href shared
+
+    let private getLocalJson (ctx: HttpContext) : Task = ctx.Response.WriteAsJsonAsync {| ok = true |}
+
+    /// `local`'s `application/alps+json` excerpt is exactly what asserts on `rootUriFor`'s
+    /// resolution; the `application/json` branch exists only so `local` has an endpoint to `binds`
+    /// (a descriptor with no bound endpoint is pruned from `served` entirely, per
+    /// `DescriptorTree.prune`, and would never appear in the response body to assert on).
+    let localResource =
+        resource "/local" {
+            get (
+                negotiate {
+                    accepts "application/json" (handler {
+                        handle getLocalJson
+                        binds local
+                    })
+
+                    accepts "application/alps+json" (Alps.excerpt None)
+                }
+            )
+        }
+
+let private hrefOf (id: string) (body: string) =
+    JsonDocument
+        .Parse(body)
+        .RootElement.GetProperty("alps")
+        .GetProperty("descriptor")
+        .EnumerateArray()
+    |> Seq.find (fun d -> d.GetProperty("id").GetString() = id)
+    |> fun d -> d.GetProperty("href").GetString()
+
+let private getAlpsExcerpt (client: HttpClient) (path: string) =
+    task {
+        let request = new HttpRequestMessage(HttpMethod.Get, path)
+        request.Headers.Accept.ParseAdd "application/alps+json"
+        return! client.SendAsync request
+    }
+
 [<Tests>]
 let tests =
     testList
@@ -210,4 +263,53 @@ let tests =
                   ids
                   (Set.ofList [ "open"; "closed"; "game"; "viewGame"; "makeMove" ])
                   "Full profile contains every descriptor id"
+          }
+
+          testTask
+              "Alps.excerpt resolves a cross-document href against a non-default useAlps Path, not AlpsOptions.Default" {
+              // useAlps composed via the 3-arg `configure` overload, at a non-default Path -- proving
+              // `Excerpt.rootUriFor` reads back the SAME AlpsOptions `install` registered in DI, not a
+              // hardcoded default.
+              let spec =
+                  (webHost [||])
+                      .UseAlps(WebHostSpec.Empty, [ RootUriWiring.local ], (fun opts -> { opts with Path = "/custom/alps.json" }))
+
+              let spec =
+                  { spec with
+                      Endpoints = Array.append spec.Endpoints RootUriWiring.localResource.Endpoints }
+
+              let client = createServer spec
+              let! (response: HttpResponseMessage) = getAlpsExcerpt client "/local"
+              let! (body: string) = response.Content.ReadAsStringAsync()
+
+              Expect.equal (int response.StatusCode) 200 "the excerpt is served"
+
+              Expect.equal
+                  (hrefOf "local" body)
+                  "/custom/alps.json#shared"
+                  "the excerpt's href for a descriptor absent from the profile resolves against the \
+                   configured non-default useAlps Path -- proof Excerpt.rootUriFor read the \
+                   DI-registered AlpsOptions rather than falling through to AlpsOptions.Default"
+          }
+
+          testTask "Alps.excerpt falls back to AlpsOptions.Default when no useAlps was ever composed" {
+              // No .UseAlps(...) call anywhere in this spec -- AlpsOptions is never registered in DI,
+              // so Excerpt.rootUriFor's GetService<AlpsOptions>() call must return null and its
+              // fallback branch must fire.
+              let spec =
+                  { WebHostSpec.Empty with
+                      Endpoints = RootUriWiring.localResource.Endpoints }
+
+              let client = createServer spec
+              let! (response: HttpResponseMessage) = getAlpsExcerpt client "/local"
+              let! (body: string) = response.Content.ReadAsStringAsync()
+
+              Expect.equal (int response.StatusCode) 200 "the excerpt still serves correctly with no useAlps composed at all"
+
+              Expect.equal
+                  (hrefOf "local" body)
+                  "/.well-known/alps.json#shared"
+                  "with no useAlps composed, AlpsOptions is never registered in DI -- rootUriFor's null \
+                   check must fall back to AlpsOptions.Default rather than throwing or resolving \
+                   incorrectly"
           } ]
