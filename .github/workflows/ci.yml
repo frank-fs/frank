@@ -27,8 +27,6 @@ jobs:
         run: |
           dotnet restore Frank.sln
           dotnet build Frank.sln -c Release --no-restore
-          dotnet restore Frank.Datastar.sln
-          dotnet build Frank.Datastar.sln -c Release --no-restore
       - name: Test
         run: |
           dotnet test test/Frank.Tests
@@ -39,8 +37,8 @@ jobs:
           dotnet test test/Frank.JsonHome.Tests
           dotnet test test/Frank.Rdf.Tests
           dotnet test test/Frank.Provenance.Tests
-          dotnet test test/Frank.Alps.Tests
           dotnet test test/Frank.Validation.Tests
+          dotnet test test/Frank.Alps.Tests
       - name: Pack
         run: |
           dotnet pack src/Frank -c Release --no-restore --include-symbols -o out
@@ -51,8 +49,8 @@ jobs:
           dotnet pack src/Frank.JsonHome -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.Rdf -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.Provenance -c Release --no-restore --include-symbols -o out
-          dotnet pack src/Frank.Alps -c Release --no-restore --include-symbols -o out
           dotnet pack src/Frank.Validation -c Release --no-restore --include-symbols -o out
+          dotnet pack src/Frank.Alps -c Release --no-restore --include-symbols -o out
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
