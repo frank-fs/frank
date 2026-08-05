@@ -1,5 +1,6 @@
 namespace Frank.Alps
 
+open System
 open System.IO
 open System.Text
 open System.Text.Json
@@ -20,9 +21,16 @@ module Serialization =
         | DocFormat.Asciidoc -> "asciidoc"
         | DocFormat.Markdown -> "markdown"
 
-    let private resolveHref (r: DescriptorRef) : string =
+    let private idsIn (profile: Descriptor list) : Set<string> =
+        DescriptorTree.flattenAll profile |> List.map (fun d -> d.Id) |> Set.ofList
+
+    let private resolveRef (rootUri: Uri) (present: Set<string>) (id: string) : string =
+        if Set.contains id present then "#" + id
+        else rootUri.ToString() + "#" + id
+
+    let private resolveHref (rootUri: Uri) (present: Set<string>) (r: DescriptorRef) : string =
         match r with
-        | DescriptorRef.Local target -> "#" + target.Id
+        | DescriptorRef.Local target -> resolveRef rootUri present target.Id
         | DescriptorRef.External uri -> uri.ToString()
 
     let private writeDoc (writer: Utf8JsonWriter) (doc: Doc) : unit =
@@ -53,21 +61,14 @@ module Serialization =
             writer.WriteString("tag", String.concat " " e.Tag)
         writer.WriteEndObject()
 
-    let private stateExtPairs (from_: Descriptor list) : Ext list =
+    let private stateExtPairs (rootUri: Uri) (present: Set<string>) (from_: Descriptor list) : Ext list =
         from_
         |> List.collect (fun state ->
-            let value = Some("#" + state.Id)
+            let value = Some(resolveRef rootUri present state.Id)
+            [ { Id = ProtocolStateExtId; Href = None; Value = value; Tag = [] }
+              { Id = AvailableInStatesExtId; Href = None; Value = value; Tag = [] } ])
 
-            [ { Id = ProtocolStateExtId
-                Href = None
-                Value = value
-                Tag = [] }
-              { Id = AvailableInStatesExtId
-                Href = None
-                Value = value
-                Tag = [] } ])
-
-    let rec private writeDescriptor (writer: Utf8JsonWriter) (d: Descriptor) : unit =
+    let rec private writeDescriptor (writer: Utf8JsonWriter) (rootUri: Uri) (present: Set<string>) (d: Descriptor) : unit =
         writer.WriteStartObject()
         writer.WriteString("id", d.Id)
         d.Name |> Option.iter (fun n -> writer.WriteString("name", n))
@@ -81,15 +82,15 @@ module Serialization =
         d.Def |> Option.iter (fun uri -> writer.WriteString("def", uri.ToString()))
         d.Doc |> Option.iter (writeDoc writer)
 
-        let allExt = d.Ext @ stateExtPairs d.From
+        let allExt = d.Ext @ stateExtPairs rootUri present d.From
 
         if not (List.isEmpty allExt) then
             writer.WriteStartArray("ext")
             allExt |> List.iter (writeExtElement writer)
             writer.WriteEndArray()
 
-        d.InheritsFrom |> Option.iter (fun r -> writer.WriteString("href", resolveHref r))
-        d.Rt |> Option.iter (fun target -> writer.WriteString("rt", "#" + target.Id))
+        d.InheritsFrom |> Option.iter (fun r -> writer.WriteString("href", resolveHref rootUri present r))
+        d.Rt |> Option.iter (fun target -> writer.WriteString("rt", resolveRef rootUri present target.Id))
         d.Rel |> Option.iter (fun r -> writer.WriteString("rel", r))
 
         if not (List.isEmpty d.Tag) then
@@ -102,12 +103,13 @@ module Serialization =
 
         if not (List.isEmpty d.Descriptors) then
             writer.WriteStartArray("descriptor")
-            d.Descriptors |> List.iter (writeDescriptor writer)
+            d.Descriptors |> List.iter (writeDescriptor writer rootUri present)
             writer.WriteEndArray()
 
         writer.WriteEndObject()
 
-    let toJson (profile: Descriptor list) : string =
+    let toJson (rootUri: Uri) (profile: Descriptor list) : string =
+        let present = idsIn profile
         use stream = new MemoryStream()
 
         (use writer = new Utf8JsonWriter(stream)
@@ -115,7 +117,7 @@ module Serialization =
          writer.WriteStartObject("alps")
          writer.WriteString("version", "1.0")
          writer.WriteStartArray("descriptor")
-         profile |> List.iter (writeDescriptor writer)
+         profile |> List.iter (writeDescriptor writer rootUri present)
          writer.WriteEndArray()
          writer.WriteEndObject()
          writer.WriteEndObject())

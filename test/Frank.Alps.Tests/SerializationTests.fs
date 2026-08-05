@@ -1,8 +1,11 @@
 module Frank.Alps.Tests.SerializationTests
 
+open System
 open System.Text.Json
 open Expecto
 open Frank.Alps
+
+let private testRootUri = Uri("/.well-known/alps.json", UriKind.Relative)
 
 let private parse (json: string) = JsonDocument.Parse(json).RootElement
 
@@ -17,14 +20,14 @@ let tests =
     testList
         "Serialization.toJson"
         [ test "root shape is alps.version = 1.0, alps.descriptor as an array" {
-              let root = Serialization.toJson [ semantic "x" ] |> parse
+              let root = Serialization.toJson testRootUri [ semantic "x" ] |> parse
               Expect.equal (root.GetProperty("alps").GetProperty("version").GetString()) "1.0" ""
               Expect.equal (descriptorArray root |> List.length) 1 ""
           }
 
           test "type is omitted for Semantic, present and lowercase otherwise" {
               let root =
-                  Serialization.toJson [ semantic "a"; safe "b"; unsafe "c"; idempotent "d" ] |> parse
+                  Serialization.toJson testRootUri [ semantic "a"; safe "b"; unsafe "c"; idempotent "d" ] |> parse
 
               let descriptors = descriptorArray root
               let hasType id = (findById id descriptors).TryGetProperty("type") |> fst
@@ -44,7 +47,7 @@ let tests =
                   |> tag "currency"
                   |> rel "self"
 
-              let json = findById "price" (descriptorArray (Serialization.toJson [ d ] |> parse))
+              let json = findById "price" (descriptorArray (Serialization.toJson testRootUri [ d ] |> parse))
 
               Expect.equal (json.GetProperty("def").GetString()) "https://schema.org/price" ""
               Expect.equal (json.GetProperty("doc").GetProperty("value").GetString()) "Price in minor units" ""
@@ -55,7 +58,7 @@ let tests =
           test "rt serializes as a local #id reference" {
               let product = semantic "product"
               let d = safe "listProducts" |> rt product
-              let json = findById "listProducts" (descriptorArray (Serialization.toJson [ product; d ] |> parse))
+              let json = findById "listProducts" (descriptorArray (Serialization.toJson testRootUri [ product; d ] |> parse))
               Expect.equal (json.GetProperty("rt").GetString()) "#product" ""
           }
 
@@ -64,7 +67,7 @@ let tests =
               let local = semantic "local" |> href shared
               let external' = semantic "external" |> hrefExternal "https://example.org/other#thing"
 
-              let descriptors = descriptorArray (Serialization.toJson [ shared; local; external' ] |> parse)
+              let descriptors = descriptorArray (Serialization.toJson testRootUri [ shared; local; external' ] |> parse)
 
               Expect.equal ((findById "local" descriptors).GetProperty("href").GetString()) "#shared" ""
 
@@ -77,7 +80,7 @@ let tests =
           test "contains serializes as a nested descriptor array" {
               let child = semantic "productId"
               let parent = semantic "product" |> contains [ child ]
-              let json = findById "product" (descriptorArray (Serialization.toJson [ parent ] |> parse))
+              let json = findById "product" (descriptorArray (Serialization.toJson testRootUri [ parent ] |> parse))
               let nested = json.GetProperty("descriptor").EnumerateArray() |> List.ofSeq
               Expect.equal nested.Length 1 ""
               Expect.equal (nested.[0].GetProperty("id").GetString()) "productId" ""
@@ -88,7 +91,7 @@ let tests =
               let c = semantic "c"
               let t = unsafe "t" |> from [ a; b ] |> rt c
 
-              let json = findById "t" (descriptorArray (Serialization.toJson [ a; b; c; t ] |> parse))
+              let json = findById "t" (descriptorArray (Serialization.toJson testRootUri [ a; b; c; t ] |> parse))
               let extIds = json.GetProperty("ext").EnumerateArray() |> Seq.map (fun e -> e.GetProperty("id").GetString()) |> List.ofSeq
 
               Expect.equal
@@ -100,12 +103,12 @@ let tests =
 
           test "a transition with no from emits no protocolState/availableInStates ext" {
               let t = unsafe "t"
-              let json = findById "t" (descriptorArray (Serialization.toJson [ t ] |> parse))
+              let json = findById "t" (descriptorArray (Serialization.toJson testRootUri [ t ] |> parse))
               Expect.isFalse (json.TryGetProperty("ext") |> fst) ""
           }
 
           test "empty tag/link/descriptor/ext are omitted entirely, not written as empty arrays" {
-              let json = findById "x" (descriptorArray (Serialization.toJson [ semantic "x" ] |> parse))
+              let json = findById "x" (descriptorArray (Serialization.toJson testRootUri [ semantic "x" ] |> parse))
               Expect.isFalse (json.TryGetProperty("tag") |> fst) ""
               Expect.isFalse (json.TryGetProperty("link") |> fst) ""
               Expect.isFalse (json.TryGetProperty("descriptor") |> fst) ""
@@ -119,7 +122,7 @@ let tests =
                        |> ext "https://example.org/custom" "custom-value"
                        |> from [ a; b ]
 
-              let json = findById "t" (descriptorArray (Serialization.toJson [ a; b; t ] |> parse))
+              let json = findById "t" (descriptorArray (Serialization.toJson testRootUri [ a; b; t ] |> parse))
               let extArray = json.GetProperty("ext").EnumerateArray() |> List.ofSeq
               let extIds = extArray |> List.map (fun e -> e.GetProperty("id").GetString())
 
@@ -133,4 +136,27 @@ let tests =
 
               Expect.equal protocolStatePairs 2 "should have 2 protocolState entries"
               Expect.equal availableInStatesPairs 2 "should have 2 availableInStates entries"
+          }
+
+          test "href to a descriptor NOT in profile resolves to rootUri#id" {
+              let shared = semantic "shared"
+              let local = semantic "local" |> href shared
+              let json = findById "local" (descriptorArray (Serialization.toJson testRootUri [ local ] |> parse))
+              Expect.equal (json.GetProperty("href").GetString()) "/.well-known/alps.json#shared" ""
+          }
+
+          test "rt to a descriptor NOT in profile resolves to rootUri#id" {
+              let shared = semantic "shared"
+              let local = unsafe "local" |> rt shared
+              let json = findById "local" (descriptorArray (Serialization.toJson testRootUri [ local ] |> parse))
+              Expect.equal (json.GetProperty("rt").GetString()) "/.well-known/alps.json#shared" ""
+          }
+
+          test "from-state NOT in profile resolves ext value to rootUri#id" {
+              let awaitingPing = semantic "awaitingPing"
+              let awaitingPong = semantic "awaitingPong" |> from [ awaitingPing ]
+              let json = findById "awaitingPong" (descriptorArray (Serialization.toJson testRootUri [ awaitingPong ] |> parse))
+              let extArray = json.GetProperty("ext").EnumerateArray() |> List.ofSeq
+              let extValue = extArray.[0].GetProperty("value").GetString()
+              Expect.equal extValue "/.well-known/alps.json#awaitingPing" ""
           } ]

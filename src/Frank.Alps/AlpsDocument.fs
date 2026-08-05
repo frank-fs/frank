@@ -96,7 +96,8 @@ module AlpsDocument =
                 ctx.Response.Headers.Vary <- "Authorization"
 
             ctx.Response.ContentType <- MediaType
-            do! ctx.Response.WriteAsync(Serialization.toJson served)
+            let rootUri = Uri(AlpsOptions.Default.Path, UriKind.Relative)
+            do! ctx.Response.WriteAsync(Serialization.toJson rootUri served)
         }
 
     /// Wraps the private documentHandler into a Resource -- the same shape as

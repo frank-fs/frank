@@ -13,4 +13,12 @@ module SerializationExt =
 module Serialization =
     /// Serializes a profile (the same `Descriptor list` passed to `useAlps`, or any subset for the
     /// per-resource excerpt) as draft-07 JSON: `{ "alps": { "version": "1.0", "descriptor": [...] } }`.
-    val toJson: profile: Descriptor list -> string
+    ///
+    /// Cross-descriptor references resolve in two cases:
+    /// - Local references: if the referenced descriptor is present in `profile`, emits a same-document
+    ///   `#id` fragment (the scope of the served document).
+    /// - Cross-document fallback: if the referenced descriptor is absent from `profile` (filtered out
+    ///   in an excerpt or role-pruned view), emits `rootUri#id` to link the reader to the full document
+    ///   at `rootUri`.
+    /// External references (URIs) are always serialized verbatim, unchanged.
+    val toJson: rootUri: System.Uri -> profile: Descriptor list -> string

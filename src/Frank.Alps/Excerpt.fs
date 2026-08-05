@@ -62,6 +62,7 @@ module Alps =
                     ctx.Response.Headers.Append("Vary", "Authorization")
 
                 ctx.Response.ContentType <- AlpsDocument.MediaType
-                return! ctx.Response.WriteAsync(Serialization.toJson served)
+                let rootUri = Uri(AlpsOptions.Default.Path, UriKind.Relative)
+                return! ctx.Response.WriteAsync(Serialization.toJson rootUri served)
              })
             :> Task)
