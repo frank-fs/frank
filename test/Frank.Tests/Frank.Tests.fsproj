@@ -16,6 +16,7 @@
     <Compile Include="MiddlewareOrderingTests.fs" />
     <Compile Include="MetadataTests.fs" />
     <Compile Include="MediaTypeNegotiationTests.fs" />
+    <Compile Include="ProducesMatcherPolicyTests.fs" />
     <Compile Include="NegotiateBuilderTests.fs" />
     <Compile Include="ContentNegotiationTests.fs" />
     <Compile Include="Program.fs" />

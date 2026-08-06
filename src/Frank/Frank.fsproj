@@ -17,6 +17,8 @@
     <Compile Include="WebLink.fs" />
     <Compile Include="NegotiateBuilder.fsi" />
     <Compile Include="NegotiateBuilder.fs" />
+    <Compile Include="ProducesMatcherPolicy.fsi" />
+    <Compile Include="ProducesMatcherPolicy.fs" />
     <Compile Include="ResourceBuilder.fsi" />
     <Compile Include="ResourceBuilder.fs" />
     <Compile Include="WebHostBuilder.fsi" />
