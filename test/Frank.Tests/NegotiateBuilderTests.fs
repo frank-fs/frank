@@ -283,10 +283,50 @@ let tests =
                   let produces = HandlerDefinition.findAll<Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata> def
                   Expect.hasLength produces 1 "Only the handler{}-based representation's metadata should exist, broadcast to every representation"
 
+          testCase "non-produces metadata stays on its own representation and is NOT broadcast to siblings"
+          <| fun () ->
+              // Only `produces` metadata is broadcast across representations (the OpenAPI
+              // mitigation). Anything else -- an ALPS `Descriptor` from `binds`, an
+              // authorization marker -- belongs to the one representation that declared it;
+              // broadcasting it duplicated it onto every sibling endpoint (verified against
+              // Frank.Alps.Sample: the alps+json representation served `viewGame` twice).
+              let marker = box "marker-only-on-rep-0"
+
+              let jsonRepresentation =
+                  handler {
+                      produces typeof<Product> 200 [ "application/json" ]
+                      handle (writeText "json")
+                  }
+                  |> HandlerDefinition.addMetadata marker
+
+              let defs =
+                  negotiate {
+                      accepts "application/json" jsonRepresentation
+
+                      accepts "text/html" (handler {
+                          produces typeof<Product> 200 [ "text/html" ]
+                          handle (writeText "html")
+                      })
+                  }
+
+              Expect.hasLength defs 2 "Two representations"
+
+              Expect.isTrue
+                  (defs.[0].Metadata |> List.exists (fun m -> System.Object.ReferenceEquals(m, marker)))
+                  "The declaring representation keeps its own non-produces metadata"
+
+              Expect.isFalse
+                  (defs.[1].Metadata |> List.exists (fun m -> System.Object.ReferenceEquals(m, marker)))
+                  "A sibling representation must NOT inherit another representation's non-produces metadata"
+
+              // ... while produces metadata IS still merged and broadcast to both (Task 4/6).
+              for def in defs do
+                  let produces = HandlerDefinition.findAll<Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata> def
+                  Expect.hasLength produces 1 "Same status code + type still merge into one broadcast metadata object"
+                  Expect.containsAll produces.[0].ContentTypes [ "application/json"; "text/html" ] "Every representation still carries the full merged content-type union"
+
           testCase "negotiate {} with no accepts calls throws"
           <| fun () ->
-              let buildEmpty () = negotiate { accepts "unused" (writeText "unused") } |> ignore |> ignore
-              // (kept non-empty above to prove the builder compiles; the real empty-block case:)
               let buildTrulyEmpty () =
                   (NegotiateBuilder()).Run(NegotiateSpec.Empty) |> ignore
 

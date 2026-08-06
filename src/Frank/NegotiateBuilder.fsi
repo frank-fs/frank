@@ -20,9 +20,12 @@ type NegotiateBuilder =
     member Yield: 'T -> NegotiateSpec
     /// Builds one `HandlerDefinition` per registered representation -- dispatch among
     /// them happens at the routing layer (`FrankProducesMatcherPolicy`), not here.
-    /// Every representation's `HandlerDefinition.Metadata` carries the SAME
-    /// broadcast-merged `produces` metadata (see `Negotiation.mergeProducesMetadata`),
-    /// plus its own `ProducesMediaTypeMetadata` tag used by the matcher policy.
+    /// Every representation's `HandlerDefinition.Metadata` carries its own
+    /// `ProducesMediaTypeMetadata` tag (used by the matcher policy), then its OWN
+    /// non-`produces` metadata, then the SAME broadcast-merged `produces` metadata
+    /// (see `Negotiation.mergeProducesMetadata`) that every sibling carries. Only
+    /// `produces` metadata is broadcast -- anything else a representation declares
+    /// stays on that representation's endpoint alone.
     member Run: spec: NegotiateSpec -> HandlerDefinition list
 
     [<CustomOperation("accepts")>]

@@ -343,6 +343,17 @@ let tests =
                   (Set.ofList ids)
                   (Set.ofList [ "viewGame"; "makeMove" ])
                   "Excerpt for /games/1 contains exactly the GET (negotiate{}-routed) and POST descriptors"
+
+              // The set assertion above collapses duplicates by definition, so it cannot see a
+              // descriptor served twice. It missed exactly that: NegotiateBuilder.Run once
+              // broadcast EVERY representation's metadata (not just `produces`) to every
+              // sibling endpoint, so the alps+json representation inherited the json
+              // representation's `binds Catalog.viewGame` Descriptor and this document listed
+              // "viewGame" twice. Assert on the list, not the set.
+              Expect.equal
+                  (List.sort ids)
+                  [ "makeMove"; "viewGame" ]
+                  "Each descriptor appears exactly once -- no representation inherits a sibling's binds"
           }
 
           testTask "GET /.well-known/alps.json returns the full profile including openState/closedState/game" {

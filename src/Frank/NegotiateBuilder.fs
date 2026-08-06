@@ -31,6 +31,10 @@ module internal Negotiation =
                 "accepts \"%s\" cannot auto-format a value-returning handler via viaOutputFormatter -- wildcard media types have no concrete type for the formatter selector, and would emit an invalid Content-Type. Use a RequestDelegate or HttpContext -> unit handler instead."
                 mediaType
 
+    /// True when a metadata entry is `produces` metadata -- the only kind
+    /// `NegotiateBuilder.Run` broadcasts across every representation's endpoint.
+    let isProducesMetadata (metadata: obj) = metadata :? IProducesResponseTypeMetadata
+
     /// Merges `IProducesResponseTypeMetadata` entries that share both the same status code
     /// and the same response `Type` into one, unioning their content types -- the exact
     /// shape (one metadata object, several content types) that already reaches the
@@ -57,13 +61,19 @@ module internal Negotiation =
     /// left as separate metadata objects -- Microsoft.AspNetCore.OpenApi's last-wins
     /// behavior still applies to that narrower case. A documented, accepted limitation, not
     /// fixed here.
+    ///
+    /// Returns ONLY the merged `produces` entries. Non-`produces` metadata is dropped here
+    /// on purpose: `Run` broadcasts this result to EVERY representation's endpoint, and
+    /// broadcasting anything else (e.g. an ALPS `Descriptor` attached via `binds`, or an
+    /// authorization marker) would duplicate a single representation's own metadata onto its
+    /// siblings. Each representation's non-`produces` metadata stays on its own endpoint,
+    /// carried through by `Run`.
     let mergeProducesMetadata (metadata: obj list) : obj list =
-        let produces, other =
-            metadata |> List.partition (fun m -> m :? IProducesResponseTypeMetadata)
-
         let merged =
-            produces
-            |> List.map (fun m -> m :?> IProducesResponseTypeMetadata)
+            metadata
+            |> List.choose (function
+                | :? IProducesResponseTypeMetadata as p -> Some p
+                | _ -> None)
             |> List.groupBy (fun m -> m.StatusCode, m.Type)
             |> List.map (fun ((statusCode, responseType), group) ->
                 match group with
@@ -77,7 +87,7 @@ module internal Negotiation =
 
                     ProducesResponseTypeMetadata(statusCode, responseType, contentTypes) :> obj)
 
-        other @ merged
+        merged
 
 [<Sealed>]
 type NegotiateBuilder() =
@@ -88,15 +98,23 @@ type NegotiateBuilder() =
         if List.isEmpty spec.Representations then
             failwith "At least one representation must be registered using the 'accepts' operation"
 
-        let allOwnMetadata =
-            spec.Representations |> List.collect (fun (_, _, m) -> m)
-
-        let mergedMetadata = Negotiation.mergeProducesMetadata allOwnMetadata
+        // Only `produces` metadata is broadcast: the generated OpenAPI document needs every
+        // representation's endpoint to advertise the same union of content types. Anything
+        // else a representation declares (an ALPS `Descriptor` from `binds`, an authorization
+        // marker, ...) belongs to that representation alone -- broadcasting it would duplicate
+        // it onto sibling endpoints that never declared it.
+        let broadcastProduces =
+            spec.Representations
+            |> List.collect (fun (_, _, m) -> m)
+            |> Negotiation.mergeProducesMetadata
 
         spec.Representations
-        |> List.mapi (fun ordinal (mediaType, handler, _) ->
+        |> List.mapi (fun ordinal (mediaType, handler, ownMetadata) ->
+            let ownNonProduces =
+                ownMetadata |> List.filter (Negotiation.isProducesMetadata >> not)
+
             { Handler = handler
-              Metadata = (ProducesMediaTypeMetadata(mediaType, ordinal) :> obj) :: mergedMetadata })
+              Metadata = ((ProducesMediaTypeMetadata(mediaType, ordinal) :> obj) :: ownNonProduces) @ broadcastProduces })
 
     [<CustomOperation("accepts")>]
     member _.Accepts(spec: NegotiateSpec, mediaType: string, handler: RequestDelegate) =
