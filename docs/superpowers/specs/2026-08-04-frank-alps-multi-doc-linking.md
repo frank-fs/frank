@@ -107,8 +107,8 @@ module PingPong =
 |---|---|---|---|
 | `/sessions` | GET, POST | `listSessions`, `createSession` | none |
 | `/sessions/{id}` | GET | `viewSession` (state-resolved via the existing Provenance `CurrentStateResolver` pattern) | none |
-| `/sessions/{id}/ping` | POST | `ping` | `requireRole "pinger"` |
-| `/sessions/{id}/pong` | POST | `pong` | `requireRole "pinger"` |
+| `/sessions/{id}/ping` | GET, POST | `ping` | `requireRole "pinger"` |
+| `/sessions/{id}/pong` | GET, POST | `pong` | `requireRole "ponger"` |
 
 Separate sub-routes for `ping`/`pong` rather than one POST on `/sessions/{id}`: keeps the one-descriptor-per-endpoint mapping `binds` already assumes everywhere else in this package.
 
@@ -122,5 +122,5 @@ Per `CLAUDE.md`'s package-deliverable rule, this stays inside the existing `Fran
 ## Verification
 
 - `Frank.Alps.Tests`: unit coverage for `resolveRef`/`idsIn` (present → `#id`, absent → `rootUri#id`) directly, plus an integration test serializing a deliberately-incomplete `profile` list and asserting no dangling `#id`.
-- `Frank.Alps.Sample` + a Playwright/HTTP test (mirroring `SampleIntegrationTests.fs`): full ping/pong cycle — create session, alternate `ping`/`pong` as two differently-authenticated principals, assert 403 on wrong-turn and wrong-role calls, assert the served excerpt and full document each resolve `href`/`rt`/`from` references correctly at every step.
+- `Frank.Alps.Sample` + a Playwright/HTTP test (mirroring `SampleIntegrationTests.fs`): full ping/pong cycle — create session, alternate `ping`/`pong` as two differently-authenticated principals, assert 409 on a wrong-turn call and 403 on a wrong-role call (distinct guards, distinct status codes — deliberately diverges from tic-tac-toe's own unenforced `makeMoveHandler`, which stays as-is), assert the served excerpt and full document each resolve `href`/`rt`/`from` references correctly at every step.
 - Build across all three TFMs (`net8.0;net9.0;net10.0`) per project convention — signature mismatches on `toJson`'s new `rootUri` parameter only surface at compile time across targets.
