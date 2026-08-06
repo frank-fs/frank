@@ -4,6 +4,7 @@ open System.Net.Http.Json
 open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Routing
 open Expecto
 open Frank.Builder
 open Frank.OpenApi.Tests.OpenApiDocumentTests
@@ -82,4 +83,75 @@ let tests =
 
               Expect.isTrue (responses.TryGetProperty("application/json") |> fst) "JSON representation's metadata should appear"
               Expect.isTrue (responses.TryGetProperty("text/html") |> fst) "HTML representation's metadata should appear"
+          }
+
+          // Regression test for dotnet/aspnetcore#58329: Microsoft.AspNetCore.OpenApi
+          // collapses multiple RouteEndpoints sharing the same (path, method) key down
+          // to ONE operation, keeping only the LAST-registered endpoint's metadata. A
+          // `negotiate { }` block with N representations registers N separate
+          // RouteEndpoints at the exact same path+verb (dispatch among them happens at
+          // the routing layer, via FrankProducesMatcherPolicy, not by folding them into
+          // one endpoint) -- so without the broadcast-merge in `NegotiateBuilder.Run`,
+          // this framework bug would silently drop every representation but the last
+          // from the generated OpenAPI document. This test proves both that the two
+          // RouteEndpoints really are separate (the premise of the bug) and that the
+          // resulting operation still lists every content type (the mitigation).
+          testCaseAsync "N separate RouteEndpoints from negotiate { } still produce ONE OpenAPI operation listing every content type -- mitigates dotnet/aspnetcore#58329"
+          <| async {
+              let negotiatedHandler =
+                  negotiate {
+                      accepts "application/json" (handler {
+                          produces typeof<Product> 200 [ "application/json" ]
+                          handle (fun (ctx: HttpContext) -> Task.CompletedTask)
+                      })
+                      accepts "text/html" (handler {
+                          produces typeof<Product> 200 [ "text/html" ]
+                          handle (fun (ctx: HttpContext) -> Task.CompletedTask)
+                      })
+                  }
+
+              let resourceSpec =
+                  resource "/products/{id}" {
+                      get negotiatedHandler
+                  }
+
+              // Premise: negotiate { } really did register two SEPARATE RouteEndpoints
+              // at the same path+verb, not one endpoint -- otherwise this test would not
+              // be exercising the framework's collapse bug at all.
+              let routeEndpoints =
+                  resourceSpec.Endpoints
+                  |> Array.map (fun e -> e :?> RouteEndpoint)
+
+              Expect.equal routeEndpoints.Length 2 "negotiate { } with two representations should register two separate RouteEndpoints"
+              Expect.allEqual
+                  (routeEndpoints |> Array.map (fun e -> e.RoutePattern.RawText))
+                  routeEndpoints.[0].RoutePattern.RawText
+                  "Both RouteEndpoints should share the same path"
+              Expect.allEqual
+                  (routeEndpoints |> Array.map (fun e -> e.Metadata.GetMetadata<HttpMethodMetadata>().HttpMethods |> Seq.exactlyOne))
+                  "GET"
+                  "Both RouteEndpoints should share the same HTTP method"
+
+              let client = createOpenApiTestServer [ resourceSpec ]
+              let! json = client.GetStringAsync(openApiRoutePattern) |> Async.AwaitTask
+              use doc = JsonDocument.Parse(json)
+
+              let responses =
+                  doc.RootElement
+                      .GetProperty("paths")
+                      .GetProperty("/products/{id}")
+                      .GetProperty("get")
+                      .GetProperty("responses")
+                      .GetProperty("200")
+                      .GetProperty("content")
+
+              let contentTypes =
+                  responses.EnumerateObject()
+                  |> Seq.map (fun p -> p.Name)
+                  |> Set.ofSeq
+
+              Expect.equal
+                  contentTypes
+                  (Set.ofList [ "application/json"; "text/html" ])
+                  "Both content types must appear despite two separate RouteEndpoints at the same path+verb -- proves the broadcast-merge in NegotiateBuilder.Run works around the framework's last-write-wins collapse"
           } ]
