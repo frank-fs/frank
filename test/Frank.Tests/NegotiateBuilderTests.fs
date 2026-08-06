@@ -765,4 +765,50 @@ let tests =
 
                   Expect.isTrue
                       (System.Object.ReferenceEquals(original, merged))
-                      "A non-colliding representation's metadata object should pass through negotiate unchanged, not be rebuilt" ]
+                      "A non-colliding representation's metadata object should pass through negotiate unchanged, not be rebuilt"
+
+          testCaseTask "webHost { } auto-registers FrankProducesMatcherPolicy -- negotiate { } works with zero explicit DI setup"
+          <| fun () -> task {
+              let resourceSpec =
+                  (resource "/x") {
+                      get (
+                          negotiate {
+                              accepts "application/json" (writeText "json")
+                              accepts "text/html" (writeText "html")
+                          }
+                      )
+                  }
+
+              // Build directly off WebHostSpec.Empty (production defaults), substituting
+              // only UseTestServer() for the real listener -- same pattern as
+              // AlpsDocumentIntegrationTests.buildHost, but starting from the actual
+              // WebHostSpec.Empty.Services this task modifies, not a hand-rolled one.
+              let spec =
+                  { WebHostSpec.Empty with
+                      Endpoints = resourceSpec.Endpoints }
+
+              use host =
+                  Host
+                      .CreateDefaultBuilder([||])
+                      .ConfigureWebHost(fun webBuilder ->
+                          webBuilder
+                              .UseTestServer()
+                              .ConfigureServices(fun services ->
+                                  services.AddRouting() |> ignore
+                                  spec.Services services |> ignore)
+                              .Configure(fun app ->
+                                  app.UseRouting() |> ignore
+                                  app.UseEndpoints(fun endpoints ->
+                                      endpoints.DataSources.Add(TestEndpointDataSource spec.Endpoints))
+                                  |> ignore)
+                          |> ignore)
+                      .Build()
+
+              do! host.StartAsync()
+              use client = host.GetTestClient()
+              use request = new HttpRequestMessage(HttpMethod.Get, "/x")
+              request.Headers.Accept.ParseAdd("text/html")
+              let! response = client.SendAsync(request)
+              let! body = response.Content.ReadAsStringAsync()
+              Expect.equal body "html" "Negotiation worked without the test explicitly registering FrankProducesMatcherPolicy"
+          } ]

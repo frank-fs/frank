@@ -6,6 +6,7 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
+open Microsoft.AspNetCore.Routing.Matching
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.FileProviders
 open Microsoft.Extensions.Hosting
@@ -28,6 +29,8 @@ type WebHostSpec =
             (fun services ->
                 services.AddMvcCore(fun options -> options.ReturnHttpNotAcceptable <- true)
                 |> ignore
+
+                services.AddSingleton<MatcherPolicy, FrankProducesMatcherPolicy>() |> ignore
 
                 services)
           LinkProviders = []
