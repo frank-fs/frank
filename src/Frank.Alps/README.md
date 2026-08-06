@@ -97,7 +97,7 @@ descriptor "makeMove" { unsafe; from [ Catalog.openState ]; rt Catalog.closedSta
 ### Two HTTP Exposures
 
 - **App-wide document** — `useAlps [ ... ]` serves the whole profile at `/.well-known/alps.json` (configurable) and advertises it with a `Link: rel="profile"` response header. Filtered by authorization only; there is no resource instance in scope to have a state.
-- **Per-resource excerpt** — `Alps.excerpt resolver`, wired into a `negotiate { }` block's `accepts "application/alps+json"` case, serves just the transitions bound to *this* resource's route (every HTTP method's, not only the one it runs under). Filtered by authorization *and*, when `resolver` is `Some`, by state.
+- **Per-resource excerpt** — `Alps.excerpt resolver`, wired into a `negotiate { }` block's `accepts "application/alps+json"` case, serves just the transitions bound to *this* resource's route (every HTTP method's, not only the one it runs under). Filtered by authorization *and*, when `resolver` is `Some`, by state. When a served (filtered) document references a descriptor absent from that filtered view, the reference resolves to the full document's URI (`rootUri#id`) rather than a dangling same-document fragment.
 
 Both emit `Cache-Control: private, no-cache` and `Vary: Authorization` whenever any bound endpoint is guarded.
 
