@@ -69,8 +69,9 @@ module Alps =
                     // Mirrors AlpsDocument.documentHandler, which mirrors Frank.JsonHome's own -- except
                     // that Vary is APPENDED rather than assigned. AlpsDocument and Frank.JsonHome each
                     // own a dedicated endpoint and can assign; the excerpt is documented to be wired
-                    // inside a `negotiate { }` block, and NegotiateBuilder.dispatch has already appended
-                    // "Accept" before invoking this handler (RFC 9110 §12.5.5). Assigning would drop it,
+                    // inside a `negotiate { }` block, and FrankProducesMatcherPolicy has already
+                    // appended "Accept" at the routing layer, before this endpoint's handler runs
+                    // (RFC 9110 §12.5.5). Assigning would drop it,
                     // making the response cacheable across clients with different Accept headers.
                     ctx.Response.Headers.CacheControl <- "private, no-cache"
                     ctx.Response.Headers.Append("Vary", "Authorization")
