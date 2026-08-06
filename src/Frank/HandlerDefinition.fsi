@@ -1,6 +1,5 @@
 namespace Frank.Builder
 
-open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 
 [<AutoOpen>]
@@ -28,7 +27,3 @@ module HandlerDefinition =
 
     /// Every metadata entry assignable to 'T, in declaration order.
     val findAll<'T when 'T : not struct> : def:HandlerDefinition -> 'T list
-
-module HandlerDefinitionMetadata =
-
-    val toConventions : def:HandlerDefinition -> (EndpointBuilder -> unit) list

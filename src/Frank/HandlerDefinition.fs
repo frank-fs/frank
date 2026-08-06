@@ -1,6 +1,5 @@
 namespace Frank.Builder
 
-open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 
 [<AutoOpen>]
@@ -36,9 +35,3 @@ module HandlerDefinition =
             match m with
             | :? 'T as t -> Some t
             | _ -> None)
-
-module HandlerDefinitionMetadata =
-
-    let toConventions (def: HandlerDefinition) : (EndpointBuilder -> unit) list =
-        def.Metadata
-        |> List.map (fun m -> fun (b: EndpointBuilder) -> b.Metadata.Add m)

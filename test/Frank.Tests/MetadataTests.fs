@@ -32,7 +32,7 @@ let metadataTests =
                 b.Metadata.Add(marker)
             let spec =
                 { ResourceSpec.Empty with
-                    Handlers = [ "GET", RequestDelegate(fun ctx -> Task.CompletedTask) ]
+                    Handlers = [ "GET", RequestDelegate(fun ctx -> Task.CompletedTask), [] ]
                     Metadata = [ convention ] }
             let resource = spec.Build("/test")
             let endpoint = resource.Endpoints[0]
@@ -45,7 +45,7 @@ let metadataTests =
             let spec =
                 { ResourceSpec.Empty with
                     Name = "TestResource"
-                    Handlers = [ "GET", handler ] }
+                    Handlers = [ "GET", handler, [] ] }
             let resource = spec.Build("/test")
             let endpoint = resource.Endpoints[0] :?> RouteEndpoint
             Expect.equal endpoint.DisplayName "GET TestResource" "Display name should match"
@@ -60,7 +60,7 @@ let metadataTests =
             let spec =
                 { ResourceSpec.Empty with
                     Name = "MyResource"
-                    Handlers = [ "POST", handler; "GET", handler ] }
+                    Handlers = [ "POST", handler, []; "GET", handler, [] ] }
             let resource = spec.Build("/api/items")
             Expect.equal resource.Endpoints.Length 2 "Should produce one endpoint per handler"
             for endpoint in resource.Endpoints do

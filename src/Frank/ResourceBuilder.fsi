@@ -10,7 +10,7 @@ type Resource = { Endpoints: Endpoint[] }
 
 type ResourceSpec =
     { Name: string
-      Handlers: (string * RequestDelegate) list
+      Handlers: (string * RequestDelegate * obj list) list
       Metadata: (EndpointBuilder -> unit) list }
 
     static member Empty: ResourceSpec
@@ -49,11 +49,16 @@ type ResourceBuilder =
         httpMethod: string * spec: ResourceSpec * convention: (EndpointBuilder -> unit) -> ResourceSpec
 
     /// Shared helper behind the `Get`/`Post`/etc. `HandlerDefinition` overloads: adds
-    /// the handler and projects `HandlerDefinitionMetadata.toConventions` through
-    /// `AddMethodMetadata`, so the definition's metadata only applies to endpoints
-    /// registered under the given HTTP method.
+    /// the handler with its own metadata attached directly to that handler's entry,
+    /// so the definition's metadata only ever applies to its own endpoint -- not to
+    /// other handlers sharing the same HTTP method.
     static member AddHandlerDefinition:
         httpMethod: string * spec: ResourceSpec * def: HandlerDefinition -> ResourceSpec
+
+    /// Adds one handler entry per `HandlerDefinition`, each carrying only its own
+    /// metadata. Shared helper behind the `Get`/`Post`/etc. `HandlerDefinition list` overloads.
+    static member AddHandlerDefinitions:
+        httpMethod: string * spec: ResourceSpec * defs: HandlerDefinition list -> ResourceSpec
 
     static member AddHandler: httpMethod: string * spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
 
@@ -97,6 +102,7 @@ type ResourceBuilder =
     member Delete: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
     member Delete: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
     member Delete: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
+    member Delete: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
 
     [<CustomOperation("get")>]
     member Get: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
@@ -111,6 +117,7 @@ type ResourceBuilder =
     member Get: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
     member Get: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
     member Get: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
+    member Get: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
 
     [<CustomOperation("head")>]
     member Head: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
@@ -125,6 +132,7 @@ type ResourceBuilder =
     member Head: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
     member Head: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
     member Head: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
+    member Head: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
 
     [<CustomOperation("options")>]
     member Options: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
@@ -139,6 +147,7 @@ type ResourceBuilder =
     member Options: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
     member Options: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
     member Options: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
+    member Options: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
 
     [<CustomOperation("patch")>]
     member Patch: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
@@ -153,6 +162,7 @@ type ResourceBuilder =
     member Patch: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
     member Patch: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
     member Patch: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
+    member Patch: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
 
     [<CustomOperation("post")>]
     member Post: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
@@ -167,6 +177,7 @@ type ResourceBuilder =
     member Post: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
     member Post: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
     member Post: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
+    member Post: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
 
     [<CustomOperation("put")>]
     member Put: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
@@ -181,6 +192,7 @@ type ResourceBuilder =
     member Put: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
     member Put: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
     member Put: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
+    member Put: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
 
     [<CustomOperation("trace")>]
     member Trace: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
