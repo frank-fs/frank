@@ -1,15 +1,10 @@
 module Frank.Alps.Tests.SampleIntegrationTests
 
 open System
-open System.Collections.Concurrent
-open System.Collections.Generic
 open System.Net.Http
-open System.Security.Claims
-open System.Text.Encodings.Web
 open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Authentication
-open Microsoft.AspNetCore.Authorization
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
@@ -184,226 +179,42 @@ let private getAlpsExcerpt (client: HttpClient) (path: string) =
         return! client.SendAsync request
     }
 
-/// Rebuilds `sample/Frank.Alps.Sample/Program.fs`'s ping-pong `PingPong` descriptors,
-/// `PingPongAuth` scheme, and the four `/sessions*` resources in-line, exactly like `Sample`
-/// above does for the tic-tac-toe half -- same rationale (no `ProjectReference` to the sample's
-/// `Exe` project, entry-point conflict). Task 4 of the multi-doc-linking plan: end-to-end proof
-/// that cross-document `href` resolution (Task 1), DI-threaded `rootUri` (Task 2), and the
-/// ping/pong sample itself (Task 3) all work together over real HTTP -- doc-linking,
-/// state-gating, and role-projection. Task 5 (post-hoc addendum): unlike tic-tac-toe's
-/// `Sample.makeMoveHandler` (deliberately left with no server-side state enforcement),
-/// ping/pong's POST handlers now 409 a wrong-turn call server-side, in addition to the
-/// wrong-turn transition disappearing from a follow-up excerpt.
-module private PingPong =
-    let participant = semantic "participant" |> doc "A session participant"
-
-    let awaitingPing =
-        semantic "awaitingPing" |> doc "Waiting for a ping" |> def "https://pingpong.example/states/awaitingPing"
-
-    let awaitingPong =
-        semantic "awaitingPong" |> doc "Waiting for a pong" |> def "https://pingpong.example/states/awaitingPong"
-
-    let session = semantic "session" |> doc "A ping-pong session"
-
-    let listSessions = safe "listSessions" |> rt session
-    let createSession = unsafe "createSession" |> rt session
-    let viewSession = safe "viewSession" |> rt session
-
-    let ping = unsafe "ping" |> from [ awaitingPing ] |> rt awaitingPong |> href participant
-    let pong = unsafe "pong" |> from [ awaitingPong ] |> rt awaitingPing |> href participant
-
-    let profile =
-        [ participant
-          awaitingPing
-          awaitingPong
-          session
-          listSessions
-          createSession
-          viewSession
-          ping
-          pong ]
-
-/// Verbatim shape of `sample/Frank.Alps.Sample/Program.fs`'s own `PingPongAuth` module (itself
-/// modeled on `sample/Frank.JsonHome.Sample/ApiKeyAuth.fs`): an "X-Api-Key" header mapped to a
-/// hardcoded user/roles table, with the SAME two keys the sample ships ("pinger-key" ->
-/// role "pinger", "ponger-key" -> role "ponger") so this test's HTTP requests are exactly what a
-/// reader of the sample would send.
-module private PingPongAuth =
-    [<Literal>]
-    let SchemeName = "PingPongApiKey"
-
-    let private users: IDictionary<string, string * string list> =
-        dict [ "pinger-key", ("pinger", [ "pinger" ]); "ponger-key", ("ponger", [ "ponger" ]) ]
-
-    type ApiKeyAuthHandler(options, logger, encoder: UrlEncoder) =
-        inherit AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
-
-        override this.HandleAuthenticateAsync() =
-            let key = this.Request.Headers["X-Api-Key"].ToString()
-
-            match users.TryGetValue key with
-            | true, (name, roles) ->
-                let claims = Claim(ClaimTypes.Name, name) :: (roles |> List.map (fun r -> Claim(ClaimTypes.Role, r)))
-                let identity = ClaimsIdentity(claims, SchemeName)
-                let ticket = AuthenticationTicket(ClaimsPrincipal identity, SchemeName)
-                Task.FromResult(AuthenticateResult.Success ticket)
-            | false, _ -> Task.FromResult(AuthenticateResult.NoResult())
-
-/// `Frank.Auth`'s `requireRole` custom operation, reimplemented at the `HandlerDefinition` level:
-/// verbatim rationale of `FilteringIntegrationTests.fs`'s own copy -- this test project has no
-/// `ProjectReference` to `Frank.Auth`, and `AuthorizationFilter`/ASP.NET's own authorization
-/// middleware only need the stock `IAuthorizeData`/`AuthorizationPolicy` metadata objects
-/// `Frank.Auth.EndpointAuth.toMetadataObjects` would emit for `AuthRequirement.Role`. Applied to
-/// BOTH the GET (excerpt) and POST handler on each of `pingResource`/`pongResource`, matching the
-/// real sample's resource-level `resource { requireRole "..." }` (which gates every method on the
-/// resource, not just POST).
-let private requireRole (role: string) (def: HandlerDefinition) : HandlerDefinition =
-    let policy =
-        let pb = AuthorizationPolicyBuilder()
-        pb.RequireRole role |> ignore
-        pb.Build()
-
-    def
-    |> HandlerDefinition.addMetadata (AuthorizeAttribute())
-    |> HandlerDefinition.addMetadata policy
-
-/// In-memory stand-in for the real sample's `Frank.Provenance`-backed `pingPongStateResolver`
-/// (this test project has no `ProjectReference` to `Frank.Provenance` either) -- same contract:
-/// keyed by the session's own path (the `/ping`/`/pong` suffix stripped, so a POST to either
-/// action and a later excerpt GET on the other both resolve to the SAME session's current state),
-/// and a session with no recorded move yet falls back to `awaitingPing` (not `[]`) for the exact
-/// reason `Program.fs`'s own doc comment gives: `Alps.excerpt` treats a resolver's `[]` as "state
-/// filtering does not apply", which would wrongly leave `pong` visible in a fresh session's
-/// excerpt.
-let private sessionStates = ConcurrentDictionary<string, Uri>()
-
-let private sessionPathOf (path: string) : string =
-    if path.EndsWith("/ping") then path.Substring(0, path.Length - "/ping".Length)
-    elif path.EndsWith("/pong") then path.Substring(0, path.Length - "/pong".Length)
-    else path
-
-let private pingPongStateResolver: CurrentStateResolver =
-    fun path ->
-        match sessionStates.TryGetValue(sessionPathOf path) with
-        | true, state -> [ state ]
-        | false, _ -> [ PingPong.awaitingPing.Def.Value ]
-
-/// Adapts `Alps.excerpt`'s `RequestDelegate` result into the `HttpContext -> Task` shape
-/// `handler { handle ... }` accepts, so the excerpt handler can be piped through `requireRole`
-/// exactly like the POST handlers below.
-let private excerptHandler (resolver: CurrentStateResolver) : HttpContext -> Task =
-    (Alps.excerpt (Some resolver)).Invoke
-
-/// Records the session's move, typed as the state it transitions INTO -- mirrors
-/// `Program.fs`'s `recordPingPongMove` convention (ping types `awaitingPong`, pong types
-/// `awaitingPing`), minus the `Frank.Provenance` plumbing this test project doesn't reference.
-let private recordMove (ctx: HttpContext) (targetStateDef: Uri option) : unit =
-    targetStateDef |> Option.iter (fun d -> sessionStates.[sessionPathOf ctx.Request.Path.Value] <- d)
-
-/// Task 5 (post-hoc addendum): mirrors `Program.fs`'s own `currentStateSatisfies`/
-/// `pingPongMoveHandler` -- reuses `pingPongStateResolver` (the SAME resolver the excerpt handlers
-/// above call) rather than a second state-lookup mechanism, so a wrong-turn POST 409s instead of
-/// unconditionally recording the move.
-let private currentStateSatisfies (path: string) (requiredState: Descriptor) : bool =
-    match requiredState.Def with
-    | Some target -> pingPongStateResolver path |> List.contains target
-    | None -> false
-
-let private pingPongMoveHandler (requiredState: Descriptor) (targetStateDef: Uri option) (ctx: HttpContext) : Task =
-    task {
-        if currentStateSatisfies ctx.Request.Path.Value requiredState then
-            recordMove ctx targetStateDef
-            do! ctx.Response.WriteAsJsonAsync {| ok = true |}
-        else
-            ctx.Response.StatusCode <- 409
-            do! ctx.Response.WriteAsJsonAsync {| error = $"session is not in the required state ({requiredState.Id})" |}
-    }
-    :> Task
-
-let private pingHandler (ctx: HttpContext) : Task =
-    pingPongMoveHandler PingPong.awaitingPing PingPong.awaitingPong.Def ctx
-
-let private pongHandler (ctx: HttpContext) : Task =
-    pingPongMoveHandler PingPong.awaitingPong PingPong.awaitingPing.Def ctx
-
-let private sessionIds = ConcurrentBag<Guid>()
-
-let private listSessionsHandler (ctx: HttpContext) : Task =
-    ctx.Response.WriteAsJsonAsync {| sessions = sessionIds |> Seq.map string |> Seq.toList |}
-
-let private createSessionHandler (ctx: HttpContext) : Task =
-    task {
-        let id = Guid.NewGuid()
-        sessionIds.Add id
-        do! ctx.Response.WriteAsJsonAsync {| id = string id |}
-    }
-    :> Task
-
-let private getSessionHandler (ctx: HttpContext) : Task =
-    ctx.Response.WriteAsJsonAsync {| id = ctx.Request.RouteValues.["id"] |}
-
-let private sessionsResource =
-    resource "/sessions" {
-        get (handler {
-            handle listSessionsHandler
-            binds PingPong.listSessions
-        })
-
-        post (handler {
-            handle createSessionHandler
-            binds PingPong.createSession
-        })
-    }
-
-let private sessionResource =
-    resource "/sessions/{id}" {
-        get (
-            negotiate {
-                accepts "application/json" (handler {
-                    handle getSessionHandler
-                    binds PingPong.viewSession
-                })
-
-                accepts "application/alps+json" (Alps.excerpt (Some pingPongStateResolver))
-            }
-        )
-    }
-
-/// GET here serves only the ALPS excerpt (there is no plain-JSON representation of "the ping
-/// action") -- `requireRole "pinger"` on both methods so an unauthorized GET 403s before it ever
-/// reaches `Alps.excerpt`, exactly like the POST does.
-let private pingResource =
-    resource "/sessions/{id}/ping" {
-        get (handler { handle (excerptHandler pingPongStateResolver) } |> requireRole "pinger")
-
-        post (
-            handler {
-                handle pingHandler
-                binds PingPong.ping
-            }
-            |> requireRole "pinger"
-        )
-    }
-
-let private pongResource =
-    resource "/sessions/{id}/pong" {
-        get (handler { handle (excerptHandler pingPongStateResolver) } |> requireRole "ponger")
-
-        post (
-            handler {
-                handle pongHandler
-                binds PingPong.pong
-            }
-            |> requireRole "ponger"
-        )
-    }
+/// Task 6 (corrective rebuild): the previous version of this section reconstructed
+/// `sample/Frank.Alps.Sample/Program.fs`'s ping-pong `PingPong` descriptors, `PingPongAuth`
+/// scheme, and the four `/sessions*` resources in-line -- rejected outright, because a test
+/// running its own parallel copy of that logic cannot catch a regression in the REAL sample code.
+/// `Frank.Alps.Tests.fsproj` now has a `ProjectReference` to `sample/Frank.Alps.Sample`'s `Exe`
+/// project specifically so this file can exercise the actual `Frank.Alps.Sample.Program` module
+/// values below -- `PingPong` (descriptors) and `PingPongAuth` (auth scheme) were already public;
+/// `sessionsResource`/`sessionResource`/`pingResource`/`pongResource` were made non-`private` for
+/// this same reason. Task 4's end-to-end proof (cross-document `href` resolution, DI-threaded
+/// `rootUri`, ping/pong role/state wiring) and Task 5's server-side wrong-turn 409 enforcement are
+/// unchanged in intent -- only the target of what's being exercised changed, from a hand-written
+/// copy to the shipped sample itself.
+open Frank.Alps.Sample.Program
 
 /// `FilteringIntegrationTests.fs`'s own `createServer` shape (`AlpsDocumentIntegrationTests`'s
 /// pipeline plus `AddAuthentication`/`UseAuthentication` so `requireRole`'s `AuthorizeAttribute`
 /// has a principal to evaluate) -- this file's own top-level `createServer` deliberately never
-/// wires authentication, so it can't be reused here.
+/// wires authentication, so it can't be reused here. Mirrors `Program.fs`'s own `main` composition
+/// (lines ~357-401): the SAME `PingPongAuth.SchemeName` + `PingPongAuth.ApiKeyAuthHandler`
+/// registered as the default scheme, the SAME four resources, and the SAME `PingPong.*` descriptor
+/// list passed to `useAlps`.
 let private createPingPongServer () : HttpClient =
-    let spec = (webHost [||]).UseAlps(WebHostSpec.Empty, PingPong.profile)
+    let spec =
+        (webHost [||])
+            .UseAlps(
+                WebHostSpec.Empty,
+                [ PingPong.participant
+                  PingPong.awaitingPing
+                  PingPong.awaitingPong
+                  PingPong.session
+                  PingPong.listSessions
+                  PingPong.createSession
+                  PingPong.viewSession
+                  PingPong.ping
+                  PingPong.pong ]
+            )
 
     let pingPongEndpoints =
         [ sessionsResource; sessionResource; pingResource; pongResource ]
@@ -725,4 +536,30 @@ let pingPongTests =
 
               Expect.isTrue (Set.contains "pong" pongerIds) "ponger's full document includes pong"
               Expect.isFalse (Set.contains "ping" pongerIds) "ponger's full document excludes ping"
+          }
+
+          // Task 6: the pong-side mirror of test 1's step 4b, previously only manually curl-verified
+          // and never asserted by an automated test. A fresh session starts awaitingPing, so a
+          // ponger POST .../pong (which requires awaitingPong) is a wrong-turn call from the very
+          // first move -- `pongHandler`/`pongResource` (the real sample code, exercised via the
+          // `Frank.Alps.Sample` project reference) must reject it with 409, symmetric with ping's.
+          testTask "a wrong-turn pong POST on a fresh (awaitingPing) session is rejected with 409" {
+              let client = createPingPongServer ()
+
+              let! (createResponse: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Post "/sessions" None None)
+
+              Expect.equal (int createResponse.StatusCode) 200 "POST /sessions creates a session"
+              let! (createBody: string) = createResponse.Content.ReadAsStringAsync()
+              let id = JsonDocument.Parse(createBody).RootElement.GetProperty("id").GetString()
+              let pongPath = $"/sessions/{id}/pong"
+
+              let! (wrongTurnPongResponse: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Post pongPath None (Some "ponger-key"))
+
+              Expect.equal
+                  (int wrongTurnPongResponse.StatusCode)
+                  409
+                  "a fresh session is awaitingPing, not awaitingPong -- ponger's POST .../pong is a \
+                   wrong-turn call and is rejected with 409"
           } ]

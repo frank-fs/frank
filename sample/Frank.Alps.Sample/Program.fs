@@ -301,7 +301,7 @@ let private createSessionHandler (ctx: HttpContext) : Task =
 let private getSessionHandler (ctx: HttpContext) : Task =
     ctx.Response.WriteAsJsonAsync {| id = ctx.Request.RouteValues.["id"] |}
 
-let private sessionsResource =
+let sessionsResource =
     resource "/sessions" {
         get (handler {
             handle listSessionsHandler
@@ -314,7 +314,7 @@ let private sessionsResource =
         })
     }
 
-let private sessionResource =
+let sessionResource =
     resource "/sessions/{id}" {
         get (
             negotiate {
@@ -332,7 +332,7 @@ let private sessionResource =
 /// action") -- `requireRole "pinger"` gates BOTH methods on this resource, so an unauthorized
 /// `GET .../ping?Accept=application/alps+json` 403s before it ever reaches Alps.excerpt, exactly
 /// like the POST does.
-let private pingResource =
+let pingResource =
     resource "/sessions/{id}/ping" {
         requireRole "pinger"
         get (Alps.excerpt (Some pingPongStateResolver))
@@ -343,7 +343,7 @@ let private pingResource =
         })
     }
 
-let private pongResource =
+let pongResource =
     resource "/sessions/{id}/pong" {
         requireRole "ponger"
         get (Alps.excerpt (Some pingPongStateResolver))

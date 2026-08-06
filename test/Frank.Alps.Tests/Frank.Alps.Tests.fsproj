@@ -41,6 +41,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Frank/Frank.fsproj" />
     <ProjectReference Include="../../src/Frank.Alps/Frank.Alps.fsproj" />
+    <ProjectReference Include="../../sample/Frank.Alps.Sample/Frank.Alps.Sample.fsproj" />
   </ItemGroup>
 
 </Project>
