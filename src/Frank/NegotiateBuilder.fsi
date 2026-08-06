@@ -4,12 +4,12 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 
 /// One representation: a media type (an exact type, or a "*/*"/"type/*" wildcard
-/// catch-all) paired with the RequestDelegate that produces it. Representations are
-/// independent of each other -- there is no shared object serialized differently per
-/// entry, unlike IOutputFormatter's model.
+/// catch-all) paired with the RequestDelegate that produces it and that
+/// representation's own metadata. Representations are independent of each other --
+/// there is no shared object serialized differently per entry, unlike
+/// IOutputFormatter's model.
 type NegotiateSpec =
-    { Representations: (string * RequestDelegate) list
-      Metadata: obj list }
+    { Representations: (string * RequestDelegate * obj list) list }
 
     static member Empty: NegotiateSpec
 
@@ -18,7 +18,12 @@ type NegotiateBuilder =
     new: unit -> NegotiateBuilder
 
     member Yield: 'T -> NegotiateSpec
-    member Run: spec: NegotiateSpec -> HandlerDefinition
+    /// Builds one `HandlerDefinition` per registered representation -- dispatch among
+    /// them happens at the routing layer (`FrankProducesMatcherPolicy`), not here.
+    /// Every representation's `HandlerDefinition.Metadata` carries the SAME
+    /// broadcast-merged `produces` metadata (see `Negotiation.mergeProducesMetadata`),
+    /// plus its own `ProducesMediaTypeMetadata` tag used by the matcher policy.
+    member Run: spec: NegotiateSpec -> HandlerDefinition list
 
     [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: RequestDelegate -> NegotiateSpec
@@ -43,8 +48,9 @@ type NegotiateBuilder =
 [<AutoOpen>]
 module NegotiateFunctions =
     /// The `negotiate { }` computation expression: registers one representation per
-    /// `accepts` operation and dispatches to whichever the client's Accept header
-    /// selects.
+    /// `accepts` operation. `Run` builds one `HandlerDefinition` per representation;
+    /// which one serves a given request is decided at the routing layer, by
+    /// `FrankProducesMatcherPolicy`, based on the client's Accept header.
     ///
     /// NAME COLLISION: this shares the identifier `negotiate` with the unrelated
     /// function `Frank.ContentNegotiation.negotiate` (`statusCode -> body -> ctx -> Task`,

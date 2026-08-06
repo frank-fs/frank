@@ -107,15 +107,15 @@ let hello =
                     let! input = reader.ReadToEndAsync()
                     let greeting = JsonSerializer.Deserialize<Greeting>(input, caseInsensitiveJsonOptions)
 
-                    let negotiated =
-                        negotiate {
-                            accepts [ "application/json"; "application/xml" ] (fun (ctx: HttpContext) -> task {
-                                ctx.Response.StatusCode <- 201
-                                return greeting
-                            })
-                        }
-
-                    do! negotiated.Handler.Invoke(ctx)
+                    // `negotiate { }` no longer produces a single invokable Handler -- Run
+                    // returns one HandlerDefinition per representation, dispatched by the
+                    // routing layer (FrankProducesMatcherPolicy), not by calling it here
+                    // mid-handler. This inline usage never needed the CE's multi-producer
+                    // machinery anyway (both representations share the same producer), so
+                    // it uses the plain Frank.ContentNegotiation.negotiate/ctx.Negotiate
+                    // function instead -- the same viaOutputFormatter-backed negotiation
+                    // the old code got, without the CE indirection.
+                    do! Frank.ContentNegotiation.negotiate 201 greeting ctx
                 else
                     ctx.Response.StatusCode <- 500
                     do! ctx.Response.WriteAsync("Could not seek")
