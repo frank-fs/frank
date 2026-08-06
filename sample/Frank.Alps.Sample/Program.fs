@@ -195,28 +195,39 @@ let private sessionPathOf (path: string) : string =
 let private pingPongResourceIriFor (path: string) : string = pingPongBaseUri + sessionPathOf path
 
 /// Same query/graph-walk as the tic-tac-toe `stateResolver` above, over `pingPongResourceIriFor`
-/// instead of `resourceIriFor`. A session with no recorded activity yet resolves to `[]` -- the same
-/// "state filtering does not apply" default `Alps.excerpt` already gives an unfiltered resource --
-/// which is exactly right for a fresh session: its initial state (before any move) is
-/// `awaitingPing`, and `ping`'s `from [ awaitingPing ]` guard is trivially satisfied either way.
+/// instead of `resourceIriFor`, EXCEPT for what a session with no recorded activity yet resolves
+/// to. Unlike tic-tac-toe (whose game has no meaningful state prior to any move -- `[]` correctly
+/// means "no opinion, don't filter"), ping-pong's design DOES declare an initial state: "the
+/// session's initial state (before any move) is awaitingPing" (design doc, *Sample: ping/pong*).
+/// `Alps.excerpt` treats a resolver's `[]` as "state filtering does not apply at all" (see
+/// Excerpt.fs's `| [] -> authAllowed` branch) -- NOT as "the state is empty" -- so returning `[]`
+/// here would have let `pong` (guard `from [ awaitingPong ]`) show up in a fresh session's excerpt
+/// even though that guard is never satisfied pre-first-move. Falling back to `awaitingPing.Def`
+/// makes a fresh session correctly show `ping` and hide `pong`, actually proving the state-gating
+/// story this sample exists to demonstrate.
 let private pingPongStateResolver: CurrentStateResolver =
     fun path ->
         let resourceIri = pingPongResourceIriFor path
 
-        match store.Query(ProvenanceQuery.Latest resourceIri) with
-        | SparqlQueryResult.Bindings _ -> []
-        | SparqlQueryResult.Graph g ->
-            let resourceNode = Uri resourceIri
-            let rdfTypePredicate = g.CreateUriNode(Uri RdfTypeIri)
-            let provActivityClass = Uri(ProvClass.toIri ProvClass.Activity)
+        let recordedStates =
+            match store.Query(ProvenanceQuery.Latest resourceIri) with
+            | SparqlQueryResult.Bindings _ -> []
+            | SparqlQueryResult.Graph g ->
+                let resourceNode = Uri resourceIri
+                let rdfTypePredicate = g.CreateUriNode(Uri RdfTypeIri)
+                let provActivityClass = Uri(ProvClass.toIri ProvClass.Activity)
 
-            g.GetTriplesWithPredicate(rdfTypePredicate)
-            |> Seq.choose (fun t ->
-                match t.Subject, t.Object with
-                | (:? IUriNode as s), (:? IUriNode as o) when s.Uri <> resourceNode && o.Uri <> provActivityClass ->
-                    Some o.Uri
-                | _ -> None)
-            |> List.ofSeq
+                g.GetTriplesWithPredicate(rdfTypePredicate)
+                |> Seq.choose (fun t ->
+                    match t.Subject, t.Object with
+                    | (:? IUriNode as s), (:? IUriNode as o) when s.Uri <> resourceNode && o.Uri <> provActivityClass ->
+                        Some o.Uri
+                    | _ -> None)
+                |> List.ofSeq
+
+        match recordedStates with
+        | [] -> [ PingPong.awaitingPing.Def.Value ]
+        | states -> states
 
 /// Records a "this session was moved" activity typed as the state the move transitions INTO --
 /// mirrors makeMoveHandler's convention exactly (ping types the activity `awaitingPong.Def`, pong
