@@ -251,8 +251,36 @@ let private recordPingPongMove (ctx: HttpContext) (targetStateDef: Uri option) :
     }
     :> Task
 
-let private pingHandler (ctx: HttpContext) : Task = recordPingPongMove ctx PingPong.awaitingPong.Def
-let private pongHandler (ctx: HttpContext) : Task = recordPingPongMove ctx PingPong.awaitingPing.Def
+/// Task 5 (post-hoc addendum): unlike `makeMoveHandler` above -- which is deliberately left with no
+/// server-side state enforcement -- ping/pong's design doc calls for a genuine 403/409 on a
+/// wrong-turn call, not just an excerpt that quietly stops listing the transition. Reuses
+/// `pingPongStateResolver` (the SAME resolver `Alps.excerpt` calls for this session) rather than a
+/// second state-lookup mechanism, so "what the excerpt would show" and "what the POST enforces" can
+/// never disagree.
+let private currentStateSatisfies (path: string) (requiredState: Descriptor) : bool =
+    match requiredState.Def with
+    | Some target -> pingPongStateResolver path |> List.contains target
+    | None -> false
+
+/// Gates `recordPingPongMove` on the session's current state: proceeds (and returns whatever
+/// `recordPingPongMove` returns, `{| ok = true |}` / 200) only if `requiredState` is satisfied,
+/// otherwise 409s with no Provenance activity appended -- an invalid move has no recorded side
+/// effect.
+let private pingPongMoveHandler (requiredState: Descriptor) (targetStateDef: Uri option) (ctx: HttpContext) : Task =
+    task {
+        if currentStateSatisfies ctx.Request.Path.Value requiredState then
+            do! recordPingPongMove ctx targetStateDef
+        else
+            ctx.Response.StatusCode <- 409
+            do! ctx.Response.WriteAsJsonAsync {| error = $"session is not in the required state ({requiredState.Id})" |}
+    }
+    :> Task
+
+let private pingHandler (ctx: HttpContext) : Task =
+    pingPongMoveHandler PingPong.awaitingPing PingPong.awaitingPong.Def ctx
+
+let private pongHandler (ctx: HttpContext) : Task =
+    pingPongMoveHandler PingPong.awaitingPong PingPong.awaitingPing.Def ctx
 
 /// In-memory session directory -- demo purposes only, same convention as this repo's other
 /// in-memory samples (e.g. 002-datastar-sample). Not provenance's job: the store answers "what state

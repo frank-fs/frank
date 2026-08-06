@@ -190,8 +190,10 @@ let private getAlpsExcerpt (client: HttpClient) (path: string) =
 /// `Exe` project, entry-point conflict). Task 4 of the multi-doc-linking plan: end-to-end proof
 /// that cross-document `href` resolution (Task 1), DI-threaded `rootUri` (Task 2), and the
 /// ping/pong sample itself (Task 3) all work together over real HTTP -- doc-linking,
-/// state-gating (via excerpt-absence, not a 409 -- ping/pong's handlers always record the move
-/// and return 200, mirroring `Sample.makeMoveHandler`'s own posture), and role-projection.
+/// state-gating, and role-projection. Task 5 (post-hoc addendum): unlike tic-tac-toe's
+/// `Sample.makeMoveHandler` (deliberately left with no server-side state enforcement),
+/// ping/pong's POST handlers now 409 a wrong-turn call server-side, in addition to the
+/// wrong-turn transition disappearing from a follow-up excerpt.
 module private PingPong =
     let participant = semantic "participant" |> doc "A session participant"
 
@@ -298,19 +300,31 @@ let private excerptHandler (resolver: CurrentStateResolver) : HttpContext -> Tas
 let private recordMove (ctx: HttpContext) (targetStateDef: Uri option) : unit =
     targetStateDef |> Option.iter (fun d -> sessionStates.[sessionPathOf ctx.Request.Path.Value] <- d)
 
-let private pingHandler (ctx: HttpContext) : Task =
+/// Task 5 (post-hoc addendum): mirrors `Program.fs`'s own `currentStateSatisfies`/
+/// `pingPongMoveHandler` -- reuses `pingPongStateResolver` (the SAME resolver the excerpt handlers
+/// above call) rather than a second state-lookup mechanism, so a wrong-turn POST 409s instead of
+/// unconditionally recording the move.
+let private currentStateSatisfies (path: string) (requiredState: Descriptor) : bool =
+    match requiredState.Def with
+    | Some target -> pingPongStateResolver path |> List.contains target
+    | None -> false
+
+let private pingPongMoveHandler (requiredState: Descriptor) (targetStateDef: Uri option) (ctx: HttpContext) : Task =
     task {
-        recordMove ctx PingPong.awaitingPong.Def
-        do! ctx.Response.WriteAsJsonAsync {| ok = true |}
+        if currentStateSatisfies ctx.Request.Path.Value requiredState then
+            recordMove ctx targetStateDef
+            do! ctx.Response.WriteAsJsonAsync {| ok = true |}
+        else
+            ctx.Response.StatusCode <- 409
+            do! ctx.Response.WriteAsJsonAsync {| error = $"session is not in the required state ({requiredState.Id})" |}
     }
     :> Task
 
+let private pingHandler (ctx: HttpContext) : Task =
+    pingPongMoveHandler PingPong.awaitingPing PingPong.awaitingPong.Def ctx
+
 let private pongHandler (ctx: HttpContext) : Task =
-    task {
-        recordMove ctx PingPong.awaitingPing.Def
-        do! ctx.Response.WriteAsJsonAsync {| ok = true |}
-    }
-    :> Task
+    pingPongMoveHandler PingPong.awaitingPong PingPong.awaitingPing.Def ctx
 
 let private sessionIds = ConcurrentBag<Guid>()
 
@@ -647,10 +661,8 @@ let pingPongTests =
 
               Expect.equal (int wrongRoleResponse.StatusCode) 403 "ponger is forbidden from GET .../ping"
 
-              // 4. pinger pings -- always 200 (no server-side 409; ping/pong POST handlers always
-              // record the move, mirroring Sample.makeMoveHandler's own posture). State-gating is
-              // enforced purely via HATEOAS: a follow-up excerpt no longer lists "ping" once the
-              // session has moved to awaitingPong.
+              // 4. pinger pings -- the session is awaitingPing, so this is a legal move: 200, and the
+              // follow-up excerpt no longer lists "ping" once the session has moved to awaitingPong.
               let! (pingPostResponse: HttpResponseMessage) =
                   client.SendAsync(pingPongRequest HttpMethod.Post pingPath None (Some "pinger-key"))
 
@@ -663,8 +675,20 @@ let pingPongTests =
 
               Expect.isFalse
                   (Set.contains "ping" (alpsDescriptorIds postPingExcerptBody))
-                  "After a ping, the session is awaitingPong -- the ping excerpt no longer lists ping \
-                   (state-gating via excerpt-absence, not a 409)"
+                  "After a ping, the session is awaitingPong -- the ping excerpt no longer lists ping"
+
+              // 4b. Task 5 (post-hoc addendum): a second consecutive pinger POST .../ping, with no
+              // intervening pong, is a wrong-turn call -- the session is awaitingPong, not
+              // awaitingPing, so `pingPongMoveHandler`'s server-side guard must reject it with 409
+              // (not silently record the move and succeed with 200, as tic-tac-toe's
+              // `makeMoveHandler` does).
+              let! (wrongTurnPingResponse: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Post pingPath None (Some "pinger-key"))
+
+              Expect.equal
+                  (int wrongTurnPingResponse.StatusCode)
+                  409
+                  "a second consecutive pinger POST .../ping (wrong-turn: session is awaitingPong) is rejected with 409"
 
               // 5. ponger pongs -- the session returns to awaitingPing.
               let! (pongPostResponse: HttpResponseMessage) =
