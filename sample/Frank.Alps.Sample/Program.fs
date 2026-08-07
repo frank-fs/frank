@@ -24,8 +24,8 @@ module Catalog =
     let closedState = semantic "closed" |> doc "Game finished" |> def "https://tictactoe.example/states/closed"
     let game = semantic "game" |> doc "A tic-tac-toe game"
 
-    let viewGame = safe "viewGame" |> rt game
-    let makeMove = unsafe "makeMove" |> from [ openState ] |> rt closedState
+    let viewGame = descriptor "viewGame" { safe; rt game }
+    let makeMove = descriptor "makeMove" { unsafe; from [ openState ]; rt closedState }
 
 // frank-fs/frank#493: CurrentStateResolver backed by Frank.Provenance, demonstrating the seam both
 // packages' design docs named and deferred on each other. This is glue code living here in the
