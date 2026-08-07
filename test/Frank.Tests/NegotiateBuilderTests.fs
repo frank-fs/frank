@@ -851,4 +851,57 @@ let tests =
               let! response = client.SendAsync(request)
               let! body = response.Content.ReadAsStringAsync()
               Expect.equal body "html" "Negotiation worked without the test explicitly registering FrankProducesMatcherPolicy"
+          }
+
+          testCaseTask
+              "without FrankProducesMatcherPolicy registered, negotiate { } with multiple representations throws AmbiguousMatchException -- the RELEASE_NOTES caveat for non-webHost {} hosts"
+          <| fun () -> task {
+              let built =
+                  (resource "/x") {
+                      get (
+                          negotiate {
+                              accepts "application/json" (writeText "json")
+                              accepts "text/html" (writeText "html")
+                          }
+                      )
+                  }
+
+              // Deliberately bypasses `buildHost`'s own `services.AddSingleton<MatcherPolicy,
+              // FrankProducesMatcherPolicy>()` -- a bare TestServer with routing but no
+              // disambiguating policy, reproducing the exact non-webHost {} scenario
+              // RELEASE_NOTES documents: two RouteEndpoints at the same route+method with no
+              // policy to pick between them.
+              use host =
+                  Host
+                      .CreateDefaultBuilder([||])
+                      .ConfigureWebHost(fun webBuilder ->
+                          webBuilder
+                              .UseTestServer()
+                              .ConfigureServices(fun services -> services.AddRouting() |> ignore)
+                              .Configure(fun app ->
+                                  app.UseRouting() |> ignore
+                                  app.UseEndpoints(fun endpoints -> endpoints.DataSources.Add(TestEndpointDataSource built.Endpoints))
+                                  |> ignore)
+                          |> ignore)
+                      .Build()
+
+              do! host.StartAsync()
+              use client = host.GetTestClient()
+
+              let! thrown =
+                  task {
+                      try
+                          let! _ = client.GetAsync("/x")
+                          return None
+                      with ex ->
+                          return Some ex
+                  }
+
+              match thrown with
+              | Some ex ->
+                  Expect.stringContains
+                      (ex.ToString())
+                      "AmbiguousMatchException"
+                      "Without FrankProducesMatcherPolicy registered, routing cannot disambiguate the representations"
+              | None -> failtest "expected an ambiguous match exception proving the policy's absence is unguarded without it"
           } ]
