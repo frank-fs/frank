@@ -105,4 +105,36 @@ let tests =
 
               let reader = FileProvenanceJournal(dir, "actor-4") :> IProvenanceJournal
               Expect.throws (fun () -> reader.Recover() |> Seq.iter ignore |> ignore) "Missing referenced file is corruption, not a recoverable gap"
+          }
+
+          test "A failed segment write is absorbed; the journal keeps serving later messages" {
+              let dir = tempDir ()
+
+              // Pre-create a *directory* where the first segment file belongs. StreamWriter against a
+              // path that is actually a directory throws (UnauthorizedAccessException/IOException),
+              // which is the same shape of failure as a full disk or a permission denial -- and before
+              // the loop caught it, that exception killed the MailboxProcessor's receive loop for good,
+              // so every later Append/Snapshot posted into a mailbox nobody would ever read again.
+              let obstruction = Path.Combine(dir, "actor-5.journal.1.nq")
+              Directory.CreateDirectory obstruction |> ignore
+
+              let writer = FileProvenanceJournal(dir, "actor-5")
+              let journal = writer :> IProvenanceJournal
+
+              journal.Append(graphFor "https://example.org/activities/doomed")
+              writer.Flush() // Must return rather than hang, even though the message ahead of it failed.
+
+              // The failure left the manifest at its last known-good state, so NextSegmentSeq is still 1
+              // -- clearing the obstruction makes the very next append reuse that sequence number and
+              // succeed, which is exactly the transient-failure (disk freed up) recovery case.
+              Directory.Delete obstruction
+
+              journal.Append(graphFor "https://example.org/activities/after-failure")
+              writer.Flush()
+
+              let reader = FileProvenanceJournal(dir, "actor-5") :> IProvenanceJournal
+              let recovered = reader.Recover() |> List.ofSeq
+
+              Expect.equal recovered.Length 1 "The post-failure append was written and is recoverable"
+              Expect.isGreaterThan recovered.[0].Triples.Count 0 "Recovered graph has triples"
           } ]

@@ -78,12 +78,21 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
 
                             let appendCount = appendCount + 1
 
+                            // Journal failures are isolated from the record's own bookkeeping. The
+                            // record is already in `store` by this point, so letting a throwing
+                            // journal fall through to the outer handler would return the OLD entries
+                            // list -- leaving that graph in the store but absent from the eviction
+                            // list, so MaxRecords could never reclaim it. Durability is best-effort;
+                            // the store's bound is not.
                             match journal with
                             | Some j ->
-                                j.Append(namedGraph :> IGraph)
+                                try
+                                    j.Append(namedGraph :> IGraph)
 
-                                if appendCount % snapshotEvery = 0 then
-                                    j.Snapshot(store.Graphs |> List.ofSeq)
+                                    if appendCount % snapshotEvery = 0 then
+                                        j.Snapshot(store.Graphs |> List.ofSeq)
+                                with ex ->
+                                    logger.LogError(ex, "Journal write failed for {GraphName}; the record is still in the store but is not durable", graphName)
                             | None -> ()
 
                             let updated = entries @ [ namedGraph.Name, graphName ]

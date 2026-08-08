@@ -390,12 +390,22 @@ let tests =
                                 member _.Snapshot(_: IGraph seq) = ()
                                 member _.Recover() = Seq.empty }
 
-                        let store =
-                            new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance, failingJournal)
+                        // MaxRecords = 1 so the second Append must evict the first: that only happens if
+                        // the first record was still added to the eviction list despite its journal write
+                        // throwing. If the journal failure aborted the record's bookkeeping, fail1's graph
+                        // would stay in the store unreachable by eviction, and the games/f assertion below
+                        // would find its triples still there.
+                        let config =
+                            { MaxRecords = 1
+                              EvictionBatchSize = 1
+                              SnapshotEvery = 100 }
 
-                        // The journal.Append call happens inside the same try/with as the rest of Append's body
-                        // in MailboxProcessorProvenanceStore.fs, so a throwing journal is caught there, logged,
-                        // and the record is dropped for this Append -- but the mailbox loop itself survives.
+                        let store =
+                            new MailboxProcessorProvenanceStore(config, NullLogger.Instance, failingJournal)
+
+                        // The journal call is wrapped in its own try/with inside Append's body in
+                        // MailboxProcessorProvenanceStore.fs: a throwing journal is caught and logged, the
+                        // record stays in the store and in the eviction list, and the mailbox loop survives.
                         (store :> IProvenanceStore).Append(
                             record "https://example.org/activities/fail1" "https://example.org/games/f" "https://example.org/users/f"
                         )
@@ -404,12 +414,9 @@ let tests =
                             record "https://example.org/activities/fail2" "https://example.org/games/f2" "https://example.org/users/f"
                         )
 
-                        // The second Append still reaches the store, proving the loop is alive -- even though
-                        // the first one's record was dropped because the journal failure aborted its whole
-                        // try-block before store.Add for fail1 completed... actually store.Add happens BEFORE
-                        // journal.Append, so fail1's graph IS in the store; the journal failure only drops
-                        // fail1's *durability*, not its live-query visibility. Assert on fail2's resource,
-                        // which has no such ambiguity either way.
+                        // A journal failure costs the record its durability, nothing else: fail1's graph is
+                        // added to the store before journal.Append runs, and stays there. So the live-query
+                        // assertions below are about the loop surviving, not about which records landed.
                         //
                         // Bounded the same way as the malformed-record test above: if the regression this
                         // test guards against ever reoccurs (the journal failure kills the mailbox loop),
@@ -424,6 +431,11 @@ let tests =
 
                         match task.Result with
                         | SparqlQueryResult.Graph g -> Expect.isGreaterThan g.Triples.Count 0 "Second Append succeeded; mailbox survived the journal failure"
+                        | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
+
+                        match (store :> IProvenanceStore).Query(ProvenanceQuery.ByResource "https://example.org/games/f") with
+                        | SparqlQueryResult.Graph g ->
+                            Expect.equal g.Triples.Count 0 "The journal-failed record was still tracked for eviction and got evicted at MaxRecords"
                         | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
 
                         (store :> IDisposable).Dispose()

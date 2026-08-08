@@ -9,7 +9,7 @@ An F# library for recording and querying [PROV-O](https://www.w3.org/TR/prov-o/)
 - **`ProvBuilder` computation expression**: `activity`/`entity`/`agent { }` mirror the `Prov` module's constructor/modifier functions one-for-one -- plain `|>` combinators and the CE produce structurally identical `Description` values
 - **`ProvenanceRecord` + `toDoc`**: a single PROV-O record (`Activity`, `Resource`, `Agent`, `StartedAt`/`EndedAt`, an optional domain `ActivityType`, and arbitrary `Properties`), projected into a `Doc` via `ProvenanceRecord.toDoc`
 - **Closed `ProvenanceQuery` vocabulary**: `ByResource` / `ByAgent` / `ByActivityId` are the only recognized query shapes. There is no public API accepting a raw SPARQL query or query string — SPARQL is purely an internal implementation detail (`ProvenanceStore.toSparqlQuery` is `internal`); adding a new provenance-meaningful query shape means adding a case to `ProvenanceQuery`, not widening the surface to open query text
-- **`MailboxProcessorProvenanceStore`**: the v1, in-memory `IProvenanceStore` implementation — one dotNetRDF `TripleStore` holding one named graph per appended record, queried via SPARQL over the store's union graph, with bounded eviction of the oldest records once `ProvenanceStoreConfig.MaxRecords` is exceeded (`EvictionBatchSize` is clamped so the record just appended is never evicted). A `MailboxProcessor` serializes concurrent `Append`/`Query` calls, and a malformed record never kills the mailbox loop — later `Append`/`Query` calls still succeed
+- **`MailboxProcessorProvenanceStore`**: the v1 `IProvenanceStore` implementation — one dotNetRDF `TripleStore` holding one named graph per appended record, queried via SPARQL over the store's union graph, with bounded eviction of the oldest records once `ProvenanceStoreConfig.MaxRecords` is exceeded (`EvictionBatchSize` is clamped so the record just appended is never evicted). A `MailboxProcessor` serializes concurrent `Append`/`Query` calls, and a malformed record never kills the mailbox loop — later `Append`/`Query` calls still succeed. In-memory by default, and optionally durable: pass an `IProvenanceJournal` (see [Durability](#durability)) to have records logged to disk and replayed on restart
 
 ## Installation
 
@@ -80,14 +80,18 @@ let activityDescription =
 restart. Attach a journal to make it durable:
 
 ```fsharp
+open Microsoft.Extensions.Logging.Abstractions
 open Frank.Provenance
 
-let journal = FileProvenanceJournal("/var/data/provenance", "leaderboard-actor")
+// FileProvenanceJournal's logger is optional and defaults to NullLogger, but supply a real one in
+// production: Append/Snapshot are fire-and-forget, so a log line is the only signal you will ever
+// get that a write failed and durability has stopped.
+let journal = FileProvenanceJournal("/var/data/provenance", "leaderboard-actor", NullLogger.Instance)
 
 let store =
     new MailboxProcessorProvenanceStore(
         ProvenanceStoreConfig.defaults,
-        logger,
+        NullLogger.Instance,
         journal
     )
 ```
@@ -99,12 +103,20 @@ entries recorded since it, so a freshly-started process with the same `(baseDire
 up where the last one left off.
 
 `FileProvenanceJournal` writes N-Quads (`{actorId}.journal.{seq}.nq` / `{actorId}.snapshot.{seq}.nq`)
-tracked by an `{actorId}.manifest.json` pointer file -- immutable and versioned, nothing is overwritten
-or deleted. `IProvenanceJournal` is a small interface (`Append`/`Snapshot`/`Recover`); a different
-durability backend can implement it without changing `MailboxProcessorProvenanceStore` at all.
+tracked by an `{actorId}.manifest.json` pointer file. The `.nq` segment and snapshot files are
+immutable and versioned -- none of them is ever overwritten or deleted, including the ones a snapshot
+supersedes. The manifest is the one exception, by design: it is the pointer into that set, so every
+append and snapshot replaces it (atomically, via write-to-temp-then-rename, so a crash mid-write can
+never leave a torn manifest behind). `IProvenanceJournal` is a small interface
+(`Append`/`Snapshot`/`Recover`); a different durability backend can implement it without changing
+`MailboxProcessorProvenanceStore` at all.
 
-Omit the third constructor argument (or pass `None`) for the original in-memory-only behavior --
-zero cost, zero files written.
+Journal writes are best-effort: a failed write is logged through the journal's own logger and the
+journal keeps serving later appends -- it never propagates the failure back into the store, and never
+blocks or fails a caller's `Append`.
+
+Omit the third constructor argument (or pass `?journal = None`) for the original in-memory-only
+behavior -- zero cost, zero files written.
 
 ## Scope
 
