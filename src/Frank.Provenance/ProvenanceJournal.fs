@@ -12,9 +12,10 @@ type IProvenanceJournal =
     abstract Snapshot: graphs: IGraph seq -> unit
     abstract Recover: unit -> IGraph seq
 
-// Manual JSON handling: System.Text.Json.Deserialize<Manifest> fails on F# records in this build context.
-// Uses JsonDocument for reading and sprintf-based JSON string construction for writing to ensure
-// robust serialization/deserialization of all manifest fields across .NET versions.
+// Not marked `private`/`internal`: System.Text.Json's reflection-based deserializer needs this
+// record's generated constructor to be public. Omitting Manifest from ProvenanceJournal.fsi already
+// makes it inaccessible outside this module -- adding `private` here would additionally make the
+// constructor non-public and break JSON deserialization for no encapsulation benefit.
 type Manifest =
     { LatestSnapshot: int
       NextSnapshotSeq: int
