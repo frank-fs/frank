@@ -15,6 +15,7 @@
     <Compile Include="ApiSurfaceTests.fs" />
     <Compile Include="JsonHomeDocumentTests.fs" />
     <Compile Include="AuthorizationFilterTests.fs" />
+    <Compile Include="HrefVarStartupFilterTests.fs" />
     <Compile Include="IntegrationTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
