@@ -12,11 +12,9 @@ type IProvenanceJournal =
     abstract Snapshot: graphs: IGraph seq -> unit
     abstract Recover: unit -> IGraph seq
 
-// Not marked `private`/`internal`: System.Text.Json's reflection-based deserializer needs this
-// record's generated constructor to be public. Omitting Manifest from ProvenanceJournal.fsi already
-// makes it inaccessible outside this module -- adding `private` here would additionally make the
-// constructor non-public and break JSON deserialization for no encapsulation benefit.
-[<CLIMutable>]
+// Manual JSON handling: System.Text.Json.Deserialize<Manifest> fails on F# records in this build context.
+// Uses JsonDocument for reading and sprintf-based JSON string construction for writing to ensure
+// robust serialization/deserialization of all manifest fields across .NET versions.
 type Manifest =
     { LatestSnapshot: int
       NextSnapshotSeq: int
@@ -33,22 +31,19 @@ module Manifest =
     let load (path: string) : Manifest =
         if File.Exists path then
             let json = File.ReadAllText path
-            if System.String.IsNullOrWhiteSpace(json) then
-                empty
-            else
-                use doc = JsonDocument.Parse(json)
-                let root = doc.RootElement
-                let mutable prop = JsonElement()
-                { LatestSnapshot = if root.TryGetProperty("latestSnapshot", &prop) then prop.GetInt32() else 0
-                  NextSnapshotSeq = if root.TryGetProperty("nextSnapshotSeq", &prop) then prop.GetInt32() else 1
-                  JournalSegmentsSince =
-                      if root.TryGetProperty("journalSegmentsSince", &prop) then
-                          prop.EnumerateArray()
-                          |> Seq.map (fun e -> e.GetInt32())
-                          |> Array.ofSeq
-                      else
-                          [||]
-                  NextSegmentSeq = if root.TryGetProperty("nextSegmentSeq", &prop) then prop.GetInt32() else 1 }
+            use doc = JsonDocument.Parse(json)
+            let root = doc.RootElement
+            let mutable prop = JsonElement()
+            { LatestSnapshot = if root.TryGetProperty("latestSnapshot", &prop) then prop.GetInt32() else 0
+              NextSnapshotSeq = if root.TryGetProperty("nextSnapshotSeq", &prop) then prop.GetInt32() else 1
+              JournalSegmentsSince =
+                  if root.TryGetProperty("journalSegmentsSince", &prop) then
+                      prop.EnumerateArray()
+                      |> Seq.map (fun e -> e.GetInt32())
+                      |> Array.ofSeq
+                  else
+                      [||]
+              NextSegmentSeq = if root.TryGetProperty("nextSegmentSeq", &prop) then prop.GetInt32() else 1 }
         else
             empty
 
@@ -78,7 +73,6 @@ type FileProvenanceJournal(baseDirectory: string, actorId: string) =
 
         use writer = new StreamWriter(path)
         NQuadsWriter().Save(store, writer, true)
-        writer.Flush()
 
     let readGraphs (path: string) : IGraph list =
         let store = new TripleStore()
