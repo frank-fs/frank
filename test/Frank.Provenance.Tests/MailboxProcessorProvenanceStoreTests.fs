@@ -200,7 +200,10 @@ let tests =
           }
 
           test "eviction removes the oldest records once MaxRecords is exceeded" {
-              let config = { MaxRecords = 2; EvictionBatchSize = 1 }
+              let config =
+                  { MaxRecords = 2
+                    EvictionBatchSize = 1
+                    SnapshotEvery = 100 }
               let store = newStore config
 
               store.Append(
@@ -238,7 +241,10 @@ let tests =
               // EvictionBatchSize (100) far exceeds MaxRecords (1): without the min-with-(length - 1)
               // clamp in the eviction path, evictCount would equal updated.Length and wipe out every
               // record in the store -- including the one just appended in this very Append call.
-              let config = { MaxRecords = 1; EvictionBatchSize = 100 }
+              let config =
+                  { MaxRecords = 1
+                    EvictionBatchSize = 100
+                    SnapshotEvery = 100 }
               let store = newStore config
 
               store.Append(

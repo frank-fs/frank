@@ -40,7 +40,11 @@ type ProvenanceStoreConfig =
       MaxRecords: int
       /// The number of oldest records to evict at once, once MaxRecords is exceeded. Clamped so it can
       /// never evict the record just appended, even when configured >= MaxRecords.
-      EvictionBatchSize: int }
+      EvictionBatchSize: int
+      /// Number of Append calls between snapshots, when a journal is attached (see
+      /// MailboxProcessorProvenanceStore). Ignored entirely when no journal is present. Values <= 0
+      /// are clamped to 1 (snapshot on every Append) rather than raising or dividing by zero.
+      SnapshotEvery: int }
 
 module ProvenanceStoreConfig =
     val defaults: ProvenanceStoreConfig

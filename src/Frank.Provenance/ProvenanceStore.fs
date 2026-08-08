@@ -24,10 +24,14 @@ type IProvenanceStore =
 
 type ProvenanceStoreConfig =
     { MaxRecords: int
-      EvictionBatchSize: int }
+      EvictionBatchSize: int
+      SnapshotEvery: int }
 
 module ProvenanceStoreConfig =
-    let defaults = { MaxRecords = 1000; EvictionBatchSize = 100 }
+    let defaults =
+        { MaxRecords = 1000
+          EvictionBatchSize = 100
+          SnapshotEvery = 100 }
 
 [<AutoOpen>]
 module ProvenanceStore =
