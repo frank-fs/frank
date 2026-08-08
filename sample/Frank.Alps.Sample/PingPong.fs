@@ -44,13 +44,18 @@ let pong = unsafe "pong" |> from [ awaitingPong ] |> rt awaitingPing |> href par
 /// Demo-only authentication for the ping/pong endpoints -- verbatim shape of
 /// sample/Frank.JsonHome.Sample/ApiKeyAuth.fs (an "X-Api-Key" header mapped to a hardcoded
 /// user/roles table), a separate scheme/table from that sample's own since this app has its own
-/// two test principals rather than admin/anonymous.
+/// three test principals rather than admin/anonymous. Named/scoped for ping/pong, but this one
+/// scheme is now effectively app-wide: `TrafficLight`'s `emergencyOverride`/`emergencyClear`
+/// resources also `requireRole "operator"` against the `"operator"` principal below, reusing this
+/// scheme rather than standing up a second one (tic-tac-toe has no auth at all).
 module PingPongAuth =
     [<Literal>]
     let SchemeName = "PingPongApiKey"
 
     let private users: IDictionary<string, string * string list> =
-        dict [ "pinger-key", ("pinger", [ "pinger" ]); "ponger-key", ("ponger", [ "ponger" ]) ]
+        dict [ "pinger-key", ("pinger", [ "pinger" ])
+               "ponger-key", ("ponger", [ "ponger" ])
+               "operator-key", ("operator", [ "operator" ]) ]
 
     type ApiKeyAuthHandler(options, logger, encoder: UrlEncoder) =
         inherit AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)

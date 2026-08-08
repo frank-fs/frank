@@ -223,6 +223,29 @@ An intersection is seeded, on creation, already in the state `walk`'s guard requ
 very first `POST .../walk` succeeds; the second one then genuinely fails, since the pedestrian
 has moved to `pedWalk`.
 
+### Operator-gated emergency endpoints (guard + role-authorization compose)
+
+`emergencyOverrideResource` and `emergencyClearResource` each carry `requireRole "operator"`,
+reusing ping/pong's `PingPongAuth` scheme (key `operator-key` -> role `operator`) rather than
+standing up a second auth scheme. `walkResource` and the plain `/intersections`/`/intersections/{id}`
+resources remain exactly as unauthenticated as before -- only the two emergency fan-out actions
+require an operator credential. This is the one place in the sample where `StateGuard`-based
+filtering (the AND-guard on `walk`) and role-based authorization filtering (proven separately on
+ping/pong's `pingResource`/`pongResource`) compose on the same document.
+
+```bash
+# No credential at all: 401.
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:5000/intersections/$ID/emergencyOverride
+
+# Wrong role: 403.
+curl -s -o /dev/null -w '%{http_code}\n' -H "X-Api-Key: pinger-key" \
+  -X POST http://localhost:5000/intersections/$ID/emergencyOverride
+
+# operator-key: 200.
+curl -s -o /dev/null -w '%{http_code}\n' -H "X-Api-Key: operator-key" \
+  -X POST http://localhost:5000/intersections/$ID/emergencyOverride
+```
+
 ### Try it
 
 ```bash

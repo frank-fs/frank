@@ -576,10 +576,14 @@ let pingPongTests =
                    wrong-turn call and is rejected with 409"
           } ]
 
-/// Mirrors `createPingPongServer`'s shape exactly, minus ping/pong's auth wiring -- none of the
-/// five `/intersections*` resources carry a `requireRole`, so plain `createServer` (no
-/// `AddAuthentication`/`UseAuthentication`) is enough. Wires the REAL
-/// `Frank.Alps.Sample.Program.TrafficLight` profile and the REAL
+/// `emergencyOverrideResource`/`emergencyClearResource` now carry `requireRole "operator"` --
+/// every traffic-light resource shares the SAME app-wide `PingPongAuth` scheme once `Program.fs`'s
+/// `main` registers it (there is no precedent in this app for a second concurrent scheme), so this
+/// helper wires authentication exactly like `createPingPongServer` rather than plain `createServer`.
+/// `walkResource`/`intersectionResource`/`intersectionsResource` carry no `requireRole` at all, so
+/// requests against them continue to succeed with no `X-Api-Key` header -- this helper's addition of
+/// auth *middleware* does not, by itself, gate anything that wasn't already gated by the resources'
+/// own metadata. Wires the REAL `Frank.Alps.Sample.Program.TrafficLight` profile and the REAL
 /// `intersectionsResource`/`intersectionResource`/`walkResource`/`emergencyOverrideResource`/
 /// `emergencyClearResource` endpoints via the sample's `ProjectReference`, never a hand-copied
 /// duplicate of that logic.
@@ -595,7 +599,43 @@ let private createTrafficLightServer () : HttpClient =
         { spec with
             Endpoints = Array.append spec.Endpoints trafficLightEndpoints }
 
-    createServer spec
+    let host =
+        Host
+            .CreateDefaultBuilder([||])
+            .ConfigureWebHost(fun webBuilder ->
+                webBuilder
+                    .UseTestServer()
+                    .ConfigureServices(fun services ->
+                        services.AddRouting() |> ignore
+                        spec.Services services |> ignore
+
+                        services
+                            .AddAuthentication(PingPongAuth.SchemeName)
+                            .AddScheme<AuthenticationSchemeOptions, PingPongAuth.ApiKeyAuthHandler>(
+                                PingPongAuth.SchemeName,
+                                fun _ -> ()
+                            )
+                        |> ignore
+
+                        services.AddAuthorization() |> ignore)
+                    .Configure(fun app ->
+                        app
+                        |> WebLink.useAppWideLinks spec.LinkProviders
+                        |> spec.BeforeRoutingMiddleware
+                        |> fun app -> app.UseRouting()
+                        |> WebLink.useResourceScopedLinks
+                        |> spec.Middleware
+                        |> fun app ->
+                            app
+                                .UseAuthentication()
+                                .UseAuthorization()
+                                .UseEndpoints(fun endpoints -> endpoints.DataSources.Add(TestEndpointDataSource spec.Endpoints))
+                        |> ignore)
+                |> ignore)
+            .Build()
+
+    host.Start()
+    host.GetTestClient()
 
 /// Traffic light + pedestrian crossing: proves Frank.Alps's compound-transition primitives
 /// (StateGuard/TransitionTarget/guardedBy/entersRegions/satisfiesGuard) enforced over real HTTP,
@@ -643,24 +683,28 @@ let trafficLightTests =
                   "Seeded state (vehicleRed + pedWaiting) satisfies walk's AND-guard"
 
               let! (overrideExcerptResponse: HttpResponseMessage) =
-                  client.SendAsync(pingPongRequest HttpMethod.Get overridePath (Some "application/alps+json") None)
+                  client.SendAsync(
+                      pingPongRequest HttpMethod.Get overridePath (Some "application/alps+json") (Some "operator-key")
+                  )
 
               let! (overrideExcerptBody: string) = overrideExcerptResponse.Content.ReadAsStringAsync()
 
               Expect.contains
                   (alpsDescriptorIds overrideExcerptBody)
                   "emergencyOverride"
-                  "emergencyOverride is unconditional -- always present"
+                  "emergencyOverride is unconditional -- always present (once authorized as operator)"
 
               let! (clearExcerpt1Response: HttpResponseMessage) =
-                  client.SendAsync(pingPongRequest HttpMethod.Get clearPath (Some "application/alps+json") None)
+                  client.SendAsync(
+                      pingPongRequest HttpMethod.Get clearPath (Some "application/alps+json") (Some "operator-key")
+                  )
 
               let! (clearExcerpt1Body: string) = clearExcerpt1Response.Content.ReadAsStringAsync()
 
               Expect.contains
                   (alpsDescriptorIds clearExcerpt1Body)
                   "emergencyClear"
-                  "emergencyClear is unconditional -- always present"
+                  "emergencyClear is unconditional -- always present (once authorized as operator)"
 
               // 3. The guard is satisfied -- the first walk POST succeeds.
               let! (walk1Response: HttpResponseMessage) =
@@ -697,11 +741,12 @@ let trafficLightTests =
               Expect.equal (jsonView1.GetProperty("vehicle").GetString()) "vehicleRed" "vehicle is still vehicleRed"
               Expect.equal (jsonView1.GetProperty("pedestrian").GetString()) "pedWalk" "pedestrian moved to pedWalk"
 
-              // 7. emergencyOverride is unconditional -- always succeeds, regardless of state.
+              // 7. emergencyOverride is unconditional -- always succeeds, regardless of state (once
+              // authorized as operator).
               let! (overrideResponse: HttpResponseMessage) =
-                  client.SendAsync(pingPongRequest HttpMethod.Post overridePath None None)
+                  client.SendAsync(pingPongRequest HttpMethod.Post overridePath None (Some "operator-key"))
 
-              Expect.equal (int overrideResponse.StatusCode) 200 "POST .../emergencyOverride succeeds unconditionally"
+              Expect.equal (int overrideResponse.StatusCode) 200 "operator's POST .../emergencyOverride succeeds unconditionally"
 
               let! (jsonView2Response: HttpResponseMessage) =
                   client.SendAsync(pingPongRequest HttpMethod.Get intersectionPath (Some "application/json") None)
@@ -719,9 +764,9 @@ let trafficLightTests =
               // initial": a fake implementation that just replayed the two initial states would
               // pass every assertion above but fail this one.
               let! (clearResponse: HttpResponseMessage) =
-                  client.SendAsync(pingPongRequest HttpMethod.Post clearPath None None)
+                  client.SendAsync(pingPongRequest HttpMethod.Post clearPath None (Some "operator-key"))
 
-              Expect.equal (int clearResponse.StatusCode) 200 "POST .../emergencyClear succeeds unconditionally"
+              Expect.equal (int clearResponse.StatusCode) 200 "operator's POST .../emergencyClear succeeds unconditionally"
 
               let! (jsonView3Response: HttpResponseMessage) =
                   client.SendAsync(pingPongRequest HttpMethod.Get intersectionPath (Some "application/json") None)
@@ -739,4 +784,126 @@ let trafficLightTests =
                   "pedWalk"
                   "History restores pedestrian to pedWalk (post-walk), NOT pedWaiting (initial) -- \
                    proof History resumes the actual prior substate, not a hardcoded reset"
+          } ]
+
+/// The gap this test closes: `StateGuard`-based filtering (the AND-guard above, proven on `walk`)
+/// and role-based authorization filtering (`PingPongAuth`'s `requireRole`, proven on
+/// `pingResource`/`pongResource`) were each demonstrated separately, but never composing on the
+/// SAME resource. `emergencyOverrideResource`/`emergencyClearResource` now carry
+/// `requireRole "operator"` -- this test proves that gate over real HTTP (401 with no credential,
+/// 403 with the wrong role, 200 with `operator-key`, both GET and POST), while `walk` and the
+/// plain intersection resources remain exactly as unauthenticated as before.
+[<Tests>]
+let trafficLightAuthTests =
+    testList
+        "Sample: traffic light emergency endpoints are operator-gated (guard + authorization compose)"
+        [ testTask "walk and intersections stay public; emergencyOverride/emergencyClear require the operator role" {
+              let client = createTrafficLightServer ()
+
+              // 1. POST /intersections creates an intersection -- unauthenticated, no requireRole here.
+              let! (createResponse: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Post "/intersections" None None)
+
+              Expect.equal (int createResponse.StatusCode) 200 "POST /intersections creates an intersection with no API key"
+              let! (createBody: string) = createResponse.Content.ReadAsStringAsync()
+              let id = JsonDocument.Parse(createBody).RootElement.GetProperty("id").GetString()
+              let walkPath = $"/intersections/{id}/walk"
+              let overridePath = $"/intersections/{id}/emergencyOverride"
+              let clearPath = $"/intersections/{id}/emergencyClear"
+
+              // 2. POST .../walk with no API key -- still 200: walk carries no requireRole and is
+              // unaffected by this change.
+              let! (walkResponse: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Post walkPath None None)
+
+              Expect.equal (int walkResponse.StatusCode) 200 "POST .../walk with no API key still succeeds -- walk stays public"
+
+              // 3. GET .../emergencyOverride with no API key at all -- no credential, so 401, matching
+              // the existing 401-for-missing-credential behavior already observed on pingResource.
+              let! (noKeyGetResponse: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Get overridePath (Some "application/alps+json") None)
+
+              Expect.equal
+                  (int noKeyGetResponse.StatusCode)
+                  401
+                  "GET .../emergencyOverride with no API key at all is unauthenticated: 401"
+
+              // 4. GET .../emergencyOverride with a WRONG role's key -- authenticated but forbidden,
+              // matching pingResource's "ponger is forbidden from GET .../ping" precedent exactly.
+              let! (wrongRoleGetResponse: HttpResponseMessage) =
+                  client.SendAsync(
+                      pingPongRequest HttpMethod.Get overridePath (Some "application/alps+json") (Some "pinger-key")
+                  )
+
+              Expect.equal
+                  (int wrongRoleGetResponse.StatusCode)
+                  403
+                  "GET .../emergencyOverride with pinger-key (wrong role) is forbidden: 403"
+
+              // 5. GET .../emergencyOverride with operator-key -- 200, and the excerpt DOES list
+              // emergencyOverride (unconditional guard, always present once authorized).
+              let! (operatorGetResponse: HttpResponseMessage) =
+                  client.SendAsync(
+                      pingPongRequest HttpMethod.Get overridePath (Some "application/alps+json") (Some "operator-key")
+                  )
+
+              Expect.equal (int operatorGetResponse.StatusCode) 200 "GET .../emergencyOverride with operator-key succeeds"
+              let! (operatorGetBody: string) = operatorGetResponse.Content.ReadAsStringAsync()
+
+              Expect.contains
+                  (alpsDescriptorIds operatorGetBody)
+                  "emergencyOverride"
+                  "operator's excerpt lists emergencyOverride"
+
+              // 6. POST .../emergencyOverride with no API key -- requireRole gates BOTH methods on
+              // this resource, prove it explicitly for POST too, not just assumed from the GET check.
+              let! (noKeyPostResponse: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Post overridePath None None)
+
+              Expect.equal
+                  (int noKeyPostResponse.StatusCode)
+                  401
+                  "POST .../emergencyOverride with no API key is unauthenticated: 401 -- requireRole gates POST too"
+
+              // 7. POST .../emergencyOverride with operator-key -- 200; state mutates to flashing/flashing.
+              let! (operatorPostResponse: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Post overridePath None (Some "operator-key"))
+
+              Expect.equal (int operatorPostResponse.StatusCode) 200 "operator's POST .../emergencyOverride succeeds"
+
+              let! (jsonViewResponse: HttpResponseMessage) =
+                  client.SendAsync(
+                      pingPongRequest HttpMethod.Get $"/intersections/{id}" (Some "application/json") None
+                  )
+
+              let! (jsonViewBody: string) = jsonViewResponse.Content.ReadAsStringAsync()
+              let jsonView = JsonDocument.Parse(jsonViewBody).RootElement
+
+              Expect.equal (jsonView.GetProperty("vehicle").GetString()) "vehicleFlashing" "vehicle entered vehicleFlashing"
+              Expect.equal (jsonView.GetProperty("pedestrian").GetString()) "pedFlashing" "pedestrian entered pedFlashing"
+
+              // 8. POST .../emergencyClear with operator-key -- 200; state restores to the ACTUAL
+              // pre-override values (vehicleRed/pedWalk, since walk already fired), not a reset.
+              let! (clearResponse: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Post clearPath None (Some "operator-key"))
+
+              Expect.equal (int clearResponse.StatusCode) 200 "operator's POST .../emergencyClear succeeds"
+
+              let! (jsonView2Response: HttpResponseMessage) =
+                  client.SendAsync(
+                      pingPongRequest HttpMethod.Get $"/intersections/{id}" (Some "application/json") None
+                  )
+
+              let! (jsonView2Body: string) = jsonView2Response.Content.ReadAsStringAsync()
+              let jsonView2 = JsonDocument.Parse(jsonView2Body).RootElement
+
+              Expect.equal
+                  (jsonView2.GetProperty("vehicle").GetString())
+                  "vehicleRed"
+                  "History restores vehicle to vehicleRed -- its actual state before the override"
+
+              Expect.equal
+                  (jsonView2.GetProperty("pedestrian").GetString())
+                  "pedWalk"
+                  "History restores pedestrian to pedWalk (post-walk), NOT pedWaiting (initial)"
           } ]

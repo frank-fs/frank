@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Frank.Builder
+open Frank.Auth
 open Frank.Alps
 
 /// Compound transitions: orthogonal (AND) regions, structural AND-guards, and unconditional
@@ -235,8 +236,18 @@ let walkResource =
         })
     }
 
+/// Only an operator may force the emergency fan-out/clear; anyone may request `walk` when the
+/// AND-guard permits it (`walkResource`, above, carries no `requireRole` at all). Reuses
+/// `PingPong.PingPongAuth`'s scheme (`"operator-key"` -> role `"operator"`) rather than standing up
+/// a second scheme -- this app has no precedent for multiple concurrent auth schemes. Proves that
+/// `StateGuard`-based filtering (the AND-guard on `walk`) and role-based authorization filtering
+/// (`requireRole`, proven separately on `PingPong.pingResource`/`pongResource`) compose
+/// independently on the SAME document, rather than only ever appearing in isolation from each other
+/// elsewhere in this sample. `requireRole "operator"` gates BOTH methods on each resource, same as
+/// `pingResource`.
 let emergencyOverrideResource =
     resource "/intersections/{id}/emergencyOverride" {
+        requireRole "operator"
         get (Alps.excerpt (Some trafficLightResolver))
 
         post (handler {
@@ -245,8 +256,10 @@ let emergencyOverrideResource =
         })
     }
 
+/// See `emergencyOverrideResource`'s doc comment -- same operator-only rationale applies here.
 let emergencyClearResource =
     resource "/intersections/{id}/emergencyClear" {
+        requireRole "operator"
         get (Alps.excerpt (Some trafficLightResolver))
 
         post (handler {
