@@ -7,8 +7,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Linked, not ProjectReference'd: HrefVarAnalyzer reuses Frank.JsonHome's
+         pure UriTemplate/HrefVarValidation logic without pulling the
+         Microsoft.AspNetCore.App framework reference into this analyzer
+         package. See specs/017-hrefvar-validation/research.md R2. -->
+    <Compile Include="../Frank.JsonHome/UriTemplate.fsi" Link="UriTemplate.fsi" />
+    <Compile Include="../Frank.JsonHome/UriTemplate.fs" Link="UriTemplate.fs" />
+    <Compile Include="../Frank.JsonHome/HrefVarValidation.fsi" Link="HrefVarValidation.fsi" />
+    <Compile Include="../Frank.JsonHome/HrefVarValidation.fs" Link="HrefVarValidation.fs" />
     <Compile Include="DuplicateHandlerAnalyzer.fsi" />
     <Compile Include="DuplicateHandlerAnalyzer.fs" />
+    <Compile Include="HrefVarAnalyzer.fsi" />
+    <Compile Include="HrefVarAnalyzer.fs" />
   </ItemGroup>
 
   <ItemGroup>
