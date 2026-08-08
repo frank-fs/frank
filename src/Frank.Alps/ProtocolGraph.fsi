@@ -1,16 +1,15 @@
 namespace Frank.Alps
 
-/// One edge in the protocol graph derived from authored descriptors: `Transition` is valid from
-/// `FromState`, and moves to `ToState`. Traced to
-/// https://wizardsofsmart.wordpress.com/2018/12/05/state-transitions-through-sequence-diagrams/'s
-/// `Transition<'State,'Message> = { FromState; Message; ToState }`, generalized to `Descriptor`.
+/// A derived protocol edge. `FromGuard = None` means the transition is unconditional -- it fires
+/// regardless of prior state. `ToTargets` non-empty is the only requirement for an edge to exist.
 type ProtocolTransition =
-    { FromState: Descriptor
+    { FromGuard: StateGuard option
       Transition: Descriptor
-      ToState: Descriptor }
+      ToTargets: TransitionTarget list }
 
 module ProtocolGraph =
-    /// Derives every ProtocolTransition edge from a profile's authored descriptors, walking nested
-    /// `Descriptors` recursively. A descriptor declaring both `From` (non-empty) and `Rt` (`Some`)
-    /// yields one edge per `From` element; anything else yields none.
-    val ofProfile: profile: Descriptor list -> ProtocolTransition list
+    /// Derives the read-only edge set from an authored profile. `FromGuard` comes from `Guard` if set,
+    /// else from `From` (empty -> None, one -> State, many -> Any -- collapses today's per-alternative
+    /// expansion into one edge). `ToTargets` comes from `Targets` if non-empty, else from `Rt` (Some ->
+    /// one EnterState, None -> empty). An edge is emitted iff the resulting `ToTargets` is non-empty.
+    val ofProfile: Descriptor list -> ProtocolTransition list
