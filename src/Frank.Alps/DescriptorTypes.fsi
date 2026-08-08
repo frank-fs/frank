@@ -53,8 +53,10 @@ type Descriptor =
       Doc: Doc option
       Ext: Ext list
       InheritsFrom: DescriptorRef option
-      Rt: Descriptor option
       From: Descriptor list
+      Guard: StateGuard option
+      Rt: Descriptor option
+      Targets: TransitionTarget list
       Rel: string option
       Tag: string list
       Link: Link list
@@ -65,3 +67,21 @@ type Descriptor =
 and DescriptorRef =
     | Local of Descriptor
     | External of Uri
+
+/// A structural guard tree over descriptor state, evaluated against a resolver's active-state set.
+/// `State`/`Predicate` hold a plain, local Descriptor -- cross-role composition connects via a shared
+/// `Def` URI on independently-authored descriptors, not via a cross-document reference (design doc,
+/// 2026-08-08-frank-alps-compound-transitions-design.md).
+and StateGuard =
+    | State of Descriptor
+    | Not of StateGuard
+    | All of StateGuard list
+    | Any of StateGuard list
+    | Predicate of Descriptor
+
+/// Where a fan-out transition enters. Always local to the same document as the transition -- a
+/// transition can only enter its own document's orthogonal regions.
+and TransitionTarget =
+    | EnterState of Descriptor
+    | History of Descriptor
+    | DeepHistory of Descriptor

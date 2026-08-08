@@ -43,8 +43,10 @@ type Descriptor =
       Doc: Doc option
       Ext: Ext list
       InheritsFrom: DescriptorRef option
-      Rt: Descriptor option
       From: Descriptor list
+      Guard: StateGuard option
+      Rt: Descriptor option
+      Targets: TransitionTarget list
       Rel: string option
       Tag: string list
       Link: Link list
@@ -53,3 +55,15 @@ type Descriptor =
 and DescriptorRef =
     | Local of Descriptor
     | External of Uri
+
+and StateGuard =
+    | State of Descriptor
+    | Not of StateGuard
+    | All of StateGuard list
+    | Any of StateGuard list
+    | Predicate of Descriptor
+
+and TransitionTarget =
+    | EnterState of Descriptor
+    | History of Descriptor
+    | DeepHistory of Descriptor

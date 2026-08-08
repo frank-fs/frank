@@ -13,6 +13,8 @@ let private emptyDescriptor (id: string) : Descriptor =
       InheritsFrom = None
       Rt = None
       From = []
+      Guard = None
+      Targets = []
       Rel = None
       Tag = []
       Link = []
@@ -50,4 +52,26 @@ let tests =
               match d.InheritsFrom with
               | Some(DescriptorRef.External u) -> Expect.equal u uri ""
               | _ -> failwith "expected External"
+          }
+
+          test "a Descriptor can hold a StateGuard via Guard without a compiler error" {
+              let a = emptyDescriptor "a"
+              let d = { emptyDescriptor "t" with Guard = Some(StateGuard.State a) }
+              match d.Guard with
+              | Some(StateGuard.State s) -> Expect.equal s.Id "a" ""
+              | _ -> failwith "expected State"
+          }
+
+          test "StateGuard nests: All/Any/Not wrap StateGuard, not Descriptor" {
+              let a, b = emptyDescriptor "a", emptyDescriptor "b"
+              let g = StateGuard.All [ StateGuard.State a; StateGuard.Any [ StateGuard.State b; StateGuard.Not(StateGuard.State a) ] ]
+              match g with
+              | StateGuard.All [ StateGuard.State _; StateGuard.Any [ StateGuard.State _; StateGuard.Not(StateGuard.State _) ] ] -> ()
+              | _ -> failwith "expected nested All/Any/Not"
+          }
+
+          test "a Descriptor can hold TransitionTarget list via Targets" {
+              let a = emptyDescriptor "region"
+              let d = { emptyDescriptor "t" with Targets = [ TransitionTarget.EnterState a; TransitionTarget.History a; TransitionTarget.DeepHistory a ] }
+              Expect.equal d.Targets.Length 3 ""
           } ]
