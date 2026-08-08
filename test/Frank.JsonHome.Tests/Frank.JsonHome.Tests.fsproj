@@ -15,7 +15,7 @@
     <Compile Include="JsonHomeDocumentTests.fs" />
     <Compile Include="AuthorizationFilterTests.fs" />
     <Compile Include="IntegrationTests.fs" />
-    <Compile Include="DuplicateRelValidatorTests.fs" />
+    <Compile Include="DuplicateRelStartupFilterTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

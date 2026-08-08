@@ -52,6 +52,7 @@
 - **draft-06 Compliant:** all eleven resource hints implemented (`allow`, `formats`, `acceptPatch`, `acceptPost`, `acceptPut`, `acceptRanges`, `acceptPrefer`, `docs`, `preconditionRequired`, `authSchemes`, `status`), camelCase hint names throughout, and `hrefVars` always present alongside `hrefTemplate` per the spec's MUST.
 - **Authorization Filtering:** reads stock `IAuthorizeData`/`AuthorizationPolicy` endpoint metadata, so it works with `Frank.Auth` without referencing it and equally with a plain `AuthorizeAttribute`. Evaluation failures deny. The document is dispatched as a real endpoint through the same routing stage as every other resource — after any `useAuthentication`/`useAuthorization` middleware, regardless of where `useJsonHome` appears in the `webHost { }` block — so filtering sees the real principal rather than an anonymous one. Emits `Cache-Control: private, no-cache` and `Vary: Authorization` whenever any resource is guarded. Filtering is per HTTP method, not per whole resource: a resource whose `DELETE` requires a role it doesn't have but whose `GET` is public now shows `["GET"]` in `hints.allow` rather than disappearing entirely (previously any guarded method hid the whole resource). A resource left with no visible methods for the current principal is omitted entirely, as before.
 - **Route Template Translation:** ASP.NET route templates (`{id:guid}`, `{id?}`, `{*rest}`) are translated to RFC 6570 URI Templates for `hrefTemplate`.
+- **Duplicate `rel` fails startup** ([#475](https://github.com/frank-fs/frank/issues/475)): `useJsonHome` registers an `IStartupFilter` that throws `OptionsValidationException` when two or more resources declare the same `rel`, naming every colliding route template. `resources` in the served document is a JSON object keyed by `rel`, so a collision would otherwise silently drop one resource's *entry from the discovery document* (the resource itself stays reachable over HTTP) with no diagnostic. No opt-in: every `useJsonHome` call gets the check. It runs after the endpoint pipeline is built but before the server accepts a request — `IApiDescriptionGroupCollectionProvider` does not reflect Frank's resources any earlier than that, so `AddOptionsWithValidateOnStart` is deliberately *not* the mechanism.
 - **No Breaking Changes:** entirely additive — no changes to `Frank` core.
 - **Sample:** `sample/Frank.JsonHome.Sample` demonstrates the discovery metadata and, curling the same `/.well-known/home.json` as anonymous vs. an authenticated admin, the authorization filtering actually changing what the document lists.
 
@@ -71,12 +72,6 @@ webHost {
     }
 }
 ```
-
-**Frank.JsonHome - Duplicate Rel Validation** ([#475](https://github.com/frank-fs/frank/issues/475))
-
-- **Automatic startup validation:** `useJsonHome` now registers an options validator that fails `host.Start()` with `OptionsValidationException` when two or more resources declare the same `rel`. The exception message names the colliding route templates, enabling developers to quickly identify and fix the conflict.
-- **No opt-in required:** validation runs automatically on every `useJsonHome` call — it is not a feature developers must enable; it is the default safe behavior.
-- **Breaking behavioral change (not API):** previously, duplicate `rel` values would silently collide in the served JSON Home document, with the second resource's rel causing the first to be dropped and unreachable. Now the application refuses to start, failing fast and loudly at startup rather than causing silent data loss in the discovery document.
 
 **Frank.Auth - Handler-Level Authorization**
 

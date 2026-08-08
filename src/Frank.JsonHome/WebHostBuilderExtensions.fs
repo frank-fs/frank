@@ -1,9 +1,8 @@
 namespace Frank.JsonHome
 
+open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.DependencyInjection.Extensions
-open Microsoft.Extensions.Options
 open Frank.Builder
 
 [<AutoOpen>]
@@ -20,25 +19,11 @@ module WebHostBuilderExtensions =
                     // It is independent of OpenAPI, which merely calls it too.
                     services.AddEndpointsApiExplorer() |> ignore
 
-                    // FixedJsonHomeOptionsFactory makes IOptions<JsonHomeOptions>.Value the
-                    // same instance documentHandler already renders from -- no second,
-                    // independently-configured copy of this useJsonHome call's options.
-                    // Resolved from the container (rather than constructed directly) so it
-                    // receives the registered IValidateOptions<JsonHomeOptions> collection,
-                    // including DuplicateRelValidator below -- otherwise ValidateOnStart's
-                    // resolution of IOptions<JsonHomeOptions>.Value would never run it.
-                    services.AddSingleton<IOptionsFactory<JsonHomeOptions>>(fun (sp: System.IServiceProvider) ->
-                        FixedJsonHomeOptionsFactory(options, sp.GetServices<IValidateOptions<JsonHomeOptions>>())
-                        :> IOptionsFactory<JsonHomeOptions>)
-                    |> ignore
-
-                    // Fails startup if two resources declare the same rel (#475) --
-                    // DuplicateRelValidator.Validate runs during Host.StartAsync, before
-                    // Kestrel (or any other IHostedService) starts serving.
-                    services.AddOptionsWithValidateOnStart<JsonHomeOptions>() |> ignore
-
-                    services.TryAddEnumerable(
-                        ServiceDescriptor.Singleton<IValidateOptions<JsonHomeOptions>, DuplicateRelValidator>())
+                    // Fails startup if two resources declare the same rel (#475).
+                    // Deliberately an IStartupFilter, not AddOptionsWithValidateOnStart:
+                    // see DuplicateRelStartupFilter.fsi for why the Options-validation
+                    // hook fires too early to see Frank's endpoints.
+                    services.AddSingleton<IStartupFilter, DuplicateRelStartupFilter>() |> ignore
 
                     services
             LinkProviders =
