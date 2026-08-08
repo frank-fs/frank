@@ -30,6 +30,16 @@ type internal DuplicateRelValidator(provider: IApiDescriptionGroupCollectionProv
             | fs -> ValidateOptionsResult.Fail(fs: string seq)
 
 [<Sealed>]
-type internal FixedJsonHomeOptionsFactory(value: JsonHomeOptions) =
+type internal FixedJsonHomeOptionsFactory(value: JsonHomeOptions, validators: IValidateOptions<JsonHomeOptions> seq) =
     interface IOptionsFactory<JsonHomeOptions> with
-        member _.Create(_name: string) : JsonHomeOptions = value
+        member _.Create(name: string) : JsonHomeOptions =
+            let failures =
+                validators
+                |> Seq.map (fun v -> v.Validate(name, value))
+                |> Seq.filter (fun r -> r.Failed)
+                |> Seq.collect (fun r -> r.Failures)
+                |> List.ofSeq
+
+            match failures with
+            | [] -> value
+            | fs -> raise (OptionsValidationException(name, typeof<JsonHomeOptions>, fs))

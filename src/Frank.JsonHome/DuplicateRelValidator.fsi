@@ -16,14 +16,22 @@ type internal DuplicateRelValidator =
     new: provider: IApiDescriptionGroupCollectionProvider -> DuplicateRelValidator
     interface IValidateOptions<JsonHomeOptions>
 
-/// Returns the given `JsonHomeOptions` value unconditionally. `JsonHomeOptions`
-/// is an immutable record with no parameterless constructor, so it cannot
-/// flow through the default `IOptionsFactory<T>` (`Activator.CreateInstance`
-/// + `IConfigureOptions<T>.Configure(Action<T>)` mutation). This factory
+/// Returns the given `JsonHomeOptions` value unconditionally, after running
+/// it through the injected validators. `JsonHomeOptions` is an immutable
+/// record with no parameterless constructor, so it cannot flow through the
+/// default `IOptionsFactory<T>` (`Activator.CreateInstance` +
+/// `IConfigureOptions<T>.Configure(Action<T>)` mutation). This factory
 /// makes `IOptions<JsonHomeOptions>.Value` and `useJsonHome`'s own
 /// closure-captured options the same instance -- no second, independently
-/// configured copy of the same settings.
+/// configured copy of the same settings. Because replacing the default
+/// `IOptionsFactory<T>` opts out of its behavior entirely, this factory
+/// re-implements the one piece of that behavior `AddOptionsWithValidateOnStart`
+/// depends on: running every registered `IValidateOptions<JsonHomeOptions>`
+/// (including `DuplicateRelValidator`) and raising `OptionsValidationException`
+/// on failure, same as `OptionsFactory<TOptions>.Create` does. Configure/
+/// post-configure steps are not replicated since `value` is already a
+/// complete, fixed instance.
 [<Sealed>]
 type internal FixedJsonHomeOptionsFactory =
-    new: value: JsonHomeOptions -> FixedJsonHomeOptionsFactory
+    new: value: JsonHomeOptions * validators: IValidateOptions<JsonHomeOptions> seq -> FixedJsonHomeOptionsFactory
     interface IOptionsFactory<JsonHomeOptions>

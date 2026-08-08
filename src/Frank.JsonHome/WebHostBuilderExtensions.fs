@@ -23,7 +23,13 @@ module WebHostBuilderExtensions =
                     // FixedJsonHomeOptionsFactory makes IOptions<JsonHomeOptions>.Value the
                     // same instance documentHandler already renders from -- no second,
                     // independently-configured copy of this useJsonHome call's options.
-                    services.AddSingleton<IOptionsFactory<JsonHomeOptions>>(FixedJsonHomeOptionsFactory(options))
+                    // Resolved from the container (rather than constructed directly) so it
+                    // receives the registered IValidateOptions<JsonHomeOptions> collection,
+                    // including DuplicateRelValidator below -- otherwise ValidateOnStart's
+                    // resolution of IOptions<JsonHomeOptions>.Value would never run it.
+                    services.AddSingleton<IOptionsFactory<JsonHomeOptions>>(fun (sp: System.IServiceProvider) ->
+                        FixedJsonHomeOptionsFactory(options, sp.GetServices<IValidateOptions<JsonHomeOptions>>())
+                        :> IOptionsFactory<JsonHomeOptions>)
                     |> ignore
 
                     // Fails startup if two resources declare the same rel (#475) --
