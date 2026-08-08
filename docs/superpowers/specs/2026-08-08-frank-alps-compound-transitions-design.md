@@ -2,7 +2,7 @@
 
 **Date**: 2026-08-08
 **Branch**: `worktree-compound-protocol`
-**Status**: Draft — awaiting review (one open item, see *Wire format*)
+**Status**: Draft — awaiting review (Wire format decided, see below)
 
 ## Context
 
@@ -133,7 +133,7 @@ let rec satisfiesGuard (activeStates: Uri list) (guard: StateGuard) : bool =
 
 `None` (unconditional) is always satisfied — never filtered, same graceful-degradation instinct as an absent resolver today.
 
-### Wire format — **open item, not resolved this session**
+### Wire format — **decided: option 4**
 
 Verified against the actual spec text (draft-07, fetched during this design): `rt` (§2.2.13) is singular — "MUST point to the id of an existing descriptor," one reference, not an array. `ext` (§2.2.6) explicitly MAY be an array. `rt` therefore keeps pointing at one target (the first/primary `ToTargets` element when present); it cannot carry fan-out on its own.
 
@@ -144,7 +144,7 @@ Four options were surfaced for representing the rest of `StateGuard`/`ToTargets`
 3. **Reuse `contains`** — wrap member transitions under one parent, mark AND/OR via the existing `regions`/`StateComposition` mechanism. Con: overloads `contains` with a third meaning (representation grouping, composite-state hierarchy, now compound-transition membership).
 4. **Don't serialize at all** — `StateGuard`/`ToTargets` stay purely in-process/derived, matching the package's already-stated posture ("nothing in this package executes a transition... stays external"). Wire format stays exactly `from`/`rt` per plain edge, unchanged. Con: an external tool reading the raw JSON can never see the compound structure — only an in-process consumer (this assembly) can.
 
-Recommendation carried into the plan: **option 4**, most consistent with the existing author-and-read-only-derive boundary and avoids any ALPS workaround — but this was not confirmed with the user and must be resolved before or during implementation, not assumed.
+**Confirmed: option 4.** `StateGuard`/`ToTargets` stay purely in-process/derived — no wire serialization. Rationale (user, 2026-08-08): ALPS is already projected to the current resource state by role — the served excerpt is a per-request, per-role view, not a write-side model. Serializing guard/fan-out logic onto the wire would leak that write-side model into a document meant to say "what's true from here, now." Options 1-3 above stay recorded for context; not pursued.
 
 ### Sketch: traffic light + pedestrian crossing (single-document — the light proof sample)
 
@@ -216,7 +216,7 @@ The fulfillment resource's `CurrentStateResolver` is whatever the orchestrator w
 | Transition has `rt` but no `from`/`guardedBy` | Yields an unconditional edge (`FromGuard = None`) — behavior change from the parent design, see *Replacing `ProtocolTransition`*. |
 | Transition has `entersRegions` but no `from`/`guardedBy`/`rt` | Unconditional fan-out edge. |
 | Transition has both `from` and `guardedBy` | `guardedBy` wins for `ofProfile`/enforcement; `From` still serializes to `protocolState`/`availableInStates` ext as before (representational, unchanged). |
-| Transition has both `rt` and `entersRegions` | `entersRegions` wins for `ofProfile`; `rt` still serializes as the wire-required single property (which element — open, see *Wire format*). |
+| Transition has both `rt` and `entersRegions` | `entersRegions` wins for `ofProfile`; `rt` still serializes as the wire-required single property. Which `ToTargets` element it mirrors when there's more than one is a separate, narrower open question — unrelated to the *Wire format* decision above, which only governs `StateGuard`/`ToTargets` themselves. |
 | `History`/`DeepHistory` target whose region has no `initial`-marked child | Frank.Alps carries the marker; resolving "last active" is the consuming runtime's problem, not authored or validated here. |
 | Two unrelated states accidentally share a `def` URI | Not validated — same "nothing to check" posture `hrefExternal` already has; author's responsibility. |
 | `CurrentStateResolver` absent or returns `[]` | Unchanged: no state filtering, only authorization applies. |

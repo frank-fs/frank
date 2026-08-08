@@ -14,12 +14,12 @@
 - Test framework is **Expecto**, matching `Frank.Alps.Tests`.
 - `Descriptor`, `StateGuard`, `TransitionTarget`, `ProtocolTransition` are plain reference types — do not add `[<Struct>]` to any of these (unchanged posture from the parent plan; rides on #485, not decided here).
 - Commit after every task (this repo is trunk-based — commit directly, no PR).
-- **Wire format is out of scope for this plan.** `StateGuard`/`TransitionTarget` ship as pure in-process/derived types only — no `ext`-marker serialization. This is the design doc's recommended option ("don't serialize at all"), matching `ProtocolGraph`'s existing "read-only, nothing executes" posture, but it was not confirmed with the user and remains open — do not add serialization logic without resolving that first (see design doc, *Wire format*).
+- **Wire format is out of scope for this plan.** `StateGuard`/`TransitionTarget` ship as pure in-process/derived types only — no `ext`-marker serialization. **Decided** (user, 2026-08-08): option 4, "don't serialize at all" — matches `ProtocolGraph`'s existing "read-only, nothing executes" posture, and ALPS is already a per-request/per-role projection of current state, not a write-side model. Other options recorded but not pursued (see design doc, *Wire format*).
 
 ## Out of scope for this plan
 
 - **Fan-out (write) enforcement.** `ToTargets` is authored and derived; nothing commits a multi-region state change. Actor-model work, tracked separately.
-- **Wire-format encoding** of `StateGuard`/`ToTargets` — see Global Constraints.
+- **Wire-format encoding** of `StateGuard`/`ToTargets` — decided against (option 4), see Global Constraints.
 - **Cross-role fan-out targets**, **timed transitions**, **transition actions/side-effects** — unchanged non-goals from the design doc.
 - **The order-fulfillment sample.** Built after this plan lands and the traffic-light sample proves the mechanism — separate follow-on, not a task here.
 - **Full multi-document profile hosting/discovery.** Untouched — `def`-based cross-role matching (used by the future order-fulfillment sample) needs no change to this plan's scope.
@@ -632,6 +632,5 @@ dotnet run --project sample/Frank.Alps.TrafficLightSample/Frank.Alps.TrafficLigh
 
 ## After this plan
 
-- Resolve *Wire format* (design doc) — needed before `StateGuard`/`TransitionTarget` can appear in a served ALPS document, not needed for this plan's in-process proof.
 - Build the order-fulfillment sample (cross-role, `def`-shared guard leaves) — separate follow-on.
 - Fan-out (write) enforcement — actor-model work, tracked separately.
