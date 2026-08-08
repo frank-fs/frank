@@ -100,6 +100,33 @@ check_test "DatastarNoConflict" false "Datastar + POST (no conflict)"
 check_test "DuplicateAccepts" true "Duplicate accepts media type detection" "FRANK002"
 check_test "DistinctAccepts" false "Distinct accepts media types (no warning)" "FRANK002"
 
+# hrefVar / route template validation
+check_test "HrefVarExtra" true "hrefVar with no matching template variable" "FRANK003"
+check_test "HrefVarMissing" true "template variable with no hrefVar declaration" "FRANK003"
+check_test "HrefVarValid" false "hrefVar matches template variable (no warning)" "FRANK003"
+check_test "HrefVarWithLet" false "hrefVar after an intervening let (no warning)" "FRANK003"
+
+# Content checks -- code-only grep (check_test above) can't tell a real
+# per-file diagnostic from a filename-keyed fake that emits a canned
+# message regardless of the actual mismatch. Require the mismatched name
+# to appear in the message text too, matching HrefVarAnalyzer.fs's actual
+# createExtraMessage/createMissingMessage format strings.
+if echo "$ANALYZER_OUTPUT" | grep -q "HrefVarExtra.fs" && echo "$ANALYZER_OUTPUT" | grep -q "hrefVar 'prodId'"; then
+    echo -e "${GREEN}PASS${NC}: HrefVarExtra - message names the mismatched hrefVar 'prodId'"
+    PASSED=$((PASSED + 1))
+else
+    echo -e "${RED}FAIL${NC}: HrefVarExtra - message does not name 'prodId'"
+    FAILED=$((FAILED + 1))
+fi
+
+if echo "$ANALYZER_OUTPUT" | grep -q "HrefVarMissing.fs" && echo "$ANALYZER_OUTPUT" | grep -q "variable '{id}'"; then
+    echo -e "${GREEN}PASS${NC}: HrefVarMissing - message names the missing variable '{id}'"
+    PASSED=$((PASSED + 1))
+else
+    echo -e "${RED}FAIL${NC}: HrefVarMissing - message does not name '{id}'"
+    FAILED=$((FAILED + 1))
+fi
+
 echo ""
 echo "========================================="
 echo -e "Total: $((PASSED + FAILED)) | ${GREEN}Passed: $PASSED${NC} | ${RED}Failed: $FAILED${NC}"
