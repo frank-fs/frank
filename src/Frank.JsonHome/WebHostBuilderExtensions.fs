@@ -25,6 +25,11 @@ module WebHostBuilderExtensions =
                     // hook fires too early to see Frank's endpoints.
                     services.AddSingleton<IStartupFilter, DuplicateRelStartupFilter>() |> ignore
 
+                    // Fails startup if a hrefVar doesn't match its resource's route
+                    // template variables, in either direction (#474). Same
+                    // IStartupFilter reasoning as DuplicateRelStartupFilter above.
+                    services.AddSingleton<IStartupFilter, HrefVarStartupFilter>() |> ignore
+
                     services
             LinkProviders =
                 spec.LinkProviders

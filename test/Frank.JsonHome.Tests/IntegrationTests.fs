@@ -390,6 +390,26 @@ let tests =
                   | other -> failwith $"Expected OptionsValidationException, got %s{other.GetType().FullName}")
           }
 
+          test "a resource with a matching hrefVar still starts through the real DI-wired pipeline" {
+              // End-to-end proof that Task 10's wiring (HrefVarStartupFilter registered
+              // as an IStartupFilter in useJsonHome's install) doesn't break a normal,
+              // collision-free app -- mirrors Frank.JsonHome.Sample's productByIdResource
+              // (/products/{id} with hrefVar "id") exactly.
+              let productById =
+                  resource "/products/{id}" {
+                      rel "tag:example.com,2026:product"
+                      hrefVar "id" "https://example.com/param/product-id"
+                      get ok
+                  }
+
+              let host = buildHost options [ productById ]
+
+              // No Expect.throws* wrapper: an unhandled exception here fails the test
+              // on its own, and that's exactly what we want to catch -- a startup
+              // exception from a matching hrefVar.
+              host.Start()
+          }
+
           test "three resources, only two sharing a rel, still fail startup without over-flagging the third" {
               // Guards the real host/DI pipeline against the same over-flagging risk
               // DuplicateRelStartupFilterTests.fs already checks in isolation.
