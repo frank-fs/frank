@@ -12,10 +12,13 @@ type IProvenanceJournal =
     abstract Snapshot: graphs: IGraph seq -> unit
     abstract Recover: unit -> IGraph seq
 
-// Not marked `private`/`internal`: System.Text.Json's reflection-based deserializer needs this
-// record's generated constructor to be public. Omitting Manifest from ProvenanceJournal.fsi already
-// makes it inaccessible outside this module -- adding `private` here would additionally make the
-// constructor non-public and break JSON deserialization for no encapsulation benefit.
+// Manual JSON handling (JsonDocument for reading, sprintf-based construction for writing), not
+// System.Text.Json.JsonSerializer's reflection-based (de)serialization: JsonSerializer.Deserialize
+// on this record type -- with or without [<CLIMutable>] -- reproducibly throws "Deserialization of
+// types without a parameterless constructor..." specifically under this repo's `dotnet test` VSTest
+// execution host, despite round-tripping correctly in `dotnet fsi` and a plain `dotnet run` console
+// app on the same TFM. Manifest is not marked `private`/`internal` because it's already excluded
+// from ProvenanceJournal.fsi, which is sufficient encapsulation on its own.
 type Manifest =
     { LatestSnapshot: int
       NextSnapshotSeq: int
