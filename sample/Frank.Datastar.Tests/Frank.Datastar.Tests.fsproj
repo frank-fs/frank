@@ -15,6 +15,7 @@
     <Compile Include="SearchFilterTests.fs" />
     <Compile Include="BulkUpdateTests.fs" />
     <Compile Include="StateIsolationTests.fs" />
+    <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>

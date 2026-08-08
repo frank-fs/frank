@@ -149,7 +149,7 @@ let tests =
               let doc = ProvenanceRecord.toDoc record
               let originalGraph = Doc.toGraph doc :> IGraph
 
-              let store = TripleStore()
+              let store = new TripleStore()
               use reader = new StringReader(Doc.toJsonLd doc)
               JsonLdParser().Load(store, reader)
               let parsedGraph = store.Graphs |> Seq.exactlyOne
