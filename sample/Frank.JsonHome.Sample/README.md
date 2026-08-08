@@ -85,3 +85,12 @@ curl -sI http://localhost:5000/nope | grep -i '^Link:'
 ```
 
 Even a 404 carries it — that's where a lost client most needs the link.
+
+## What happens if hrefVars don't match the route template
+
+`productByIdResource` above declares `hrefVar "id" "..."` for `/products/{id}` -- the name matches the template's `{id}` segment exactly. If it didn't (a typo, e.g. `hrefVar "prodId" "..."`), two independent checks would catch it:
+
+- **At compile time**: `Frank.Analyzers`' FRANK003 rule reports an error at the `hrefVar` call site, in your editor or `dotnet build` output, before you ever run the app.
+- **At startup**: `HrefVarStartupFilter` raises `HrefVarValidationException` listing every mismatched resource, before Kestrel accepts connections, rather than serving a `/.well-known/home.json` with a `hrefVars` entry that resolves nothing.
+
+This sample intentionally has no mismatches -- see `test/Frank.JsonHome.Tests/HrefVarStartupFilterTests.fs` and `test/Frank.Analyzers.Tests/fixtures/HrefVarExtra.fs` for the failing cases exercised directly, without breaking a runnable sample.
