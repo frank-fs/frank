@@ -2,6 +2,8 @@ namespace Frank.JsonHome
 
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.DependencyInjection.Extensions
+open Microsoft.Extensions.Options
 open Frank.Builder
 
 [<AutoOpen>]
@@ -17,6 +19,21 @@ module WebHostBuilderExtensions =
                     // AddEndpointsApiExplorer is what populates ApiDescription.
                     // It is independent of OpenAPI, which merely calls it too.
                     services.AddEndpointsApiExplorer() |> ignore
+
+                    // FixedJsonHomeOptionsFactory makes IOptions<JsonHomeOptions>.Value the
+                    // same instance documentHandler already renders from -- no second,
+                    // independently-configured copy of this useJsonHome call's options.
+                    services.AddSingleton<IOptionsFactory<JsonHomeOptions>>(FixedJsonHomeOptionsFactory(options))
+                    |> ignore
+
+                    // Fails startup if two resources declare the same rel (#475) --
+                    // DuplicateRelValidator.Validate runs during Host.StartAsync, before
+                    // Kestrel (or any other IHostedService) starts serving.
+                    services.AddOptionsWithValidateOnStart<JsonHomeOptions>() |> ignore
+
+                    services.TryAddEnumerable(
+                        ServiceDescriptor.Singleton<IValidateOptions<JsonHomeOptions>, DuplicateRelValidator>())
+
                     services
             LinkProviders =
                 spec.LinkProviders
