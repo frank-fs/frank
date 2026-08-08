@@ -17,6 +17,7 @@
     <Compile Include="AuthorizationFilterTests.fs" />
     <Compile Include="HrefVarStartupFilterTests.fs" />
     <Compile Include="IntegrationTests.fs" />
+    <Compile Include="DuplicateRelStartupFilterTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

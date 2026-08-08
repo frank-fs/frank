@@ -14,6 +14,7 @@ open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.FileProviders
 open Microsoft.Extensions.Hosting
+open Microsoft.Extensions.Options
 open Expecto
 open Frank.Builder
 open Frank.Auth
@@ -48,53 +49,60 @@ type TestAuthHandler(options, logger, encoder) =
 
 let private options = JsonHomeOptions.Default
 
-let private createServer (homeOptions: JsonHomeOptions) (resources: Resource list) =
-    // Same composition useJsonHome performs: the document is one more
-    // resource, dispatched through the same routing/UseEndpoints stage as
-    // everything else -- after UseAuthentication/UseAuthorization, not before.
+/// Same composition useJsonHome performs: the document is one more resource,
+/// dispatched through the same routing/UseEndpoints stage as everything else
+/// -- after UseAuthentication/UseAuthorization, not before. Returns the IHost
+/// itself, unstarted, so callers can assert on `host.Start()` directly
+/// (startup-validation tests) as well as via `createServer`'s TestClient
+/// (request/response tests).
+///
+/// The endpoints are published ONLY through `UseEndpoints` below, never
+/// registered as an `EndpointDataSource` in DI: a real Frank app's only data
+/// source is the one `WebHostBuilder.Run`'s `Configure` delegate adds inside
+/// `UseEndpoints`, so anything reading `IApiDescriptionGroupCollectionProvider`
+/// before that point legitimately sees zero endpoints. Registering a
+/// pre-populated data source in the container here would hide exactly that.
+let private buildHost (homeOptions: JsonHomeOptions) (resources: Resource list) : IHost =
     let spec = (webHost [||]).UseJsonHome(WebHostSpec.Empty, fun _ -> homeOptions)
     let endpoints =
         (List.ofArray spec.Endpoints @ (resources |> List.collect (fun r -> List.ofArray r.Endpoints)))
         |> Array.ofList
 
-    let host =
-        Host
-            .CreateDefaultBuilder([||])
-            .ConfigureWebHost(fun webBuilder ->
-                webBuilder
-                    .UseTestServer()
-                    .ConfigureServices(fun services ->
-                        services.AddRouting() |> ignore
-                        spec.Services services |> ignore
+    Host
+        .CreateDefaultBuilder([||])
+        .ConfigureWebHost(fun webBuilder ->
+            webBuilder
+                .UseTestServer()
+                .ConfigureServices(fun services ->
+                    services.AddRouting() |> ignore
+                    spec.Services services |> ignore
 
-                        services
-                            .AddAuthentication(TestScheme)
-                            .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestScheme, fun _ -> ())
-                        |> ignore
+                    services
+                        .AddAuthentication(TestScheme)
+                        .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestScheme, fun _ -> ())
+                    |> ignore
 
-                        services.AddAuthorization() |> ignore
-
-                        // ApiExplorer discovers endpoints through registered data sources.
-                        services.AddSingleton<EndpointDataSource>(TestEndpointDataSource endpoints)
-                        |> ignore)
-                    .Configure(fun app ->
-                        // The same middleware useJsonHome installs. WebHostBuilder.Run
-                        // builds and blocks, so the pipeline is wired by hand, but the
-                        // code under test is the real thing rather than a copy.
+                    services.AddAuthorization() |> ignore)
+                .Configure(fun app ->
+                    // The same middleware useJsonHome installs. WebHostBuilder.Run
+                    // builds and blocks, so the pipeline is wired by hand, but the
+                    // code under test is the real thing rather than a copy.
+                    app
+                    |> WebLink.useAppWideLinks spec.LinkProviders
+                    |> spec.BeforeRoutingMiddleware
+                    |> fun app -> app.UseRouting()
+                    |> WebLink.useResourceScopedLinks
+                    |> fun app ->
                         app
-                        |> WebLink.useAppWideLinks spec.LinkProviders
-                        |> spec.BeforeRoutingMiddleware
-                        |> fun app -> app.UseRouting()
-                        |> WebLink.useResourceScopedLinks
-                        |> fun app ->
-                            app
-                                .UseAuthentication()
-                                .UseAuthorization()
-                                .UseEndpoints(fun e -> e.DataSources.Add(TestEndpointDataSource endpoints))
-                        |> ignore)
-                |> ignore)
-            .Build()
+                            .UseAuthentication()
+                            .UseAuthorization()
+                            .UseEndpoints(fun e -> e.DataSources.Add(TestEndpointDataSource endpoints))
+                    |> ignore)
+            |> ignore)
+        .Build()
 
+let private createServer (homeOptions: JsonHomeOptions) (resources: Resource list) =
+    let host = buildHost homeOptions resources
     host.Start()
     host.GetTestClient()
 
@@ -310,4 +318,106 @@ let tests =
               // resource.Methods already had. Compare as sets so this test doesn't
               // couple to that incidental ordering.
               Expect.equal (Set.ofList adminAllow) (Set.ofList [ "GET"; "DELETE" ]) "Admin request sees both methods"
+          }
+
+          testTask "a collision-free app still serves a populated resources object" {
+              // Regression guard for the failure mode the IStartupFilter redesign fixes:
+              // ApiDescriptionGroupCollectionProvider caches its result for the process
+              // lifetime, keyed on a version that never changes in a Frank app. Reading it
+              // during startup validation -- i.e. before UseEndpoints has published the
+              // endpoints -- permanently cached an EMPTY snapshot, so every app served
+              // {"resources":{}} regardless of whether it had a rel collision at all.
+              // Reading it from an IStartupFilter, after next.Invoke(app) has run
+              // UseEndpoints, is both the correct check and the correct first read.
+              let products =
+                  resource "/products" {
+                      rel "tag:example.com,2026:products"
+                      get ok
+                  }
+
+              let orders =
+                  resource "/orders" {
+                      rel "tag:example.com,2026:orders"
+                      get ok
+                  }
+
+              let host = buildHost options [ products; orders ]
+              host.Start()
+
+              let client = host.GetTestClient()
+              let! (response: HttpResponseMessage) = client.GetAsync options.Path
+              let! (body: string) = response.Content.ReadAsStringAsync()
+              let resources = JsonDocument.Parse(body).RootElement.GetProperty "resources"
+
+              Expect.isGreaterThan
+                  (Seq.length (resources.EnumerateObject()))
+                  0
+                  "resources is populated, not the empty object the poisoned cache produced"
+
+              Expect.isTrue
+                  (fst (resources.TryGetProperty "tag:example.com,2026:products"))
+                  "The products resource is listed"
+
+              Expect.isTrue
+                  (fst (resources.TryGetProperty "tag:example.com,2026:orders"))
+                  "The orders resource is listed"
+          }
+
+          test "two resources sharing a rel fail host startup, naming both routes" {
+              // End-to-end proof that Task 2's wiring (DuplicateRelStartupFilter registered
+              // as an IStartupFilter) actually fires during Host.StartAsync against a real DI
+              // container and a real EndpointDataSource published by UseEndpoints -- not just
+              // DuplicateRelStartupFilterTests.fs's direct, provider-only unit tests.
+              let widgetA =
+                  resource "/widgets-a" {
+                      rel "widget"
+                      get ok
+                  }
+
+              let widgetB =
+                  resource "/widgets-b" {
+                      rel "widget"
+                      get ok
+                  }
+
+              let host = buildHost options [ widgetA; widgetB ]
+
+              Expect.throwsC (fun () -> host.Start()) (fun ex ->
+                  match ex with
+                  | :? OptionsValidationException as ove ->
+                      Expect.stringContains ove.Message "/widgets-a" "Failure names the first route"
+                      Expect.stringContains ove.Message "/widgets-b" "Failure names the second route"
+                  | other -> failwith $"Expected OptionsValidationException, got %s{other.GetType().FullName}")
+          }
+
+          test "three resources, only two sharing a rel, still fail startup without over-flagging the third" {
+              // Guards the real host/DI pipeline against the same over-flagging risk
+              // DuplicateRelStartupFilterTests.fs already checks in isolation.
+              let widgetA =
+                  resource "/widgets-a" {
+                      rel "widget"
+                      get ok
+                  }
+
+              let widgetB =
+                  resource "/widgets-b" {
+                      rel "widget"
+                      get ok
+                  }
+
+              let gadget =
+                  resource "/gadgets" {
+                      rel "gadget"
+                      get ok
+                  }
+
+              let host = buildHost options [ widgetA; widgetB; gadget ]
+
+              Expect.throwsC (fun () -> host.Start()) (fun ex ->
+                  match ex with
+                  | :? OptionsValidationException as ove ->
+                      Expect.stringContains ove.Message "/widgets-a" "Failure names the first route"
+                      Expect.stringContains ove.Message "/widgets-b" "Failure names the second route"
+                      Expect.isFalse (ove.Message.Contains "/gadgets") "Non-colliding third resource is not reported"
+                  | other -> failwith $"Expected OptionsValidationException, got %s{other.GetType().FullName}")
           } ]

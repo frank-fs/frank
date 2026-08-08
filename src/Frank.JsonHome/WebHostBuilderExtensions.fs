@@ -1,5 +1,6 @@
 namespace Frank.JsonHome
 
+open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.DependencyInjection
 open Frank.Builder
@@ -17,6 +18,13 @@ module WebHostBuilderExtensions =
                     // AddEndpointsApiExplorer is what populates ApiDescription.
                     // It is independent of OpenAPI, which merely calls it too.
                     services.AddEndpointsApiExplorer() |> ignore
+
+                    // Fails startup if two resources declare the same rel (#475).
+                    // Deliberately an IStartupFilter, not AddOptionsWithValidateOnStart:
+                    // see DuplicateRelStartupFilter.fsi for why the Options-validation
+                    // hook fires too early to see Frank's endpoints.
+                    services.AddSingleton<IStartupFilter, DuplicateRelStartupFilter>() |> ignore
+
                     services
             LinkProviders =
                 spec.LinkProviders

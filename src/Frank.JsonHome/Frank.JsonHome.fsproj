@@ -23,6 +23,8 @@
     <Compile Include="JsonHome.fs" />
     <Compile Include="HrefVarStartupFilter.fsi" />
     <Compile Include="HrefVarStartupFilter.fs" />
+    <Compile Include="DuplicateRelStartupFilter.fsi" />
+    <Compile Include="DuplicateRelStartupFilter.fs" />
     <Compile Include="WebHostBuilderExtensions.fsi" />
     <Compile Include="WebHostBuilderExtensions.fs" />
   </ItemGroup>
@@ -33,6 +35,12 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Frank.JsonHome.Tests</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 
 </Project>
