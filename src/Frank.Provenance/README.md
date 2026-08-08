@@ -74,6 +74,38 @@ let activityDescription =
     }
 ```
 
+## Durability
+
+`MailboxProcessorProvenanceStore` is in-memory by default -- everything it holds is lost on process
+restart. Attach a journal to make it durable:
+
+```fsharp
+open Frank.Provenance
+
+let journal = FileProvenanceJournal("/var/data/provenance", "leaderboard-actor")
+
+let store =
+    new MailboxProcessorProvenanceStore(
+        ProvenanceStoreConfig.defaults,
+        logger,
+        journal
+    )
+```
+
+With a journal attached, every `Append` is durably logged (fire-and-forget -- it doesn't block the
+caller), and every `ProvenanceStoreConfig.SnapshotEvery` appends (100 by default) the current state is
+compacted into a snapshot. On construction, the store replays the latest snapshot plus any journal
+entries recorded since it, so a freshly-started process with the same `(baseDirectory, actorId)` picks
+up where the last one left off.
+
+`FileProvenanceJournal` writes N-Quads (`{actorId}.journal.{seq}.nq` / `{actorId}.snapshot.{seq}.nq`)
+tracked by an `{actorId}.manifest.json` pointer file -- immutable and versioned, nothing is overwritten
+or deleted. `IProvenanceJournal` is a small interface (`Append`/`Snapshot`/`Recover`); a different
+durability backend can implement it without changing `MailboxProcessorProvenanceStore` at all.
+
+Omit the third constructor argument (or pass `None`) for the original in-memory-only behavior --
+zero cost, zero files written.
+
 ## Scope
 
 This package is the core, HTTP-independent half of provenance support: recording (`ProvenanceRecord`), storage/querying (`IProvenanceStore`, `MailboxProcessorProvenanceStore`), and the RDF/PROV-O modeling underneath. `HttpContext`-touching pieces — auto-capture middleware that records provenance from an in-flight request, or HTTP endpoints that expose `ProvenanceQuery` over the wire — are follow-on work, not yet part of this package.
