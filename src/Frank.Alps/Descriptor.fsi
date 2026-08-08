@@ -103,6 +103,14 @@ module DescriptorFunctions =
     /// as ext directly.
     val from: sources: Descriptor list -> Descriptor -> Descriptor
 
+    /// Sets an explicit guard tree, independent of `from`. `ProtocolGraph.ofProfile` prefers `Guard` over
+    /// deriving one from `From` when both are present.
+    val guardedBy: guard: StateGuard -> Descriptor -> Descriptor
+
+    /// Sets explicit fan-out targets, independent of `rt`. `ProtocolGraph.ofProfile` prefers `Targets` over
+    /// deriving one from `Rt` when both are present.
+    val entersRegions: targets: TransitionTarget list -> Descriptor -> Descriptor
+
 /// Whether a descriptor's nested `Descriptors` are OR-alternatives (substates -- exactly one is
 /// current) or AND-regions (orthogonal -- all are concurrently current), derived by reading the
 /// `OrthogonalExtId` marker that `regions` sets. Purely a read of already-authored data -- no runtime

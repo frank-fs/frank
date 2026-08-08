@@ -119,6 +119,9 @@ module DescriptorFunctions =
 
     let from (sources: Descriptor list) (d: Descriptor) : Descriptor = { d with From = sources }
 
+    let guardedBy (guard: StateGuard) (d: Descriptor) : Descriptor = { d with Guard = Some guard }
+    let entersRegions (targets: TransitionTarget list) (d: Descriptor) : Descriptor = { d with Targets = targets }
+
 [<RequireQualifiedAccess>]
 type StateComposition =
     | Leaf

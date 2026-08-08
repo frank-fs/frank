@@ -28,6 +28,7 @@
     <Compile Include="ExcerptTests.fs" />
     <Compile Include="FilteringIntegrationTests.fs" />
     <Compile Include="SampleIntegrationTests.fs" />
+    <Compile Include="CompoundTransitionTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
