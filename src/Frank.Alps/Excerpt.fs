@@ -12,6 +12,23 @@ module Excerpt =
     let rec satisfiesState (current: Uri) (candidate: Descriptor) : bool =
         (candidate.Def = Some current) || (candidate.Descriptors |> List.exists (satisfiesState current))
 
+    let rec satisfiesGuard (activeStates: Uri list) (guard: StateGuard) : bool =
+        match guard with
+        | StateGuard.State d
+        | StateGuard.Predicate d -> activeStates |> List.exists (fun s -> satisfiesState s d)
+        | StateGuard.Not g -> not (satisfiesGuard activeStates g)
+        | StateGuard.All gs -> gs |> List.forall (satisfiesGuard activeStates)
+        | StateGuard.Any gs -> gs |> List.exists (satisfiesGuard activeStates)
+
+    let deriveGuard (d: Descriptor) : StateGuard option =
+        match d.Guard with
+        | Some g -> Some g
+        | None ->
+            match d.From with
+            | [] -> None
+            | [ x ] -> Some(StateGuard.State x)
+            | xs -> Some(StateGuard.Any(xs |> List.map StateGuard.State))
+
 module Alps =
     let private routePatternOf (ctx: HttpContext) : string =
         match ctx.GetEndpoint() with
@@ -47,9 +64,9 @@ module Alps =
                         | activeStates ->
                             authAllowed
                             |> List.filter (fun d ->
-                                List.isEmpty d.From
-                                || d.From
-                                   |> List.exists (fun candidate -> activeStates |> List.exists (fun s -> Excerpt.satisfiesState s candidate)))
+                                match Excerpt.deriveGuard d with
+                                | None -> true
+                                | Some guard -> Excerpt.satisfiesGuard activeStates guard)
 
                 // `descriptorsForRoute` yields the descriptors bound directly to this route's endpoints,
                 // so the roots here are already authorization-checked -- but nothing in the type system

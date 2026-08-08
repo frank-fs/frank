@@ -41,4 +41,46 @@ let tests =
               let top = semantic "top" |> contains [ mid ]
 
               Expect.isTrue (Excerpt.satisfiesState uri top) ""
+          }
+
+          test "satisfiesGuard: State is existential match against a single leaf" {
+              let target = System.Uri "https://example.org/states/a"
+              let a = semantic "a" |> def "https://example.org/states/a"
+              Expect.isTrue (Excerpt.satisfiesGuard [ target ] (StateGuard.State a)) ""
+              Expect.isFalse (Excerpt.satisfiesGuard [] (StateGuard.State a)) ""
+          }
+
+          test "satisfiesGuard: All requires every element satisfied" {
+              let ua, ub = System.Uri "https://example.org/a", System.Uri "https://example.org/b"
+              let a = semantic "a" |> def "https://example.org/a"
+              let b = semantic "b" |> def "https://example.org/b"
+              let guard = StateGuard.All [ StateGuard.State a; StateGuard.State b ]
+              Expect.isTrue (Excerpt.satisfiesGuard [ ua; ub ] guard) ""
+              Expect.isFalse (Excerpt.satisfiesGuard [ ua ] guard) ""
+          }
+
+          test "satisfiesGuard: Any requires at least one element satisfied" {
+              let ua = System.Uri "https://example.org/a"
+              let a = semantic "a" |> def "https://example.org/a"
+              let b = semantic "b" |> def "https://example.org/b"
+              let guard = StateGuard.Any [ StateGuard.State a; StateGuard.State b ]
+              Expect.isTrue (Excerpt.satisfiesGuard [ ua ] guard) ""
+          }
+
+          test "satisfiesGuard: Not negates" {
+              let ua = System.Uri "https://example.org/a"
+              let a = semantic "a" |> def "https://example.org/a"
+              Expect.isFalse (Excerpt.satisfiesGuard [ ua ] (StateGuard.Not(StateGuard.State a))) ""
+              Expect.isTrue (Excerpt.satisfiesGuard [] (StateGuard.Not(StateGuard.State a))) ""
+          }
+
+          test "satisfiesGuard: nested All/Any" {
+              let ua, ub, uc =
+                  System.Uri "https://example.org/a", System.Uri "https://example.org/b", System.Uri "https://example.org/c"
+              let a = semantic "a" |> def "https://example.org/a"
+              let b = semantic "b" |> def "https://example.org/b"
+              let c = semantic "c" |> def "https://example.org/c"
+              let guard = StateGuard.All [ StateGuard.State a; StateGuard.Any [ StateGuard.State b; StateGuard.State c ] ]
+              Expect.isTrue (Excerpt.satisfiesGuard [ ua; uc ] guard) ""
+              Expect.isFalse (Excerpt.satisfiesGuard [ ua ] guard) ""
           } ]

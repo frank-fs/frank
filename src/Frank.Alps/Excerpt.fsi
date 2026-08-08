@@ -18,6 +18,15 @@ module Excerpt =
     /// nested) children does. A `candidate` with no `Def` anywhere in its own subtree can never match.
     val satisfiesState: current: Uri -> candidate: Descriptor -> bool
 
+    /// Evaluates a StateGuard against a resolver's active-state Uri list. `State`/`Predicate` use the
+    /// existing contains-ancestry match (`satisfiesState`); `All`/`Any`/`Not` fold structurally.
+    val satisfiesGuard: activeStates: Uri list -> guard: StateGuard -> bool
+
+    /// Same derivation `ProtocolGraph.deriveGuard` uses -- kept independent (no cross-module dependency
+    /// for a five-line rule) rather than shared, since ofProfile derives from a Descriptor list and this
+    /// filters Descriptors directly from a different entry point (descriptorsForRoute).
+    val deriveGuard: d: Descriptor -> StateGuard option
+
 module Alps =
     /// Serves the ALPS excerpt for the *specific resource* the current request's endpoint belongs to:
     /// every HTTP method's `binds`-bound descriptor sharing this endpoint's route pattern
