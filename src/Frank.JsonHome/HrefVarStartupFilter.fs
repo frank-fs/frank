@@ -5,10 +5,10 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Mvc.ApiExplorer
 
-exception HrefVarValidationException of messages: string list
+exception internal HrefVarValidationException of messages: string list
 
 [<Sealed>]
-type HrefVarStartupFilter(apiDescriptions: IApiDescriptionGroupCollectionProvider) =
+type internal HrefVarStartupFilter(apiDescriptions: IApiDescriptionGroupCollectionProvider) =
 
     interface IStartupFilter with
         member _.Configure(next: Action<IApplicationBuilder>) : Action<IApplicationBuilder> =
