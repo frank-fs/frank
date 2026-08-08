@@ -1,9 +1,11 @@
 # Frank.Alps Sample
 
-Demonstrates [`Frank.Alps`](../../src/Frank.Alps) via two unrelated protocols registered on
-one `useAlps` document: a tic-tac-toe game (below) and a ping/pong session protocol (see
+Demonstrates [`Frank.Alps`](../../src/Frank.Alps) via three unrelated protocols registered on
+one `useAlps` document: a tic-tac-toe game (below), a ping/pong session protocol (see
 *Ping/pong*, further down) that proves out cross-document reference resolution, state-gating,
-and role-projection together.
+and role-projection together, and a signaled traffic light (see *Traffic light*, further down)
+that proves out compound transitions -- orthogonal regions, structural AND-guards, unconditional
+fan-out, and `History` restore.
 
 The game: a hand-authored ALPS profile -- two states (`open`/`closed`), one semantic
 descriptor for the resource itself, and two transitions bound to the endpoints that implement
@@ -189,3 +191,83 @@ exactly one route per game. `pingPongStateResolver` strips the `/ping`/`/pong` s
 before building the resource IRI, so a POST to `.../ping` and a later GET excerpt at
 `.../pong` (or the plain `/sessions/{id}` view) all resolve to the same provenance
 resource.
+
+## Traffic light: compound transitions (frank-fs/frank#489)
+
+A third, unrelated protocol added alongside the game and ping/pong, registered on the same
+`useAlps` document. Where the game and ping/pong each gate one transition on one lineage of
+states, the traffic light demonstrates a genuinely different shape: a signaled intersection
+whose vehicle and pedestrian signals are TWO SIMULTANEOUSLY active orthogonal regions
+(`TrafficLight.intersection |> regions [ vehicleSignal; pedestrianSignal ]`), not one state at
+a time.
+
+- **Structural AND-guard.** `walk` only appears -- and only succeeds -- when BOTH regions are
+  in the right state at once (`guardedBy (StateGuard.All [ State vehicleRed; State pedWaiting ])`).
+  `walkHandler` evaluates this with `Excerpt.satisfiesGuard` against the intersection's current
+  active states and genuinely 409s once the guard no longer holds, not just stops advertising it.
+- **Unconditional fan-out.** `emergencyOverride` carries no guard at all (`entersRegions`, no
+  `guardedBy`) and enters BOTH regions' flashing state in one transition -- always available,
+  regardless of what either region is currently doing.
+- **`History` restore.** `emergencyClear` (also unconditional) resumes whatever each region was
+  ACTUALLY doing before the override -- which may be mid-cycle, not the initial state -- via
+  `entersRegions [ History vehicleSignal; History pedestrianSignal ]`.
+
+Each guarded/unconditional action lives on its own dedicated `/intersections/{id}/{action}` url
+(same shape as ping/pong's `.../ping`/`.../pong`) rather than sharing `/intersections/{id}`'s
+own route: `Alps.excerpt` filters an endpoint's bound descriptors by *exact* route pattern, so
+observing `walk`'s guard genuinely appearing and disappearing over HTTP means GETting the same
+url its POST is bound to, exactly as `pingResource`/`pongResource` already do above.
+
+An intersection is seeded, on creation, already in the state `walk`'s guard requires
+(`vehicleRed`/`pedWaiting`) -- deliberately, so the very first `walk` excerpt lists it and the
+very first `POST .../walk` succeeds; the second one then genuinely fails, since the pedestrian
+has moved to `pedWalk`.
+
+### Try it
+
+```bash
+dotnet run --project sample/Frank.Alps.Sample/
+
+# Create an intersection.
+curl -s -X POST http://localhost:5000/intersections
+# => {"id":"<guid>"}
+ID=<guid-from-above>
+
+# Seeded state satisfies walk's AND-guard -- "walk" is present.
+curl -s -H "Accept: application/alps+json" \
+  http://localhost:5000/intersections/$ID/walk | jq '.alps.descriptor[].id'
+
+# The fan-out transitions are unconditional -- always present, regardless of state.
+curl -s -H "Accept: application/alps+json" \
+  http://localhost:5000/intersections/$ID/emergencyOverride | jq '.alps.descriptor[].id'
+curl -s -H "Accept: application/alps+json" \
+  http://localhost:5000/intersections/$ID/emergencyClear | jq '.alps.descriptor[].id'
+
+# Walk -- the guard was satisfied, so this succeeds.
+curl -s -X POST http://localhost:5000/intersections/$ID/walk
+
+# State-gated: "walk" is now absent from its own excerpt (pedestrian moved to pedWalk).
+curl -s -H "Accept: application/alps+json" \
+  http://localhost:5000/intersections/$ID/walk | jq '.alps.descriptor[].id'
+
+# A second walk genuinely fails server-side: 409, no silent success.
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:5000/intersections/$ID/walk
+
+# Plain-JSON view: vehicle=vehicleRed, pedestrian=pedWalk.
+curl -s http://localhost:5000/intersections/$ID | jq
+
+# Emergency override -- unconditional, always succeeds.
+curl -s -X POST http://localhost:5000/intersections/$ID/emergencyOverride
+
+# Both regions entered their flashing state.
+curl -s http://localhost:5000/intersections/$ID | jq
+# => { "vehicle": "vehicleFlashing", "pedestrian": "pedFlashing" }
+
+# Emergency clear -- History restores each region's ACTUAL prior state, not a hardcoded reset.
+curl -s -X POST http://localhost:5000/intersections/$ID/emergencyClear
+
+# vehicle=vehicleRed, pedestrian=pedWalk -- the state right before the override (post-walk),
+# not pedWaiting (the initial state). This is the real proof History differs from "reset to
+# initial".
+curl -s http://localhost:5000/intersections/$ID | jq
+```

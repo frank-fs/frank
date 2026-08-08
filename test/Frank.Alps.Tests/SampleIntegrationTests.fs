@@ -574,3 +574,168 @@ let pingPongTests =
                   "a fresh session is awaitingPing, not awaitingPong -- ponger's POST .../pong is a \
                    wrong-turn call and is rejected with 409"
           } ]
+
+/// Mirrors `createPingPongServer`'s shape exactly, minus ping/pong's auth wiring -- none of the
+/// five `/intersections*` resources carry a `requireRole`, so plain `createServer` (no
+/// `AddAuthentication`/`UseAuthentication`) is enough. Wires the REAL
+/// `Frank.Alps.Sample.Program.TrafficLight` profile and the REAL
+/// `intersectionsResource`/`intersectionResource`/`walkResource`/`emergencyOverrideResource`/
+/// `emergencyClearResource` endpoints via the sample's `ProjectReference`, never a hand-copied
+/// duplicate of that logic.
+let private createTrafficLightServer () : HttpClient =
+    let spec = (webHost [||]).UseAlps(WebHostSpec.Empty, TrafficLight.profile)
+
+    let trafficLightEndpoints =
+        [ intersectionsResource; intersectionResource; walkResource; emergencyOverrideResource; emergencyClearResource ]
+        |> List.collect (fun r -> List.ofArray r.Endpoints)
+        |> List.toArray
+
+    let spec =
+        { spec with
+            Endpoints = Array.append spec.Endpoints trafficLightEndpoints }
+
+    createServer spec
+
+/// Traffic light + pedestrian crossing: proves Frank.Alps's compound-transition primitives
+/// (StateGuard/TransitionTarget/guardedBy/entersRegions/satisfiesGuard) enforced over real HTTP,
+/// to the same standard ping/pong proves single-guard state-gating to. One flow exercises the
+/// structural AND-guard (appearing, then genuinely disappearing once no longer satisfied, with
+/// real 409 enforcement on a repeat call), the unconditional fan-out (`emergencyOverride`, no
+/// guard at all), and -- the assertion an independent reviewer will scrutinize hardest --
+/// `History` restoring each region's ACTUAL prior substate on `emergencyClear`, not a hardcoded
+/// reset to the initial state.
+[<Tests>]
+let trafficLightTests =
+    testList
+        "Sample: traffic light (AND-guard enforcement + unconditional fan-out + History restore)"
+        [ testTask "an intersection lifecycle exercises the structural guard, fan-out, and history restore together" {
+              let client = createTrafficLightServer ()
+
+              // 1. POST /intersections creates an intersection; capture its id.
+              let! (createResponse: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Post "/intersections" None None)
+
+              Expect.equal (int createResponse.StatusCode) 200 "POST /intersections creates an intersection"
+              let! (createBody: string) = createResponse.Content.ReadAsStringAsync()
+              let id = JsonDocument.Parse(createBody).RootElement.GetProperty("id").GetString()
+              let intersectionPath = $"/intersections/{id}"
+              let walkPath = $"/intersections/{id}/walk"
+              let overridePath = $"/intersections/{id}/emergencyOverride"
+              let clearPath = $"/intersections/{id}/emergencyClear"
+
+              // 2. Seeded at creation (vehicleRed + pedWaiting): walk's AND-guard is already
+              // satisfied, so the very first excerpt at .../walk lists "walk" -- and the
+              // unconditional fan-out transitions' own excerpts always list them, regardless of
+              // state. `Alps.excerpt` filters by EXACT route pattern (`EndpointSurface.
+              // descriptorsForRoute`), so each action's guarded presence is observed at ITS OWN url
+              // -- same shape as `pingResource`/`pongResource` above, not a single combined excerpt
+              // at `/intersections/{id}`.
+              let! (walkExcerpt1Response: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Get walkPath (Some "application/alps+json") None)
+
+              Expect.equal (int walkExcerpt1Response.StatusCode) 200 "GET the walk excerpt succeeds"
+              let! (walkExcerpt1Body: string) = walkExcerpt1Response.Content.ReadAsStringAsync()
+
+              Expect.contains
+                  (alpsDescriptorIds walkExcerpt1Body)
+                  "walk"
+                  "Seeded state (vehicleRed + pedWaiting) satisfies walk's AND-guard"
+
+              let! (overrideExcerptResponse: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Get overridePath (Some "application/alps+json") None)
+
+              let! (overrideExcerptBody: string) = overrideExcerptResponse.Content.ReadAsStringAsync()
+
+              Expect.contains
+                  (alpsDescriptorIds overrideExcerptBody)
+                  "emergencyOverride"
+                  "emergencyOverride is unconditional -- always present"
+
+              let! (clearExcerpt1Response: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Get clearPath (Some "application/alps+json") None)
+
+              let! (clearExcerpt1Body: string) = clearExcerpt1Response.Content.ReadAsStringAsync()
+
+              Expect.contains
+                  (alpsDescriptorIds clearExcerpt1Body)
+                  "emergencyClear"
+                  "emergencyClear is unconditional -- always present"
+
+              // 3. The guard is satisfied -- the first walk POST succeeds.
+              let! (walk1Response: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Post walkPath None None)
+
+              Expect.equal (int walk1Response.StatusCode) 200 "First POST .../walk succeeds -- guard was satisfied"
+
+              // 4. Pedestrian moved to pedWalk -- the AND-guard (State vehicleRed && State
+              // pedWaiting) is no longer satisfied, so "walk" is genuinely absent from its own
+              // excerpt now: real proof the guard is structurally re-evaluated, not just present at
+              // authoring time.
+              let! (walkExcerpt2Response: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Get walkPath (Some "application/alps+json") None)
+
+              let! (walkExcerpt2Body: string) = walkExcerpt2Response.Content.ReadAsStringAsync()
+
+              Expect.isFalse
+                  (Set.contains "walk" (alpsDescriptorIds walkExcerpt2Body))
+                  "After walk, pedestrian is pedWalk -- walk's AND-guard is no longer satisfied"
+
+              // 5. A second walk POST genuinely fails server-side: 409, no silent success.
+              let! (walk2Response: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Post walkPath None None)
+
+              Expect.equal (int walk2Response.StatusCode) 409 "Second POST .../walk fails -- guard no longer satisfied"
+
+              // 6. Plain-JSON view confirms the mutated state in human-readable form.
+              let! (jsonView1Response: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Get intersectionPath (Some "application/json") None)
+
+              let! (jsonView1Body: string) = jsonView1Response.Content.ReadAsStringAsync()
+              let jsonView1 = JsonDocument.Parse(jsonView1Body).RootElement
+
+              Expect.equal (jsonView1.GetProperty("vehicle").GetString()) "vehicleRed" "vehicle is still vehicleRed"
+              Expect.equal (jsonView1.GetProperty("pedestrian").GetString()) "pedWalk" "pedestrian moved to pedWalk"
+
+              // 7. emergencyOverride is unconditional -- always succeeds, regardless of state.
+              let! (overrideResponse: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Post overridePath None None)
+
+              Expect.equal (int overrideResponse.StatusCode) 200 "POST .../emergencyOverride succeeds unconditionally"
+
+              let! (jsonView2Response: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Get intersectionPath (Some "application/json") None)
+
+              let! (jsonView2Body: string) = jsonView2Response.Content.ReadAsStringAsync()
+              let jsonView2 = JsonDocument.Parse(jsonView2Body).RootElement
+
+              Expect.equal (jsonView2.GetProperty("vehicle").GetString()) "vehicleFlashing" "vehicle entered vehicleFlashing"
+              Expect.equal (jsonView2.GetProperty("pedestrian").GetString()) "pedFlashing" "pedestrian entered pedFlashing"
+
+              // 8. THE key assertion: emergencyClear restores each region's ACTUAL prior state --
+              // vehicleRed/pedWalk (what was genuinely active right before the override, mid-cycle
+              // after "walk" already fired), NOT a hardcoded reset to the initial
+              // vehicleRed/pedWaiting. This is the real proof `History` differs from "reset to
+              // initial": a fake implementation that just replayed the two initial states would
+              // pass every assertion above but fail this one.
+              let! (clearResponse: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Post clearPath None None)
+
+              Expect.equal (int clearResponse.StatusCode) 200 "POST .../emergencyClear succeeds unconditionally"
+
+              let! (jsonView3Response: HttpResponseMessage) =
+                  client.SendAsync(pingPongRequest HttpMethod.Get intersectionPath (Some "application/json") None)
+
+              let! (jsonView3Body: string) = jsonView3Response.Content.ReadAsStringAsync()
+              let jsonView3 = JsonDocument.Parse(jsonView3Body).RootElement
+
+              Expect.equal
+                  (jsonView3.GetProperty("vehicle").GetString())
+                  "vehicleRed"
+                  "History restores vehicle to vehicleRed -- its actual state before the override"
+
+              Expect.equal
+                  (jsonView3.GetProperty("pedestrian").GetString())
+                  "pedWalk"
+                  "History restores pedestrian to pedWalk (post-walk), NOT pedWaiting (initial) -- \
+                   proof History resumes the actual prior substate, not a hardcoded reset"
+          } ]
