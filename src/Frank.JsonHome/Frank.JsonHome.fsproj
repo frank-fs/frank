@@ -21,6 +21,8 @@
     <Compile Include="AuthorizationFilter.fs" />
     <Compile Include="JsonHome.fsi" />
     <Compile Include="JsonHome.fs" />
+    <Compile Include="HrefVarStartupFilter.fsi" />
+    <Compile Include="HrefVarStartupFilter.fs" />
     <Compile Include="WebHostBuilderExtensions.fsi" />
     <Compile Include="WebHostBuilderExtensions.fs" />
   </ItemGroup>
