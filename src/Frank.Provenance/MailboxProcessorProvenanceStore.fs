@@ -83,7 +83,7 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
                                 j.Append(namedGraph :> IGraph)
 
                                 if appendCount % snapshotEvery = 0 then
-                                    j.Snapshot(seq { for g in store.Graphs -> g })
+                                    j.Snapshot(store.Graphs |> List.ofSeq)
                             | None -> ()
 
                             let updated = entries @ [ namedGraph.Name, graphName ]

@@ -317,90 +317,153 @@ let tests =
               | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
           }
 
-          test "With no journal attached, behavior is unchanged from v1" {
-              let store = new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance)
+          // Journal-backed tests are sequenced (not run in Expecto's default parallel pool): each does
+          // blocking PostAndReply/Flush waits plus synchronous file I/O (manifest read + N-Quads
+          // parse), and running them concurrently with other tests under thread-pool worker starvation
+          // was observed to make the pre-existing malformed-record test's own 5s bound miss (it
+          // couldn't get scheduled in time). Sequencing removes the contention rather than papering
+          // over it with a longer bound.
+          testSequenced (
+              testList
+                  "journal-backed behavior"
+                  [ test "With no journal attached, behavior is unchanged from v1" {
+                        let store = new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance)
 
-              (store :> IProvenanceStore).Append(
-                  record "https://example.org/activities/parity" "https://example.org/games/1" "https://example.org/users/42"
-              )
+                        (store :> IProvenanceStore).Append(
+                            record
+                                "https://example.org/activities/parity"
+                                "https://example.org/games/1"
+                                "https://example.org/users/42"
+                        )
 
-              match (store :> IProvenanceStore).Query(ProvenanceQuery.ByResource "https://example.org/games/1") with
-              | SparqlQueryResult.Graph g -> Expect.isGreaterThan g.Triples.Count 0 "Append/Query work with no journal"
-              | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
+                        match (store :> IProvenanceStore).Query(ProvenanceQuery.ByResource "https://example.org/games/1") with
+                        | SparqlQueryResult.Graph g -> Expect.isGreaterThan g.Triples.Count 0 "Append/Query work with no journal"
+                        | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
 
-              (store :> IDisposable).Dispose()
-          }
+                        (store :> IDisposable).Dispose()
+                    }
 
-          test "A store constructed with a journal recovers prior appends after restart" {
-              let dir = Path.Combine(Path.GetTempPath(), "frank-provenance-tests", Guid.NewGuid().ToString())
-              Directory.CreateDirectory dir |> ignore
+                    test "A store constructed with a journal recovers prior appends after restart" {
+                        let dir = Path.Combine(Path.GetTempPath(), "frank-provenance-tests", Guid.NewGuid().ToString())
+                        Directory.CreateDirectory dir |> ignore
 
-              let firstJournal = FileProvenanceJournal(dir, "recovery-actor")
-              let firstStore =
-                  new MailboxProcessorProvenanceStore(
-                      ProvenanceStoreConfig.defaults,
-                      NullLogger.Instance,
-                      (firstJournal :> IProvenanceJournal)
-                  )
+                        let firstJournal = FileProvenanceJournal(dir, "recovery-actor")
+                        let firstStore =
+                            new MailboxProcessorProvenanceStore(
+                                ProvenanceStoreConfig.defaults,
+                                NullLogger.Instance,
+                                (firstJournal :> IProvenanceJournal)
+                            )
 
-              (firstStore :> IProvenanceStore).Append(
-                  record "https://example.org/activities/r1" "https://example.org/games/r" "https://example.org/users/r"
-              )
+                        (firstStore :> IProvenanceStore).Append(
+                            record "https://example.org/activities/r1" "https://example.org/games/r" "https://example.org/users/r"
+                        )
 
-              // Query is a PostAndReply -- it can only complete after the mailbox has already
-              // processed the Append message ahead of it in the queue, so this doubles as the
-              // barrier that guarantees the Append (and its journal.Append post) has been handled.
-              (firstStore :> IProvenanceStore).Query(ProvenanceQuery.ByResource "https://example.org/games/r")
-              |> ignore
+                        // Query is a PostAndReply -- it can only complete after the mailbox has already
+                        // processed the Append message ahead of it in the queue, so this doubles as the
+                        // barrier that guarantees the Append (and its journal.Append post) has been handled.
+                        (firstStore :> IProvenanceStore).Query(ProvenanceQuery.ByResource "https://example.org/games/r")
+                        |> ignore
 
-              firstJournal.Flush()
-              (firstStore :> IDisposable).Dispose()
+                        firstJournal.Flush()
+                        (firstStore :> IDisposable).Dispose()
 
-              let secondJournal = FileProvenanceJournal(dir, "recovery-actor")
-              let secondStore =
-                  new MailboxProcessorProvenanceStore(
-                      ProvenanceStoreConfig.defaults,
-                      NullLogger.Instance,
-                      (secondJournal :> IProvenanceJournal)
-                  )
+                        let secondJournal = FileProvenanceJournal(dir, "recovery-actor")
+                        let secondStore =
+                            new MailboxProcessorProvenanceStore(
+                                ProvenanceStoreConfig.defaults,
+                                NullLogger.Instance,
+                                (secondJournal :> IProvenanceJournal)
+                            )
 
-              match (secondStore :> IProvenanceStore).Query(ProvenanceQuery.ByResource "https://example.org/games/r") with
-              | SparqlQueryResult.Graph g -> Expect.isGreaterThan g.Triples.Count 0 "Recovered record is queryable after restart"
-              | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
+                        match (secondStore :> IProvenanceStore).Query(ProvenanceQuery.ByResource "https://example.org/games/r") with
+                        | SparqlQueryResult.Graph g -> Expect.isGreaterThan g.Triples.Count 0 "Recovered record is queryable after restart"
+                        | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
 
-              (secondStore :> IDisposable).Dispose()
-          }
+                        (secondStore :> IDisposable).Dispose()
+                    }
 
-          test "A journal whose Append throws doesn't kill the mailbox loop" {
-              let failingJournal =
-                  { new IProvenanceJournal with
-                      member _.Append(_: IGraph) = failwith "simulated journal failure"
-                      member _.Snapshot(_: IGraph seq) = ()
-                      member _.Recover() = Seq.empty }
+                    test "A journal whose Append throws doesn't kill the mailbox loop" {
+                        let failingJournal =
+                            { new IProvenanceJournal with
+                                member _.Append(_: IGraph) = failwith "simulated journal failure"
+                                member _.Snapshot(_: IGraph seq) = ()
+                                member _.Recover() = Seq.empty }
 
-              let store =
-                  new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance, failingJournal)
+                        let store =
+                            new MailboxProcessorProvenanceStore(ProvenanceStoreConfig.defaults, NullLogger.Instance, failingJournal)
 
-              // The journal.Append call happens inside the same try/with as the rest of Append's body
-              // in MailboxProcessorProvenanceStore.fs, so a throwing journal is caught there, logged,
-              // and the record is dropped for this Append -- but the mailbox loop itself survives.
-              (store :> IProvenanceStore).Append(
-                  record "https://example.org/activities/fail1" "https://example.org/games/f" "https://example.org/users/f"
-              )
+                        // The journal.Append call happens inside the same try/with as the rest of Append's body
+                        // in MailboxProcessorProvenanceStore.fs, so a throwing journal is caught there, logged,
+                        // and the record is dropped for this Append -- but the mailbox loop itself survives.
+                        (store :> IProvenanceStore).Append(
+                            record "https://example.org/activities/fail1" "https://example.org/games/f" "https://example.org/users/f"
+                        )
 
-              (store :> IProvenanceStore).Append(
-                  record "https://example.org/activities/fail2" "https://example.org/games/f2" "https://example.org/users/f"
-              )
+                        (store :> IProvenanceStore).Append(
+                            record "https://example.org/activities/fail2" "https://example.org/games/f2" "https://example.org/users/f"
+                        )
 
-              // The second Append still reaches the store, proving the loop is alive -- even though
-              // the first one's record was dropped because the journal failure aborted its whole
-              // try-block before store.Add for fail1 completed... actually store.Add happens BEFORE
-              // journal.Append, so fail1's graph IS in the store; the journal failure only drops
-              // fail1's *durability*, not its live-query visibility. Assert on fail2's resource,
-              // which has no such ambiguity either way.
-              match (store :> IProvenanceStore).Query(ProvenanceQuery.ByResource "https://example.org/games/f2") with
-              | SparqlQueryResult.Graph g -> Expect.isGreaterThan g.Triples.Count 0 "Second Append succeeded; mailbox survived the journal failure"
-              | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
+                        // The second Append still reaches the store, proving the loop is alive -- even though
+                        // the first one's record was dropped because the journal failure aborted its whole
+                        // try-block before store.Add for fail1 completed... actually store.Add happens BEFORE
+                        // journal.Append, so fail1's graph IS in the store; the journal failure only drops
+                        // fail1's *durability*, not its live-query visibility. Assert on fail2's resource,
+                        // which has no such ambiguity either way.
+                        //
+                        // Bounded the same way as the malformed-record test above: if the regression this
+                        // test guards against ever reoccurs (the journal failure kills the mailbox loop),
+                        // a bare PostAndReply here would hang forever (MailboxProcessor.DefaultTimeout is
+                        // Timeout.Infinite) instead of failing with a clear assertion message.
+                        let task =
+                            System.Threading.Tasks.Task.Run(fun () ->
+                                (store :> IProvenanceStore).Query(ProvenanceQuery.ByResource "https://example.org/games/f2"))
 
-              (store :> IDisposable).Dispose()
-          } ]
+                        let completedInTime = task.Wait(TimeSpan.FromSeconds(5.0))
+                        Expect.isTrue completedInTime "Query completed within the bound instead of hanging on a dead mailbox"
+
+                        match task.Result with
+                        | SparqlQueryResult.Graph g -> Expect.isGreaterThan g.Triples.Count 0 "Second Append succeeded; mailbox survived the journal failure"
+                        | SparqlQueryResult.Bindings _ -> failwith "Expected a graph"
+
+                        (store :> IDisposable).Dispose()
+                    }
+
+                    test "SnapshotEvery cadence triggers a snapshot write once the threshold is crossed" {
+                        let dir = Path.Combine(Path.GetTempPath(), "frank-provenance-tests", Guid.NewGuid().ToString())
+                        Directory.CreateDirectory dir |> ignore
+
+                        let journal = FileProvenanceJournal(dir, "cadence-actor")
+                        let config = { ProvenanceStoreConfig.defaults with SnapshotEvery = 2 }
+
+                        let store =
+                            new MailboxProcessorProvenanceStore(config, NullLogger.Instance, (journal :> IProvenanceJournal))
+
+                        (store :> IProvenanceStore).Append(
+                            record
+                                "https://example.org/activities/cadence-1"
+                                "https://example.org/games/cadence"
+                                "https://example.org/users/cadence"
+                        )
+
+                        (store :> IProvenanceStore).Append(
+                            record
+                                "https://example.org/activities/cadence-2"
+                                "https://example.org/games/cadence"
+                                "https://example.org/users/cadence"
+                        )
+
+                        // Same barrier trick as the recovery test: a completed Query proves the mailbox has
+                        // already processed both Appends ahead of it, so the Snapshot call the second Append
+                        // triggers (appendCount = 2, SnapshotEvery = 2) has already been posted.
+                        (store :> IProvenanceStore).Query(ProvenanceQuery.ByResource "https://example.org/games/cadence")
+                        |> ignore
+
+                        journal.Flush()
+                        (store :> IDisposable).Dispose()
+
+                        Expect.isTrue
+                            (File.Exists(Path.Combine(dir, "cadence-actor.snapshot.1.nq")))
+                            "The store's SnapshotEvery cadence actually triggered a journal Snapshot call, not just Appends"
+                    } ]
+          ) ]
