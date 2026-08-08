@@ -14,6 +14,7 @@
     <Compile Include="ProvBuilderTests.fs" />
     <Compile Include="ProvenanceRecordTests.fs" />
     <Compile Include="ProvenanceQueryTests.fs" />
+    <Compile Include="ProvenanceJournalTests.fs" />
     <Compile Include="MailboxProcessorProvenanceStoreTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
