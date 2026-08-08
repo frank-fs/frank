@@ -9,6 +9,8 @@
   <ItemGroup>
     <Compile Include="UriTemplate.fsi" />
     <Compile Include="UriTemplate.fs" />
+    <Compile Include="HrefVarValidation.fsi" />
+    <Compile Include="HrefVarValidation.fs" />
     <Compile Include="HomeMetadata.fsi" />
     <Compile Include="HomeMetadata.fs" />
     <Compile Include="ResourceBuilderExtensions.fsi" />
