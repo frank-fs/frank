@@ -12,13 +12,23 @@ type private StoreMessage =
     | Query of ProvenanceQuery * AsyncReplyChannel<SparqlQueryResult>
 
 [<Sealed>]
-type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILogger) =
+type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILogger, ?journal: IProvenanceJournal) =
     let store = new TripleStore()
+    let snapshotEvery = max 1 config.SnapshotEvery
 
     let graphNameFor (record: ProvenanceRecord) : Uri =
         match record.Activity with
         | Node.Iri s -> Uri s
         | Node.Blank id -> Uri(sprintf "urn:frank:provenance:%s" id)
+
+    // A recovered graph's Name came from graphNameFor's own output at the time it was first
+    // appended (see graphNameFor above), so it's always an IUriNode -- the urn:frank:provenance:...
+    // fallback in graphNameFor still produces a URI, never a blank node. The Guid fallback below only
+    // guards a journal implementation that hands back a graph built some other way.
+    let graphUriOf (g: IGraph) : Uri =
+        match g.Name with
+        | :? IUriNode as un -> un.Uri
+        | _ -> Uri(sprintf "urn:frank:provenance:recovered:%s" (Guid.NewGuid().ToString()))
 
     let runQuery (query: ProvenanceQuery) : SparqlQueryResult =
         let sparqlQuery = toSparqlQuery query
@@ -30,9 +40,18 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
         | :? IGraph as g -> SparqlQueryResult.Graph g
         | other -> failwithf "Frank.Provenance: unexpected SPARQL result shape %A" other
 
+    let recoveredEntries =
+        let recovered =
+            journal |> Option.map (fun j -> j.Recover() |> List.ofSeq) |> Option.defaultValue []
+
+        for g in recovered do
+            store.Add(g, true) |> ignore
+
+        recovered |> List.map (fun g -> g.Name, graphUriOf g)
+
     let agent =
         MailboxProcessor<StoreMessage>.Start(fun inbox ->
-            let rec loop (entries: (IRefNode * Uri) list) =
+            let rec loop (entries: (IRefNode * Uri) list) (appendCount: int) =
                 async {
                     let! msg = inbox.Receive()
 
@@ -57,6 +76,16 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
                             store.Add(namedGraph :> IGraph, true) |> ignore
                             logger.LogDebug("Appended provenance record for activity {GraphName}", graphName)
 
+                            let appendCount = appendCount + 1
+
+                            match journal with
+                            | Some j ->
+                                j.Append(namedGraph :> IGraph)
+
+                                if appendCount % snapshotEvery = 0 then
+                                    j.Snapshot(seq { for g in store.Graphs -> g })
+                            | None -> ()
+
                             let updated = entries @ [ namedGraph.Name, graphName ]
 
                             let retained =
@@ -76,10 +105,10 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
                                 else
                                     updated
 
-                            return! loop retained
+                            return! loop retained appendCount
                         with ex ->
                             logger.LogError(ex, "Failed to append a provenance record; dropping it and continuing")
-                            return! loop entries
+                            return! loop entries appendCount
 
                     | Query(query, reply) ->
                         // Same story as Append, but the caller is blocked in PostAndReply waiting on
@@ -94,10 +123,10 @@ type MailboxProcessorProvenanceStore(config: ProvenanceStoreConfig, logger: ILog
                                 SparqlQueryResult.Graph(new Graph() :> IGraph)
 
                         reply.Reply(result)
-                        return! loop entries
+                        return! loop entries appendCount
                 }
 
-            loop [])
+            loop recoveredEntries 0)
 
     interface IProvenanceStore with
         member _.Append(record: ProvenanceRecord) = agent.Post(Append record)
