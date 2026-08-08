@@ -72,6 +72,12 @@ webHost {
 }
 ```
 
+**Frank.JsonHome - Duplicate Rel Validation** ([#475](https://github.com/frank-fs/frank/issues/475))
+
+- **Automatic startup validation:** `useJsonHome` now registers an options validator that fails `host.Start()` with `OptionsValidationException` when two or more resources declare the same `rel`. The exception message names the colliding route templates, enabling developers to quickly identify and fix the conflict.
+- **No opt-in required:** validation runs automatically on every `useJsonHome` call — it is not a feature developers must enable; it is the default safe behavior.
+- **Breaking behavioral change (not API):** previously, duplicate `rel` values would silently collide in the served JSON Home document, with the second resource's rel causing the first to be dropped and unreachable. Now the application refuses to start, failing fast and loudly at startup rather than causing silent data loss in the discovery document.
+
 **Frank.Auth - Handler-Level Authorization**
 
 - **New: handler-level `requireAuth`/`requireClaim`/`requireRole`/`requirePolicy`/`allowAnonymous`** — the same four authorization operations already available on `ResourceBuilder`, now also usable inside a `handler { }` block, so a single HTTP method can carry its own requirement independent of the resource (e.g. `GET` public, `DELETE` admin-only on the same resource). Composes additively (AND) with any resource-level requirement on the same endpoint via ASP.NET Core's own multi-`IAuthorizeData` combination — no new mechanism, no Frank core change.
