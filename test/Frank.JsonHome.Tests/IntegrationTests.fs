@@ -14,6 +14,7 @@ open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.FileProviders
 open Microsoft.Extensions.Hosting
+open Microsoft.Extensions.Options
 open Expecto
 open Frank.Builder
 open Frank.Auth
@@ -48,53 +49,57 @@ type TestAuthHandler(options, logger, encoder) =
 
 let private options = JsonHomeOptions.Default
 
-let private createServer (homeOptions: JsonHomeOptions) (resources: Resource list) =
-    // Same composition useJsonHome performs: the document is one more
-    // resource, dispatched through the same routing/UseEndpoints stage as
-    // everything else -- after UseAuthentication/UseAuthorization, not before.
+/// Same composition useJsonHome performs: the document is one more resource,
+/// dispatched through the same routing/UseEndpoints stage as everything else
+/// -- after UseAuthentication/UseAuthorization, not before. Returns the IHost
+/// itself, unstarted, so callers can assert on `host.Start()` directly
+/// (startup-validation tests) as well as via `createServer`'s TestClient
+/// (request/response tests).
+let private buildHost (homeOptions: JsonHomeOptions) (resources: Resource list) : IHost =
     let spec = (webHost [||]).UseJsonHome(WebHostSpec.Empty, fun _ -> homeOptions)
     let endpoints =
         (List.ofArray spec.Endpoints @ (resources |> List.collect (fun r -> List.ofArray r.Endpoints)))
         |> Array.ofList
 
-    let host =
-        Host
-            .CreateDefaultBuilder([||])
-            .ConfigureWebHost(fun webBuilder ->
-                webBuilder
-                    .UseTestServer()
-                    .ConfigureServices(fun services ->
-                        services.AddRouting() |> ignore
-                        spec.Services services |> ignore
+    Host
+        .CreateDefaultBuilder([||])
+        .ConfigureWebHost(fun webBuilder ->
+            webBuilder
+                .UseTestServer()
+                .ConfigureServices(fun services ->
+                    services.AddRouting() |> ignore
+                    spec.Services services |> ignore
 
-                        services
-                            .AddAuthentication(TestScheme)
-                            .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestScheme, fun _ -> ())
-                        |> ignore
+                    services
+                        .AddAuthentication(TestScheme)
+                        .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestScheme, fun _ -> ())
+                    |> ignore
 
-                        services.AddAuthorization() |> ignore
+                    services.AddAuthorization() |> ignore
 
-                        // ApiExplorer discovers endpoints through registered data sources.
-                        services.AddSingleton<EndpointDataSource>(TestEndpointDataSource endpoints)
-                        |> ignore)
-                    .Configure(fun app ->
-                        // The same middleware useJsonHome installs. WebHostBuilder.Run
-                        // builds and blocks, so the pipeline is wired by hand, but the
-                        // code under test is the real thing rather than a copy.
+                    // ApiExplorer discovers endpoints through registered data sources.
+                    services.AddSingleton<EndpointDataSource>(TestEndpointDataSource endpoints)
+                    |> ignore)
+                .Configure(fun app ->
+                    // The same middleware useJsonHome installs. WebHostBuilder.Run
+                    // builds and blocks, so the pipeline is wired by hand, but the
+                    // code under test is the real thing rather than a copy.
+                    app
+                    |> WebLink.useAppWideLinks spec.LinkProviders
+                    |> spec.BeforeRoutingMiddleware
+                    |> fun app -> app.UseRouting()
+                    |> WebLink.useResourceScopedLinks
+                    |> fun app ->
                         app
-                        |> WebLink.useAppWideLinks spec.LinkProviders
-                        |> spec.BeforeRoutingMiddleware
-                        |> fun app -> app.UseRouting()
-                        |> WebLink.useResourceScopedLinks
-                        |> fun app ->
-                            app
-                                .UseAuthentication()
-                                .UseAuthorization()
-                                .UseEndpoints(fun e -> e.DataSources.Add(TestEndpointDataSource endpoints))
-                        |> ignore)
-                |> ignore)
-            .Build()
+                            .UseAuthentication()
+                            .UseAuthorization()
+                            .UseEndpoints(fun e -> e.DataSources.Add(TestEndpointDataSource endpoints))
+                    |> ignore)
+            |> ignore)
+        .Build()
 
+let private createServer (homeOptions: JsonHomeOptions) (resources: Resource list) =
+    let host = buildHost homeOptions resources
     host.Start()
     host.GetTestClient()
 
@@ -310,4 +315,63 @@ let tests =
               // resource.Methods already had. Compare as sets so this test doesn't
               // couple to that incidental ordering.
               Expect.equal (Set.ofList adminAllow) (Set.ofList [ "GET"; "DELETE" ]) "Admin request sees both methods"
+          }
+
+          test "two resources sharing a rel fail host startup, naming both routes" {
+              // End-to-end proof that Task 2's wiring (AddOptionsWithValidateOnStart<JsonHomeOptions>
+              // plus DuplicateRelValidator registered via TryAddEnumerable) actually fires during
+              // Host.StartAsync against a real DI container and real EndpointDataSource -- not just
+              // DuplicateRelValidatorTests.fs's direct, provider-only unit tests.
+              let widgetA =
+                  resource "/widgets-a" {
+                      rel "widget"
+                      get ok
+                  }
+
+              let widgetB =
+                  resource "/widgets-b" {
+                      rel "widget"
+                      get ok
+                  }
+
+              let host = buildHost options [ widgetA; widgetB ]
+
+              Expect.throwsC (fun () -> host.Start()) (fun ex ->
+                  match ex with
+                  | :? OptionsValidationException as ove ->
+                      Expect.stringContains ove.Message "/widgets-a" "Failure names the first route"
+                      Expect.stringContains ove.Message "/widgets-b" "Failure names the second route"
+                  | other -> failwith $"Expected OptionsValidationException, got %s{other.GetType().FullName}")
+          }
+
+          test "three resources, only two sharing a rel, still fail startup without over-flagging the third" {
+              // Guards the real host/DI pipeline against the same over-flagging risk
+              // DuplicateRelValidatorTests.fs already checks in isolation.
+              let widgetA =
+                  resource "/widgets-a" {
+                      rel "widget"
+                      get ok
+                  }
+
+              let widgetB =
+                  resource "/widgets-b" {
+                      rel "widget"
+                      get ok
+                  }
+
+              let gadget =
+                  resource "/gadgets" {
+                      rel "gadget"
+                      get ok
+                  }
+
+              let host = buildHost options [ widgetA; widgetB; gadget ]
+
+              Expect.throwsC (fun () -> host.Start()) (fun ex ->
+                  match ex with
+                  | :? OptionsValidationException as ove ->
+                      Expect.stringContains ove.Message "/widgets-a" "Failure names the first route"
+                      Expect.stringContains ove.Message "/widgets-b" "Failure names the second route"
+                      Expect.isFalse (ove.Message.Contains "/gadgets") "Non-colliding third resource is not reported"
+                  | other -> failwith $"Expected OptionsValidationException, got %s{other.GetType().FullName}")
           } ]
