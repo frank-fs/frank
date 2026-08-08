@@ -191,7 +191,8 @@ let private getAlpsExcerpt (client: HttpClient) (path: string) =
 /// `rootUri`, ping/pong role/state wiring) and Task 5's server-side wrong-turn 409 enforcement are
 /// unchanged in intent -- only the target of what's being exercised changed, from a hand-written
 /// copy to the shipped sample itself.
-open Frank.Alps.Sample.Program
+open Frank.Alps.Sample.PingPong
+open Frank.Alps.Sample.TrafficLight
 
 /// `FilteringIntegrationTests.fs`'s own `createServer` shape (`AlpsDocumentIntegrationTests`'s
 /// pipeline plus `AddAuthentication`/`UseAuthentication` so `requireRole`'s `AuthorizeAttribute`
@@ -205,15 +206,15 @@ let private createPingPongServer () : HttpClient =
         (webHost [||])
             .UseAlps(
                 WebHostSpec.Empty,
-                [ PingPong.participant
-                  PingPong.awaitingPing
-                  PingPong.awaitingPong
-                  PingPong.session
-                  PingPong.listSessions
-                  PingPong.createSession
-                  PingPong.viewSession
-                  PingPong.ping
-                  PingPong.pong ]
+                [ participant
+                  awaitingPing
+                  awaitingPong
+                  session
+                  listSessions
+                  createSession
+                  viewSession
+                  ping
+                  pong ]
             )
 
     let pingPongEndpoints =
@@ -583,7 +584,7 @@ let pingPongTests =
 /// `emergencyClearResource` endpoints via the sample's `ProjectReference`, never a hand-copied
 /// duplicate of that logic.
 let private createTrafficLightServer () : HttpClient =
-    let spec = (webHost [||]).UseAlps(WebHostSpec.Empty, TrafficLight.profile)
+    let spec = (webHost [||]).UseAlps(WebHostSpec.Empty, profile)
 
     let trafficLightEndpoints =
         [ intersectionsResource; intersectionResource; walkResource; emergencyOverrideResource; emergencyClearResource ]

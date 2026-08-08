@@ -7,6 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Catalog.fs" />
+    <Compile Include="PingPong.fs" />
+    <Compile Include="TrafficLight.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
