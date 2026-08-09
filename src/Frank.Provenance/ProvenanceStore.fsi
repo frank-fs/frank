@@ -20,10 +20,10 @@ type ProvenanceQuery =
 
 /// SPARQL SELECT/ASK return bindings; CONSTRUCT/DESCRIBE return a graph. A store's Query can produce
 /// either, depending on the underlying SparqlQuery shape.
-[<RequireQualifiedAccess>]
+[<Struct; RequireQualifiedAccess>]
 type SparqlQueryResult =
-    | Bindings of SparqlResultSet
-    | Graph of IGraph
+    | Bindings of resultSet: SparqlResultSet
+    | Graph of graph: IGraph
 
 /// A provenance store: append records, query them via the closed ProvenanceQuery vocabulary.
 type IProvenanceStore =

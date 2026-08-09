@@ -13,10 +13,10 @@ type ProvenanceQuery =
     | ByActivityId of activityIri: string
     | Latest of resourceIri: string
 
-[<RequireQualifiedAccess>]
+[<Struct; RequireQualifiedAccess>]
 type SparqlQueryResult =
-    | Bindings of SparqlResultSet
-    | Graph of IGraph
+    | Bindings of resultSet: SparqlResultSet
+    | Graph of graph: IGraph
 
 type IProvenanceStore =
     abstract Append: record: ProvenanceRecord -> unit
