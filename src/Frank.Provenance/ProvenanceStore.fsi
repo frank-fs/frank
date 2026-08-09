@@ -7,7 +7,6 @@ open VDS.RDF.Query
 /// This is the ONLY way a caller queries a store -- there is no public API accepting a raw SparqlQuery
 /// or query string. Adding a new provenance-meaningful query shape means adding a case here, not
 /// widening the surface to open query text.
-[<Struct>]
 [<RequireQualifiedAccess>]
 type ProvenanceQuery =
     | ByResource of resourceIri: string

@@ -6,7 +6,6 @@ open VDS.RDF.Parsing
 open VDS.RDF.Query
 open Frank.Rdf
 
-[<Struct>]
 [<RequireQualifiedAccess>]
 type ProvenanceQuery =
     | ByResource of resourceIri: string
