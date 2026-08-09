@@ -12,85 +12,85 @@ module ShapeBuilderModule =
         new: initial: PropertyShapeSpec -> PropertyShapeBuilder
         member Yield: 'a -> PropertyShapeSpec
         member Zero: unit -> PropertyShapeSpec
-        member Run: p: PropertyShapeSpec -> PropertyShapeSpec
+        member inline Run: p: PropertyShapeSpec -> PropertyShapeSpec
 
         [<CustomOperation("datatype")>]
-        member Datatype: PropertyShapeSpec * XsdDatatype -> PropertyShapeSpec
+        member inline Datatype: PropertyShapeSpec * XsdDatatype -> PropertyShapeSpec
 
         [<CustomOperation("ofClass")>]
-        member OfClass: PropertyShapeSpec * Uri -> PropertyShapeSpec
+        member inline OfClass: PropertyShapeSpec * Uri -> PropertyShapeSpec
 
         [<CustomOperation("nodeKind")>]
-        member NodeKindOp: PropertyShapeSpec * NodeKind -> PropertyShapeSpec
+        member inline NodeKindOp: PropertyShapeSpec * NodeKind -> PropertyShapeSpec
 
         [<CustomOperation("minCount")>]
-        member MinCount: PropertyShapeSpec * int -> PropertyShapeSpec
+        member inline MinCount: PropertyShapeSpec * int -> PropertyShapeSpec
 
         [<CustomOperation("maxCount")>]
-        member MaxCount: PropertyShapeSpec * int -> PropertyShapeSpec
+        member inline MaxCount: PropertyShapeSpec * int -> PropertyShapeSpec
 
         [<CustomOperation("minLength")>]
-        member MinLength: PropertyShapeSpec * int -> PropertyShapeSpec
+        member inline MinLength: PropertyShapeSpec * int -> PropertyShapeSpec
 
         [<CustomOperation("maxLength")>]
-        member MaxLength: PropertyShapeSpec * int -> PropertyShapeSpec
+        member inline MaxLength: PropertyShapeSpec * int -> PropertyShapeSpec
 
         [<CustomOperation("minExclusive")>]
-        member MinExclusive: PropertyShapeSpec * Frank.Rdf.Literal -> PropertyShapeSpec
+        member inline MinExclusive: PropertyShapeSpec * Frank.Rdf.Literal -> PropertyShapeSpec
 
         [<CustomOperation("minInclusive")>]
-        member MinInclusive: PropertyShapeSpec * Frank.Rdf.Literal -> PropertyShapeSpec
+        member inline MinInclusive: PropertyShapeSpec * Frank.Rdf.Literal -> PropertyShapeSpec
 
         [<CustomOperation("maxExclusive")>]
-        member MaxExclusive: PropertyShapeSpec * Frank.Rdf.Literal -> PropertyShapeSpec
+        member inline MaxExclusive: PropertyShapeSpec * Frank.Rdf.Literal -> PropertyShapeSpec
 
         [<CustomOperation("maxInclusive")>]
-        member MaxInclusive: PropertyShapeSpec * Frank.Rdf.Literal -> PropertyShapeSpec
+        member inline MaxInclusive: PropertyShapeSpec * Frank.Rdf.Literal -> PropertyShapeSpec
 
         [<CustomOperation("pattern")>]
-        member Pattern: PropertyShapeSpec * string -> PropertyShapeSpec
+        member inline Pattern: PropertyShapeSpec * string -> PropertyShapeSpec
 
         [<CustomOperation("patternWithFlags")>]
-        member PatternWithFlags: PropertyShapeSpec * string * string -> PropertyShapeSpec
+        member inline PatternWithFlags: PropertyShapeSpec * string * string -> PropertyShapeSpec
 
         [<CustomOperation("languageIn")>]
-        member LanguageIn: PropertyShapeSpec * NonEmptyList<string> -> PropertyShapeSpec
+        member inline LanguageIn: PropertyShapeSpec * NonEmptyList<string> -> PropertyShapeSpec
 
         [<CustomOperation("uniqueLang")>]
-        member UniqueLang: PropertyShapeSpec * bool -> PropertyShapeSpec
+        member inline UniqueLang: PropertyShapeSpec * bool -> PropertyShapeSpec
 
         [<CustomOperation("equalsPath")>]
-        member EqualsPath: PropertyShapeSpec * Uri -> PropertyShapeSpec
+        member inline EqualsPath: PropertyShapeSpec * Uri -> PropertyShapeSpec
 
         [<CustomOperation("disjoint")>]
-        member Disjoint: PropertyShapeSpec * Uri -> PropertyShapeSpec
+        member inline Disjoint: PropertyShapeSpec * Uri -> PropertyShapeSpec
 
         [<CustomOperation("lessThan")>]
-        member LessThan: PropertyShapeSpec * Uri -> PropertyShapeSpec
+        member inline LessThan: PropertyShapeSpec * Uri -> PropertyShapeSpec
 
         [<CustomOperation("lessThanOrEquals")>]
-        member LessThanOrEquals: PropertyShapeSpec * Uri -> PropertyShapeSpec
+        member inline LessThanOrEquals: PropertyShapeSpec * Uri -> PropertyShapeSpec
 
         [<CustomOperation("node")>]
-        member NodeOp: PropertyShapeSpec * ShapeDecl -> PropertyShapeSpec
+        member inline NodeOp: PropertyShapeSpec * ShapeDecl -> PropertyShapeSpec
 
         [<CustomOperation("qualifiedValueShape")>]
-        member QualifiedValueShape: PropertyShapeSpec * ShapeDecl * int option * int option * bool -> PropertyShapeSpec
+        member inline QualifiedValueShape: PropertyShapeSpec * ShapeDecl * int option * int option * bool -> PropertyShapeSpec
 
         [<CustomOperation("hasValue")>]
-        member HasValue: PropertyShapeSpec * Frank.Rdf.Value -> PropertyShapeSpec
+        member inline HasValue: PropertyShapeSpec * Frank.Rdf.Value -> PropertyShapeSpec
 
         [<CustomOperation("allowedValues")>]
-        member AllowedValues: PropertyShapeSpec * NonEmptyList<Frank.Rdf.Value> -> PropertyShapeSpec
+        member inline AllowedValues: PropertyShapeSpec * NonEmptyList<Frank.Rdf.Value> -> PropertyShapeSpec
 
         [<CustomOperation("sparqlConstraint")>]
-        member SparqlConstraintOp: PropertyShapeSpec * SparqlConstraint -> PropertyShapeSpec
+        member inline SparqlConstraintOp: PropertyShapeSpec * SparqlConstraint -> PropertyShapeSpec
 
         [<CustomOperation("severity")>]
-        member SeverityOp: PropertyShapeSpec * Severity -> PropertyShapeSpec
+        member inline SeverityOp: PropertyShapeSpec * Severity -> PropertyShapeSpec
 
         [<CustomOperation("message")>]
-        member MessageOp: PropertyShapeSpec * string -> PropertyShapeSpec
+        member inline MessageOp: PropertyShapeSpec * string -> PropertyShapeSpec
 
     /// `property path { ... } = PropertyShapeBuilder(ofPath path) { ... }`.
     val property: path: PropertyPath -> PropertyShapeBuilder
@@ -100,19 +100,19 @@ module ShapeBuilderModule =
         new: initial: ShapeDecl -> ShapeBuilder
         member Yield: 'a -> ShapeDecl
         member Zero: unit -> ShapeDecl
-        member Run: d: ShapeDecl -> ShapeDecl
+        member inline Run: d: ShapeDecl -> ShapeDecl
 
         [<CustomOperation("properties")>]
-        member Properties: ShapeDecl * PropertyShapeSpec list -> ShapeDecl
+        member inline Properties: ShapeDecl * PropertyShapeSpec list -> ShapeDecl
 
         [<CustomOperation("closed")>]
-        member Closed: ShapeDecl * ignoredProperties: Uri list -> ShapeDecl
+        member inline Closed: ShapeDecl * ignoredProperties: Uri list -> ShapeDecl
 
         [<CustomOperation("severity")>]
-        member SeverityOp: ShapeDecl * Severity -> ShapeDecl
+        member inline SeverityOp: ShapeDecl * Severity -> ShapeDecl
 
         [<CustomOperation("message")>]
-        member MessageOp: ShapeDecl * string -> ShapeDecl
+        member inline MessageOp: ShapeDecl * string -> ShapeDecl
 
     /// `shape targets { ... } = ShapeBuilder(recordShape targets []) { ... }`.
     val shape: targets: TargetSpec list -> ShapeBuilder
