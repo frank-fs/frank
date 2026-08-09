@@ -69,18 +69,18 @@ type WebHostBuilder(args) =
 
         configured.Build().Run()
 
-    member __.Yield(_) = WebHostSpec.Empty
+    member inline __.Yield(_) = WebHostSpec.Empty
 
     [<CustomOperation("configure")>]
-    member __.Configure(spec, f) = { spec with Host = spec.Host >> f }
+    member inline __.Configure(spec, f) = { spec with Host = spec.Host >> f }
 
     [<CustomOperation("plugBeforeRouting")>]
-    member __.PlugBeforeRouting(spec, f) =
+    member inline __.PlugBeforeRouting(spec, f) =
         { spec with
             BeforeRoutingMiddleware = spec.BeforeRoutingMiddleware >> f }
 
     [<CustomOperation("plugBeforeRoutingWhen")>]
-    member __.PlugBeforeRoutingWhen(spec, cond, f) =
+    member inline __.PlugBeforeRoutingWhen(spec, cond, f) =
         { spec with
             BeforeRoutingMiddleware =
                 fun app ->
@@ -90,24 +90,24 @@ type WebHostBuilder(args) =
                         spec.BeforeRoutingMiddleware(app) }
 
     [<CustomOperation("plugBeforeRoutingWhenNot")>]
-    member __.PlugBeforeRoutingWhenNot(spec, cond, f) =
+    member inline __.PlugBeforeRoutingWhenNot(spec, cond, f) =
         __.PlugBeforeRoutingWhen(spec, not << cond, f)
 
     [<CustomOperation("link")>]
-    member __.Link(spec: WebHostSpec, provider: HttpContext -> WebLink seq) : WebHostSpec =
+    member inline __.Link(spec: WebHostSpec, provider: HttpContext -> WebLink seq) : WebHostSpec =
         { spec with LinkProviders = spec.LinkProviders @ [ provider ] }
 
     [<CustomOperation("link")>]
-    member __.Link(spec: WebHostSpec, target: string, rel: string) : WebHostSpec =
+    member inline __.Link(spec: WebHostSpec, target: string, rel: string) : WebHostSpec =
         __.Link(spec, fun (_: HttpContext) -> Seq.singleton { Target = target; Rel = rel; Params = [] })
 
     [<CustomOperation("plug")>]
-    member __.Plug(spec, f) =
+    member inline __.Plug(spec, f) =
         { spec with
             Middleware = spec.Middleware >> f }
 
     [<CustomOperation("plugWhen")>]
-    member __.PlugWhen(spec, cond, f) =
+    member inline __.PlugWhen(spec, cond, f) =
         { spec with
             Middleware =
                 fun app ->
@@ -117,20 +117,20 @@ type WebHostBuilder(args) =
                         spec.Middleware(app) }
 
     [<CustomOperation("plugWhenNot")>]
-    member __.PlugWhenNot(spec, cond, f) = __.PlugWhen(spec, not << cond, f)
+    member inline __.PlugWhenNot(spec, cond, f) = __.PlugWhen(spec, not << cond, f)
 
     [<CustomOperation("resource")>]
-    member __.Resource(spec, resource: Resource) : WebHostSpec =
+    member inline __.Resource(spec, resource: Resource) : WebHostSpec =
         { spec with
             Endpoints = Array.append spec.Endpoints resource.Endpoints }
 
     [<CustomOperation("service")>]
-    member __.Service(spec, f) =
+    member inline __.Service(spec, f) =
         { spec with
             Services = spec.Services >> f }
 
     [<CustomOperation("useDefaults")>]
-    member __.UseDefaults(spec) = { spec with UseDefaults = true }
+    member inline __.UseDefaults(spec) = { spec with UseDefaults = true }
 
 [<AutoOpen>]
 module WebHostFunctions =

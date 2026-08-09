@@ -23,21 +23,21 @@ type WebHostBuilder =
 
     member Run: spec: WebHostSpec -> unit
 
-    member Yield: 'T -> WebHostSpec
+    member inline Yield: 'T -> WebHostSpec
 
     [<CustomOperation("configure")>]
-    member Configure: spec: WebHostSpec * f: (IWebHostBuilder -> IWebHostBuilder) -> WebHostSpec
+    member inline Configure: spec: WebHostSpec * f: (IWebHostBuilder -> IWebHostBuilder) -> WebHostSpec
 
     [<CustomOperation("plugBeforeRouting")>]
-    member PlugBeforeRouting: spec: WebHostSpec * f: (IApplicationBuilder -> IApplicationBuilder) -> WebHostSpec
+    member inline PlugBeforeRouting: spec: WebHostSpec * f: (IApplicationBuilder -> IApplicationBuilder) -> WebHostSpec
 
     [<CustomOperation("plugBeforeRoutingWhen")>]
-    member PlugBeforeRoutingWhen:
+    member inline PlugBeforeRoutingWhen:
         spec: WebHostSpec * cond: (IApplicationBuilder -> bool) * f: (IApplicationBuilder -> IApplicationBuilder) ->
             WebHostSpec
 
     [<CustomOperation("plugBeforeRoutingWhenNot")>]
-    member PlugBeforeRoutingWhenNot:
+    member inline PlugBeforeRoutingWhenNot:
         spec: WebHostSpec * cond: (IApplicationBuilder -> bool) * f: (IApplicationBuilder -> IApplicationBuilder) ->
             WebHostSpec
 
@@ -47,32 +47,32 @@ type WebHostBuilder =
     /// sugar for a static entry; `link (fun ctx -> ...)` is the general form
     /// for a provider whose value depends on the request or on configuration.
     [<CustomOperation("link")>]
-    member Link: spec: WebHostSpec * provider: (HttpContext -> WebLink seq) -> WebHostSpec
+    member inline Link: spec: WebHostSpec * provider: (HttpContext -> WebLink seq) -> WebHostSpec
 
     [<CustomOperation("link")>]
-    member Link: spec: WebHostSpec * target: string * rel: string -> WebHostSpec
+    member inline Link: spec: WebHostSpec * target: string * rel: string -> WebHostSpec
 
     [<CustomOperation("plug")>]
-    member Plug: spec: WebHostSpec * f: (IApplicationBuilder -> IApplicationBuilder) -> WebHostSpec
+    member inline Plug: spec: WebHostSpec * f: (IApplicationBuilder -> IApplicationBuilder) -> WebHostSpec
 
     [<CustomOperation("plugWhen")>]
-    member PlugWhen:
+    member inline PlugWhen:
         spec: WebHostSpec * cond: (IApplicationBuilder -> bool) * f: (IApplicationBuilder -> IApplicationBuilder) ->
             WebHostSpec
 
     [<CustomOperation("plugWhenNot")>]
-    member PlugWhenNot:
+    member inline PlugWhenNot:
         spec: WebHostSpec * cond: (IApplicationBuilder -> bool) * f: (IApplicationBuilder -> IApplicationBuilder) ->
             WebHostSpec
 
     [<CustomOperation("resource")>]
-    member Resource: spec: WebHostSpec * resource: Resource -> WebHostSpec
+    member inline Resource: spec: WebHostSpec * resource: Resource -> WebHostSpec
 
     [<CustomOperation("service")>]
-    member Service: spec: WebHostSpec * f: (IServiceCollection -> IServiceCollection) -> WebHostSpec
+    member inline Service: spec: WebHostSpec * f: (IServiceCollection -> IServiceCollection) -> WebHostSpec
 
     [<CustomOperation("useDefaults")>]
-    member UseDefaults: spec: WebHostSpec -> WebHostSpec
+    member inline UseDefaults: spec: WebHostSpec -> WebHostSpec
 
 [<AutoOpen>]
 module WebHostFunctions =
