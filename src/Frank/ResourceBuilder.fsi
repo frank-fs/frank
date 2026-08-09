@@ -22,10 +22,10 @@ type ResourceBuilder =
 
     member Run: spec: ResourceSpec -> Resource
 
-    member Yield: 'T -> ResourceSpec
+    member inline Yield: 'T -> ResourceSpec
 
     [<CustomOperation("name")>]
-    member Name: spec: ResourceSpec * name: string -> ResourceSpec
+    member inline Name: spec: ResourceSpec * name: string -> ResourceSpec
 
     /// Registers a resource-scoped Link header contribution: present only on
     /// responses from this resource's own endpoints, never on unmatched
@@ -77,135 +77,135 @@ type ResourceBuilder =
     static member AddHandler: httpMethod: string * spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
 
     [<CustomOperation("connect")>]
-    member Connect: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
+    member inline Connect: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
 
-    member Connect: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
+    member inline Connect: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
 
-    member Connect:
+    member inline Connect:
         spec: ResourceSpec *
         handler: ((HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) ->
             ResourceSpec
 
-    member Connect: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
-    member Connect: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member inline Connect: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
+    member inline Connect: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
 
     [<CustomOperation("delete")>]
-    member Delete: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
+    member inline Delete: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
 
-    member Delete: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
+    member inline Delete: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
 
-    member Delete:
+    member inline Delete:
         spec: ResourceSpec *
         handler: ((HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) ->
             ResourceSpec
 
-    member Delete: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
-    member Delete: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
-    member Delete: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
-    member Delete: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
+    member inline Delete: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
+    member inline Delete: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member inline Delete: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
+    member inline Delete: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
 
     [<CustomOperation("get")>]
-    member Get: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
+    member inline Get: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
 
-    member Get: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
+    member inline Get: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
 
-    member Get:
+    member inline Get:
         spec: ResourceSpec *
         handler: ((HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) ->
             ResourceSpec
 
-    member Get: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
-    member Get: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
-    member Get: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
-    member Get: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
+    member inline Get: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
+    member inline Get: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member inline Get: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
+    member inline Get: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
 
     [<CustomOperation("head")>]
-    member Head: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
+    member inline Head: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
 
-    member Head: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
+    member inline Head: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
 
-    member Head:
+    member inline Head:
         spec: ResourceSpec *
         handler: ((HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) ->
             ResourceSpec
 
-    member Head: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
-    member Head: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
-    member Head: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
-    member Head: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
+    member inline Head: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
+    member inline Head: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member inline Head: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
+    member inline Head: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
 
     [<CustomOperation("options")>]
-    member Options: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
+    member inline Options: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
 
-    member Options: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
+    member inline Options: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
 
-    member Options:
+    member inline Options:
         spec: ResourceSpec *
         handler: ((HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) ->
             ResourceSpec
 
-    member Options: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
-    member Options: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
-    member Options: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
-    member Options: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
+    member inline Options: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
+    member inline Options: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member inline Options: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
+    member inline Options: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
 
     [<CustomOperation("patch")>]
-    member Patch: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
+    member inline Patch: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
 
-    member Patch: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
+    member inline Patch: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
 
-    member Patch:
+    member inline Patch:
         spec: ResourceSpec *
         handler: ((HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) ->
             ResourceSpec
 
-    member Patch: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
-    member Patch: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
-    member Patch: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
-    member Patch: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
+    member inline Patch: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
+    member inline Patch: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member inline Patch: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
+    member inline Patch: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
 
     [<CustomOperation("post")>]
-    member Post: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
+    member inline Post: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
 
-    member Post: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
+    member inline Post: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
 
-    member Post:
+    member inline Post:
         spec: ResourceSpec *
         handler: ((HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) ->
             ResourceSpec
 
-    member Post: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
-    member Post: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
-    member Post: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
-    member Post: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
+    member inline Post: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
+    member inline Post: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member inline Post: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
+    member inline Post: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
 
     [<CustomOperation("put")>]
-    member Put: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
+    member inline Put: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
 
-    member Put: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
+    member inline Put: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
 
-    member Put:
+    member inline Put:
         spec: ResourceSpec *
         handler: ((HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) ->
             ResourceSpec
 
-    member Put: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
-    member Put: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
-    member Put: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
-    member Put: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
+    member inline Put: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
+    member inline Put: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member inline Put: spec: ResourceSpec * handlerDef: HandlerDefinition -> ResourceSpec
+    member inline Put: spec: ResourceSpec * handlerDefs: HandlerDefinition list -> ResourceSpec
 
     [<CustomOperation("trace")>]
-    member Trace: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
+    member inline Trace: spec: ResourceSpec * handler: RequestDelegate -> ResourceSpec
 
-    member Trace: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
+    member inline Trace: spec: ResourceSpec * handler: (HttpContext -> Task<'a>) -> ResourceSpec
 
-    member Trace:
+    member inline Trace:
         spec: ResourceSpec *
         handler: ((HttpContext -> Task<HttpContext option>) -> HttpContext -> Task<HttpContext option>) ->
             ResourceSpec
 
-    member Trace: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
-    member Trace: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
+    member inline Trace: spec: ResourceSpec * handler: (HttpContext -> Async<'a>) -> ResourceSpec
+    member inline Trace: spec: ResourceSpec * handler: (HttpContext -> unit) -> ResourceSpec
 
 [<AutoOpen>]
 module ResourceFunctions =

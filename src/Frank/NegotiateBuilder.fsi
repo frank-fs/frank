@@ -17,7 +17,7 @@ type NegotiateSpec =
 type NegotiateBuilder =
     new: unit -> NegotiateBuilder
 
-    member Yield: 'T -> NegotiateSpec
+    member inline Yield: 'T -> NegotiateSpec
     /// Builds one `HandlerDefinition` per registered representation -- dispatch among
     /// them happens at the routing layer (`FrankProducesMatcherPolicy`), not here.
     /// Every representation's `HandlerDefinition.Metadata` carries its own
@@ -29,24 +29,24 @@ type NegotiateBuilder =
     member Run: spec: NegotiateSpec -> HandlerDefinition list
 
     [<CustomOperation("accepts")>]
-    member Accepts: spec: NegotiateSpec * mediaType: string * handler: RequestDelegate -> NegotiateSpec
+    member inline Accepts: spec: NegotiateSpec * mediaType: string * handler: RequestDelegate -> NegotiateSpec
     [<CustomOperation("accepts")>]
-    member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> unit) -> NegotiateSpec
+    member inline Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> unit) -> NegotiateSpec
     [<CustomOperation("accepts")>]
-    member Accepts: spec: NegotiateSpec * mediaType: string * handlerDef: HandlerDefinition -> NegotiateSpec
+    member inline Accepts: spec: NegotiateSpec * mediaType: string * handlerDef: HandlerDefinition -> NegotiateSpec
     /// A self-writing async handler -- what a `task { ... }` block with no `return`
     /// infers as. Dispatched directly, like `RequestDelegate`/`HttpContext -> unit`;
     /// never routed through `viaOutputFormatter`. See frank-fs/frank#492.
     [<CustomOperation("accepts")>]
-    member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> Task<unit>) -> NegotiateSpec
+    member inline Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> Task<unit>) -> NegotiateSpec
     [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> Task<'a>) -> NegotiateSpec
     [<CustomOperation("accepts")>]
     member Accepts: spec: NegotiateSpec * mediaType: string * handler: (HttpContext -> Async<'a>) -> NegotiateSpec
     [<CustomOperation("accepts")>]
-    member Accepts: spec: NegotiateSpec * mediaTypes: string list * handler: (HttpContext -> Task<'a>) -> NegotiateSpec
+    member inline Accepts: spec: NegotiateSpec * mediaTypes: string list * handler: (HttpContext -> Task<'a>) -> NegotiateSpec
     [<CustomOperation("accepts")>]
-    member Accepts: spec: NegotiateSpec * mediaTypes: string list * handler: (HttpContext -> Async<'a>) -> NegotiateSpec
+    member inline Accepts: spec: NegotiateSpec * mediaTypes: string list * handler: (HttpContext -> Async<'a>) -> NegotiateSpec
 
 [<AutoOpen>]
 module NegotiateFunctions =

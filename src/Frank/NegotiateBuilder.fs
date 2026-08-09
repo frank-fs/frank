@@ -92,7 +92,7 @@ module internal Negotiation =
 [<Sealed>]
 type NegotiateBuilder() =
 
-    member _.Yield(_) = NegotiateSpec.Empty
+    member inline _.Yield(_) = NegotiateSpec.Empty
 
     member _.Run(spec: NegotiateSpec) : HandlerDefinition list =
         if List.isEmpty spec.Representations then
@@ -117,11 +117,11 @@ type NegotiateBuilder() =
               Metadata = ((ProducesMediaTypeMetadata(mediaType, ordinal) :> obj) :: ownNonProduces) @ broadcastProduces })
 
     [<CustomOperation("accepts")>]
-    member _.Accepts(spec: NegotiateSpec, mediaType: string, handler: RequestDelegate) =
+    member inline _.Accepts(spec: NegotiateSpec, mediaType: string, handler: RequestDelegate) =
         { spec with Representations = spec.Representations @ [ mediaType, handler, [] ] }
 
     [<CustomOperation("accepts")>]
-    member _.Accepts(spec: NegotiateSpec, mediaType: string, handler: HttpContext -> unit) =
+    member inline _.Accepts(spec: NegotiateSpec, mediaType: string, handler: HttpContext -> unit) =
         let producer =
             RequestDelegate(fun ctx ->
                 handler ctx
@@ -130,7 +130,7 @@ type NegotiateBuilder() =
         { spec with Representations = spec.Representations @ [ mediaType, producer, [] ] }
 
     [<CustomOperation("accepts")>]
-    member _.Accepts(spec: NegotiateSpec, mediaType: string, handlerDef: HandlerDefinition) =
+    member inline _.Accepts(spec: NegotiateSpec, mediaType: string, handlerDef: HandlerDefinition) =
         { spec with
             Representations = spec.Representations @ [ mediaType, handlerDef.Handler, handlerDef.Metadata ] }
 
@@ -145,7 +145,7 @@ type NegotiateBuilder() =
     /// `viaOutputFormatter`, which then throws when it tries to set `ContentType` after
     /// the handler has already started the response (frank-fs/frank#492).
     [<CustomOperation("accepts")>]
-    member _.Accepts(spec: NegotiateSpec, mediaType: string, handler: HttpContext -> Task<unit>) =
+    member inline _.Accepts(spec: NegotiateSpec, mediaType: string, handler: HttpContext -> Task<unit>) =
         let producer = RequestDelegate(fun ctx -> handler ctx :> Task)
         { spec with Representations = spec.Representations @ [ mediaType, producer, [] ] }
 
@@ -176,11 +176,11 @@ type NegotiateBuilder() =
         { spec with Representations = spec.Representations @ [ mediaType, producer, [] ] }
 
     [<CustomOperation("accepts")>]
-    member this.Accepts(spec: NegotiateSpec, mediaTypes: string list, handler: HttpContext -> Task<'a>) =
+    member inline this.Accepts(spec: NegotiateSpec, mediaTypes: string list, handler: HttpContext -> Task<'a>) =
         mediaTypes |> List.fold (fun s mt -> this.Accepts(s, mt, handler)) spec
 
     [<CustomOperation("accepts")>]
-    member this.Accepts(spec: NegotiateSpec, mediaTypes: string list, handler: HttpContext -> Async<'a>) =
+    member inline this.Accepts(spec: NegotiateSpec, mediaTypes: string list, handler: HttpContext -> Async<'a>) =
         mediaTypes |> List.fold (fun s mt -> this.Accepts(s, mt, handler)) spec
 
 [<AutoOpen>]
