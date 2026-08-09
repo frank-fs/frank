@@ -10,14 +10,15 @@ type Node =
     | Blank of string
 
 /// An RDF literal value.
+[<Struct>]
 [<RequireQualifiedAccess>]
 type Literal =
-    | String of string
-    | Int of int
-    | Bool of bool
-    | DateTime of DateTimeOffset
+    | String of stringValue: string
+    | Int of intValue: int
+    | Bool of boolValue: bool
+    | DateTime of dateTimeValue: DateTimeOffset
     /// A language-tagged string (rdf:langString), e.g. "Tic-tac-toe"@en -- (value, BCP47 language tag).
-    | LangString of string * string
+    | LangString of text: string * lang: string
 
 /// The object of a triple: either a reference to another resource, or a literal.
 [<RequireQualifiedAccess>]

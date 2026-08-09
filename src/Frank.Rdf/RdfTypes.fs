@@ -8,13 +8,14 @@ type Node =
     | Iri of string
     | Blank of string
 
+[<Struct>]
 [<RequireQualifiedAccess>]
 type Literal =
-    | String of string
-    | Int of int
-    | Bool of bool
-    | DateTime of DateTimeOffset
-    | LangString of string * string
+    | String of stringValue: string
+    | Int of intValue: int
+    | Bool of boolValue: bool
+    | DateTime of dateTimeValue: DateTimeOffset
+    | LangString of text: string * lang: string
 
 [<RequireQualifiedAccess>]
 type Value =
