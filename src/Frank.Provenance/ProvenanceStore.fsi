@@ -7,6 +7,7 @@ open VDS.RDF.Query
 /// This is the ONLY way a caller queries a store -- there is no public API accepting a raw SparqlQuery
 /// or query string. Adding a new provenance-meaningful query shape means adding a case here, not
 /// widening the surface to open query text.
+[<Struct>]
 [<RequireQualifiedAccess>]
 type ProvenanceQuery =
     | ByResource of resourceIri: string
@@ -33,6 +34,7 @@ type IProvenanceStore =
 /// Bounds an in-memory store. Eviction is clamped defensively at the store: regardless of the values
 /// configured here (including pathological ones, e.g. MaxRecords <= 0 or EvictionBatchSize >=
 /// MaxRecords), the store never evicts the record most recently appended.
+[<Struct>]
 type ProvenanceStoreConfig =
     { /// The number of records to retain before the store starts evicting the oldest ones. A value
       /// <= 0 does not stop the store from accepting appends -- it just means eviction kicks in on

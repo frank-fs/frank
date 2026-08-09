@@ -6,6 +6,7 @@ open VDS.RDF.Parsing
 open VDS.RDF.Query
 open Frank.Rdf
 
+[<Struct>]
 [<RequireQualifiedAccess>]
 type ProvenanceQuery =
     | ByResource of resourceIri: string
@@ -22,6 +23,7 @@ type IProvenanceStore =
     abstract Append: record: ProvenanceRecord -> unit
     abstract Query: query: ProvenanceQuery -> SparqlQueryResult
 
+[<Struct>]
 type ProvenanceStoreConfig =
     { MaxRecords: int
       EvictionBatchSize: int
