@@ -2,6 +2,7 @@ namespace Frank.Rdf
 
 open System
 
+[<Struct>]
 [<RequireQualifiedAccess>]
 type Node =
     | Iri of string
