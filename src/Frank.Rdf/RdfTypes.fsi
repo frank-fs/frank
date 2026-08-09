@@ -3,6 +3,7 @@ namespace Frank.Rdf
 open System
 
 /// A subject, or a reference-valued object: an absolute IRI (or a "prefix:local" CURIE), or a blank node.
+[<Struct>]
 [<RequireQualifiedAccess>]
 type Node =
     | Iri of string
