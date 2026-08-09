@@ -47,12 +47,14 @@ module Rdf =
     [<Sealed>]
     type DescribeBuilder =
         new: subject: Node -> DescribeBuilder
+        // Not `inline`: FS1113 -- the implementation captures `subject`, a private constructor
+        // field, which isn't accessible enough for source-level inlining across assembly boundaries.
         member Yield: 'a -> Description
         member Zero: unit -> Description
-        member Run: d: Description -> Description
+        member inline Run: d: Description -> Description
 
         [<CustomOperation("typ")>]
-        member Typ: d: Description * curie: string -> Description
+        member inline Typ: d: Description * curie: string -> Description
 
         // `property` is overloaded over 5 types in the brief, but F#'s custom-operation overload
         // resolution commits to a single resolved parameter type for the whole CE once one call to
@@ -61,22 +63,22 @@ module Rdf =
         // task-3-report.md). Falling back to distinct operation names per the brief's documented escape
         // hatch.
         [<CustomOperation("propertyString")>]
-        member PropertyString: d: Description * predicate: string * value: string -> Description
+        member inline PropertyString: d: Description * predicate: string * value: string -> Description
 
         [<CustomOperation("propertyInt")>]
-        member PropertyInt: d: Description * predicate: string * value: int -> Description
+        member inline PropertyInt: d: Description * predicate: string * value: int -> Description
 
         [<CustomOperation("propertyBool")>]
-        member PropertyBool: d: Description * predicate: string * value: bool -> Description
+        member inline PropertyBool: d: Description * predicate: string * value: bool -> Description
 
         [<CustomOperation("propertyDateTime")>]
-        member PropertyDateTime: d: Description * predicate: string * value: System.DateTimeOffset -> Description
+        member inline PropertyDateTime: d: Description * predicate: string * value: System.DateTimeOffset -> Description
 
         [<CustomOperation("propertyLangString")>]
-        member PropertyLangString: d: Description * predicate: string * value: string * language: string -> Description
+        member inline PropertyLangString: d: Description * predicate: string * value: string * language: string -> Description
 
         [<CustomOperation("propertyNode")>]
-        member PropertyNode: d: Description * predicate: string * value: Node -> Description
+        member inline PropertyNode: d: Description * predicate: string * value: Node -> Description
 
     /// Enters a `describe { }` block: `describe (Node.Iri "https://example.org/g1") { typ "schema:Game" }`.
     val describe: subject: Node -> DescribeBuilder
@@ -87,20 +89,20 @@ module Rdf =
     [<Sealed>]
     type RdfBuilder =
         new: unit -> RdfBuilder
-        member Yield: 'a -> Doc
-        member Run: doc: Doc -> Doc
+        member inline Yield: 'a -> Doc
+        member inline Run: doc: Doc -> Doc
 
         [<CustomOperation("prefix")>]
-        member Prefix: doc: Doc * name: string * uri: string -> Doc
+        member inline Prefix: doc: Doc * name: string * uri: string -> Doc
 
         [<CustomOperation("about")>]
-        member About: doc: Doc * d: Description -> Doc
+        member inline About: doc: Doc * d: Description -> Doc
 
         [<CustomOperation("triple")>]
-        member Triple: doc: Doc * subject: Node * predicate: string * value: Value -> Doc
+        member inline Triple: doc: Doc * subject: Node * predicate: string * value: Value -> Doc
 
         [<CustomOperation("includeDoc")>]
-        member IncludeDoc: doc: Doc * other: Doc -> Doc
+        member inline IncludeDoc: doc: Doc * other: Doc -> Doc
 
     /// Enters an `rdf { }` block.
     val rdf: RdfBuilder
