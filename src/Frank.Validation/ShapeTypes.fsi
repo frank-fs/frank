@@ -41,12 +41,12 @@ type Severity =
     | Info
 
 /// sh:targetClass / sh:targetNode / sh:targetSubjectsOf / sh:targetObjectsOf.
-[<RequireQualifiedAccess>]
+[<Struct; RequireQualifiedAccess>]
 type TargetSpec =
-    | Class of Uri
-    | Node of Node
-    | SubjectsOf of Uri
-    | ObjectsOf of Uri
+    | Class of classUri: Uri
+    | Node of node: Node
+    | SubjectsOf of subjectsOfUri: Uri
+    | ObjectsOf of objectsOfUri: Uri
 
 /// sh:path -- not always a single predicate. The full SHACL property-path grammar.
 [<RequireQualifiedAccess>]
