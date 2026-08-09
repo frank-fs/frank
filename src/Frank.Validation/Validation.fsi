@@ -33,6 +33,7 @@ type Violation =
         SourceShape: Node
     }
 
+[<Struct>]
 [<RequireQualifiedAccess>]
 type ValidationOutcome =
     | Conforms

@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Compile Include="NegotiationBenchmarks.fs" />
+    <Compile Include="ValidationBenchmarks.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -18,6 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Frank/Frank.fsproj" />
+    <ProjectReference Include="../../src/Frank.Rdf/Frank.Rdf.fsproj" />
+    <ProjectReference Include="../../src/Frank.Validation/Frank.Validation.fsproj" />
   </ItemGroup>
 
 </Project>
