@@ -19,11 +19,11 @@ type ProducesMediaTypeMetadata =
 /// at startup, to reject a wildcard paired with a value-returning handler.
 module MediaTypeNegotiation =
 
-    val isWildcard: mediaType: string -> bool
+    val inline isWildcard: mediaType: string -> bool
 
-    val matches: candidate: MediaTypeHeaderValue -> registered: string -> bool
+    val inline matches: candidate: MediaTypeHeaderValue -> registered: string -> bool
 
-    val specificity: entry: MediaTypeHeaderValue -> int
+    val inline specificity: entry: MediaTypeHeaderValue -> int
 
     val effectiveQuality: parsed: MediaTypeHeaderValue list -> mt: string -> float option
 

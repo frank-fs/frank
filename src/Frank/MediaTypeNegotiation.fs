@@ -9,7 +9,7 @@ type ProducesMediaTypeMetadata(mediaType: string, ordinal: int) =
 
 module MediaTypeNegotiation =
 
-    let isWildcard (mediaType: string) = mediaType.Contains "*"
+    let inline isWildcard (mediaType: string) = mediaType.Contains "*"
 
     /// True if `candidate` (one entry from the client's Accept header) and
     /// `registered` (one representation's declared media type) match.
@@ -33,7 +33,7 @@ module MediaTypeNegotiation =
     ///   catch-all `accepts "*/*"` still matches any concrete client entry. Without
     ///   that gate a concrete registered `application/json` would act as if it were
     ///   itself a pattern and match an Accept of `application/ld+json`.
-    let matches (candidate: MediaTypeHeaderValue) (registered: string) : bool =
+    let inline matches (candidate: MediaTypeHeaderValue) (registered: string) : bool =
         let registeredValue = MediaTypeHeaderValue.Parse(registered)
         // MediaTypeHeaderValue.MediaType is a StringSegment, not a string -- render both
         // sides to plain strings so `isWildcard` and the equality check are unambiguous.
@@ -49,7 +49,7 @@ module MediaTypeNegotiation =
     /// the subtype wildcarded ("text/*"), which outranks "*/*". This -- not quality
     /// -- is what RFC 9110 §12.5.1 says determines which entry governs a given
     /// representation when more than one entry matches it.
-    let specificity (entry: MediaTypeHeaderValue) : int =
+    let inline specificity (entry: MediaTypeHeaderValue) : int =
         (if entry.MatchesAllTypes then 0 else 1) + (if entry.MatchesAllSubTypes then 0 else 1)
 
     /// The effective quality of `mt` under this Accept header: the Quality (defaulting
