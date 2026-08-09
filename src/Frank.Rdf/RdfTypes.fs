@@ -16,10 +16,11 @@ type Literal =
     | DateTime of DateTimeOffset
     | LangString of string * string
 
+[<Struct>]
 [<RequireQualifiedAccess>]
 type Value =
-    | Node of Node
-    | Literal of Literal
+    | Node of node: Node
+    | Literal of literal: Literal
 
 type Doc =
     { Prefixes: (string * string) list
