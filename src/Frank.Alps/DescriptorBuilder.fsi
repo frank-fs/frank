@@ -12,70 +12,70 @@ module DescriptorBuilderModule =
         new: id: string -> DescriptorBuilder
         member Yield: 'a -> Descriptor
         member Zero: unit -> Descriptor
-        member Run: d: Descriptor -> Descriptor
+        member inline Run: d: Descriptor -> Descriptor
 
         [<CustomOperation("semantic")>]
-        member Semantic: d: Descriptor -> Descriptor
+        member inline Semantic: d: Descriptor -> Descriptor
 
         [<CustomOperation("safe")>]
-        member Safe: d: Descriptor -> Descriptor
+        member inline Safe: d: Descriptor -> Descriptor
 
         [<CustomOperation("unsafe")>]
-        member Unsafe: d: Descriptor -> Descriptor
+        member inline Unsafe: d: Descriptor -> Descriptor
 
         [<CustomOperation("idempotent")>]
-        member Idempotent: d: Descriptor -> Descriptor
+        member inline Idempotent: d: Descriptor -> Descriptor
 
         [<CustomOperation("doc")>]
-        member Doc: d: Descriptor * text: string -> Descriptor
+        member inline Doc: d: Descriptor * text: string -> Descriptor
 
         [<CustomOperation("docWith")>]
-        member DocWith: d: Descriptor * doc: Doc -> Descriptor
+        member inline DocWith: d: Descriptor * doc: Doc -> Descriptor
 
         [<CustomOperation("def")>]
-        member Def: d: Descriptor * iri: string -> Descriptor
+        member inline Def: d: Descriptor * iri: string -> Descriptor
 
         [<CustomOperation("tag")>]
-        member Tag: d: Descriptor * value: string -> Descriptor
+        member inline Tag: d: Descriptor * value: string -> Descriptor
 
         [<CustomOperation("rel")>]
-        member Rel: d: Descriptor * relation: string -> Descriptor
+        member inline Rel: d: Descriptor * relation: string -> Descriptor
 
         [<CustomOperation("named")>]
-        member Named: d: Descriptor * name: string -> Descriptor
+        member inline Named: d: Descriptor * name: string -> Descriptor
 
         [<CustomOperation("ext")>]
-        member Ext: d: Descriptor * id: string * value: string -> Descriptor
+        member inline Ext: d: Descriptor * id: string * value: string -> Descriptor
 
         [<CustomOperation("extWith")>]
-        member ExtWith: d: Descriptor * ext: Ext -> Descriptor
+        member inline ExtWith: d: Descriptor * ext: Ext -> Descriptor
 
         [<CustomOperation("link")>]
-        member Link: d: Descriptor * href: string * rel: string -> Descriptor
+        member inline Link: d: Descriptor * href: string * rel: string -> Descriptor
 
         [<CustomOperation("linkWith")>]
-        member LinkWith: d: Descriptor * link: Link -> Descriptor
+        member inline LinkWith: d: Descriptor * link: Link -> Descriptor
 
         [<CustomOperation("contains")>]
-        member Contains: d: Descriptor * children: Descriptor list -> Descriptor
+        member inline Contains: d: Descriptor * children: Descriptor list -> Descriptor
 
         [<CustomOperation("rt")>]
-        member Rt: d: Descriptor * target: Descriptor -> Descriptor
+        member inline Rt: d: Descriptor * target: Descriptor -> Descriptor
 
         [<CustomOperation("href")>]
-        member Href: d: Descriptor * target: Descriptor -> Descriptor
+        member inline Href: d: Descriptor * target: Descriptor -> Descriptor
 
         [<CustomOperation("hrefExternal")>]
-        member HrefExternal: d: Descriptor * uri: string -> Descriptor
+        member inline HrefExternal: d: Descriptor * uri: string -> Descriptor
 
         [<CustomOperation("initial")>]
-        member Initial: d: Descriptor -> Descriptor
+        member inline Initial: d: Descriptor -> Descriptor
 
         [<CustomOperation("regions")>]
-        member Regions: d: Descriptor * children: Descriptor list -> Descriptor
+        member inline Regions: d: Descriptor * children: Descriptor list -> Descriptor
 
         [<CustomOperation("from")>]
-        member From: d: Descriptor * sources: Descriptor list -> Descriptor
+        member inline From: d: Descriptor * sources: Descriptor list -> Descriptor
 
     /// Enters a `descriptor { }` block: `descriptor "listProducts" { safe; rt product }`.
     val descriptor: id: string -> DescriptorBuilder
