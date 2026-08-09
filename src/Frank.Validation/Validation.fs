@@ -3,6 +3,7 @@ namespace Frank.Validation
 open System
 open Frank.Rdf
 
+[<Struct>]
 type Violation =
     { FocusNode: Value
       ResultPath: Uri option
