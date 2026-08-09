@@ -11,6 +11,7 @@ type Violation =
       ConstraintComponent: Uri
       SourceShape: Node }
 
+[<Struct>]
 [<RequireQualifiedAccess>]
 type ValidationOutcome =
     | Conforms
