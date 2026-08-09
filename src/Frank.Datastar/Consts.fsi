@@ -2,6 +2,7 @@ namespace Frank.Datastar
 
 open System
 
+[<Struct>]
 type ElementPatchMode =
     /// Morphs the element into the existing element.
     | Outer
@@ -20,6 +21,7 @@ type ElementPatchMode =
     /// Inserts the element after the existing element.
     | After
 
+[<Struct>]
 type PatchElementNamespace =
     | Html
     | Svg
