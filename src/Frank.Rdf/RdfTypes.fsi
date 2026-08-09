@@ -20,10 +20,11 @@ type Literal =
     | LangString of string * string
 
 /// The object of a triple: either a reference to another resource, or a literal.
+[<Struct>]
 [<RequireQualifiedAccess>]
 type Value =
-    | Node of Node
-    | Literal of Literal
+    | Node of node: Node
+    | Literal of literal: Literal
 
 /// A flat set of RDF triples plus the namespace prefixes used to author them.
 type Doc =
