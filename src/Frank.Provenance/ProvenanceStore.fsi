@@ -33,6 +33,7 @@ type IProvenanceStore =
 /// Bounds an in-memory store. Eviction is clamped defensively at the store: regardless of the values
 /// configured here (including pathological ones, e.g. MaxRecords <= 0 or EvictionBatchSize >=
 /// MaxRecords), the store never evicts the record most recently appended.
+[<Struct>]
 type ProvenanceStoreConfig =
     { /// The number of records to retain before the store starts evicting the oldest ones. A value
       /// <= 0 does not stop the store from accepting appends -- it just means eviction kicks in on

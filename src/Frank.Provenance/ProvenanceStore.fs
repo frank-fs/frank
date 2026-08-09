@@ -22,6 +22,7 @@ type IProvenanceStore =
     abstract Append: record: ProvenanceRecord -> unit
     abstract Query: query: ProvenanceQuery -> SparqlQueryResult
 
+[<Struct>]
 type ProvenanceStoreConfig =
     { MaxRecords: int
       EvictionBatchSize: int
