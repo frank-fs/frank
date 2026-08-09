@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="NegotiationBenchmarks.fs" />
     <Compile Include="ValidationBenchmarks.fs" />
+    <Compile Include="ViolationBenchmarks.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
