@@ -5,6 +5,7 @@ open Frank.Rdf
 
 /// One SHACL validation-report result, typed. See ResultPath's doc comment for a disclosed
 /// simplification versus a fully round-tripped PropertyPath.
+[<Struct>]
 type Violation =
     {
         /// The node the violation was raised against. Typed `Frank.Rdf.Value`, not `Frank.Rdf.Node`,
