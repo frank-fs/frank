@@ -14,28 +14,28 @@ module ProvBuilderModule =
         new: initial: Description -> ProvBuilder
         member Yield: 'a -> Description
         member Zero: unit -> Description
-        member Run: d: Description -> Description
+        member inline Run: d: Description -> Description
 
         [<CustomOperation("wasGeneratedBy")>]
-        member WasGeneratedBy: d: Description * activity: Node -> Description
+        member inline WasGeneratedBy: d: Description * activity: Node -> Description
 
         [<CustomOperation("wasAssociatedWith")>]
-        member WasAssociatedWith: d: Description * agent: Node -> Description
+        member inline WasAssociatedWith: d: Description * agent: Node -> Description
 
         [<CustomOperation("used")>]
-        member Used: d: Description * entity: Node -> Description
+        member inline Used: d: Description * entity: Node -> Description
 
         [<CustomOperation("startedAtTime")>]
-        member StartedAtTime: d: Description * t: DateTimeOffset -> Description
+        member inline StartedAtTime: d: Description * t: DateTimeOffset -> Description
 
         [<CustomOperation("endedAtTime")>]
-        member EndedAtTime: d: Description * t: DateTimeOffset -> Description
+        member inline EndedAtTime: d: Description * t: DateTimeOffset -> Description
 
         [<CustomOperation("wasDerivedFrom")>]
-        member WasDerivedFrom: d: Description * entity: Node -> Description
+        member inline WasDerivedFrom: d: Description * entity: Node -> Description
 
         [<CustomOperation("specializationOf")>]
-        member SpecializationOf: d: Description * entity: Node -> Description
+        member inline SpecializationOf: d: Description * entity: Node -> Description
 
     /// Enters an `activity id { }` block: `activity a { wasAssociatedWith ag; startedAtTime t0; endedAtTime t1 }`.
     val activity: id: Node -> ProvBuilder

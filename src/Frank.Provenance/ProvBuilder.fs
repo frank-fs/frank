@@ -9,28 +9,28 @@ module ProvBuilderModule =
     type ProvBuilder(initial: Description) =
         member _.Yield(_) : Description = initial
         member _.Zero() : Description = initial
-        member _.Run(d: Description) : Description = d
+        member inline _.Run(d: Description) : Description = d
 
         [<CustomOperation("wasGeneratedBy")>]
-        member _.WasGeneratedBy(d: Description, activity: Node) : Description = d |> Prov.wasGeneratedBy activity
+        member inline _.WasGeneratedBy(d: Description, activity: Node) : Description = d |> Prov.wasGeneratedBy activity
 
         [<CustomOperation("wasAssociatedWith")>]
-        member _.WasAssociatedWith(d: Description, agent: Node) : Description = d |> Prov.wasAssociatedWith agent
+        member inline _.WasAssociatedWith(d: Description, agent: Node) : Description = d |> Prov.wasAssociatedWith agent
 
         [<CustomOperation("used")>]
-        member _.Used(d: Description, entity: Node) : Description = d |> Prov.used entity
+        member inline _.Used(d: Description, entity: Node) : Description = d |> Prov.used entity
 
         [<CustomOperation("startedAtTime")>]
-        member _.StartedAtTime(d: Description, t: DateTimeOffset) : Description = d |> Prov.startedAtTime t
+        member inline _.StartedAtTime(d: Description, t: DateTimeOffset) : Description = d |> Prov.startedAtTime t
 
         [<CustomOperation("endedAtTime")>]
-        member _.EndedAtTime(d: Description, t: DateTimeOffset) : Description = d |> Prov.endedAtTime t
+        member inline _.EndedAtTime(d: Description, t: DateTimeOffset) : Description = d |> Prov.endedAtTime t
 
         [<CustomOperation("wasDerivedFrom")>]
-        member _.WasDerivedFrom(d: Description, entity: Node) : Description = d |> Prov.wasDerivedFrom entity
+        member inline _.WasDerivedFrom(d: Description, entity: Node) : Description = d |> Prov.wasDerivedFrom entity
 
         [<CustomOperation("specializationOf")>]
-        member _.SpecializationOf(d: Description, entity: Node) : Description = d |> Prov.specializationOf entity
+        member inline _.SpecializationOf(d: Description, entity: Node) : Description = d |> Prov.specializationOf entity
 
     let activity (id: Node) = ProvBuilder(Prov.activity id)
     let entity (id: Node) = ProvBuilder(Prov.entity id)
