@@ -10,8 +10,8 @@ module DescriptorBuilderModule =
     [<Sealed>]
     type DescriptorBuilder =
         new: id: string -> DescriptorBuilder
-        member Yield: 'a -> Descriptor
-        member Zero: unit -> Descriptor
+        member inline Yield: 'a -> Descriptor
+        member inline Zero: unit -> Descriptor
         member inline Run: d: Descriptor -> Descriptor
 
         [<CustomOperation("semantic")>]

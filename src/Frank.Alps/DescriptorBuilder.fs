@@ -4,8 +4,8 @@ namespace Frank.Alps
 module DescriptorBuilderModule =
     [<Sealed>]
     type DescriptorBuilder(id: string) =
-        member _.Yield(_) : Descriptor = semantic id
-        member _.Zero() : Descriptor = semantic id
+        member inline _.Yield(_) : Descriptor = semantic id
+        member inline _.Zero() : Descriptor = semantic id
         member inline _.Run(d: Descriptor) : Descriptor = d
 
         [<CustomOperation("semantic")>]
