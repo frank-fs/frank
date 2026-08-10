@@ -1,6 +1,9 @@
 module Frank.Rdf.Tests.RoundTripTests
 
+open System
+open System.Buffers
 open System.IO
+open System.Text
 open Expecto
 open VDS.RDF
 open VDS.RDF.Parsing
@@ -11,6 +14,31 @@ let private parseBackToGraph (json: string) : IGraph =
     use reader = new StringReader(json)
     (new JsonLdParser()).Load(store, reader)
     store.Graphs |> Seq.exactlyOne
+
+// IBufferWriter implementation for testing writeJsonLdAsync
+type private TestBufferWriter() =
+    let buffer = ResizeArray<byte>()
+    let mutable workingBuffer : byte[] = Array.zeroCreate 4096
+
+    interface IBufferWriter<byte> with
+        member _.GetSpan(sizeHint: int) : Span<byte> =
+            let size = if sizeHint > 0 then sizeHint else 4096
+            if workingBuffer.Length < size then
+                workingBuffer <- Array.zeroCreate size
+            Span(workingBuffer, 0, size)
+
+        member _.GetMemory(sizeHint: int) : Memory<byte> =
+            let size = if sizeHint > 0 then sizeHint else 4096
+            if workingBuffer.Length < size then
+                workingBuffer <- Array.zeroCreate size
+            Memory(workingBuffer, 0, size)
+
+        member _.Advance(count: int) : unit =
+            if count > 0 then
+                buffer.AddRange(workingBuffer.AsSpan(0, count))
+
+    member _.ToString() : string =
+        Encoding.UTF8.GetString(buffer.ToArray())
 
 [<Tests>]
 let tests =
@@ -143,4 +171,77 @@ let tests =
               // Would throw ObjectDisposedException if writeJsonLd had closed it.
               writer.Write("still usable")
               Expect.isTrue (writer.ToString().EndsWith "still usable") ""
+          }
+
+          test "writeJsonLdAsync writes the same output as toJsonLd to an IBufferWriter" {
+              let doc =
+                  rdf {
+                      prefix "schema" "https://schema.org/"
+                      about (describe (Node.Iri "https://example.org/g1") { typ "schema:Game" })
+                  }
+
+              let bufferWriter = TestBufferWriter()
+              let task = Doc.writeJsonLdAsync doc bufferWriter
+              task.Wait()
+              let asyncOutput = bufferWriter.ToString()
+              let expectedOutput = Doc.toJsonLd doc
+
+              Expect.equal asyncOutput expectedOutput "Async output matches sync output"
+          }
+
+          test "writeJsonLdAsync round-trips a single-subject document through JSON-LD parser" {
+              let doc =
+                  rdf {
+                      prefix "schema" "https://schema.org/"
+
+                      about (
+                          describe (Node.Iri "https://example.org/g1") {
+                              typ "schema:Game"
+                              propertyString "schema:name" "Tic-tac-toe"
+                          }
+                      )
+                  }
+
+              let bufferWriter = TestBufferWriter()
+              let task = Doc.writeJsonLdAsync doc bufferWriter
+              task.Wait()
+              let json = bufferWriter.ToString()
+
+              let originalGraph = Doc.toGraph doc :> IGraph
+              let parsedGraph = json |> parseBackToGraph
+
+              Expect.isTrue (originalGraph.Equals(parsedGraph)) "Isomorphic after async round-trip"
+          }
+
+          test "writeJsonLdAsync handles a multi-subject document" {
+              let players = Node.Iri "https://example.org/g1#players"
+
+              let doc =
+                  rdf {
+                      prefix "schema" "https://schema.org/"
+
+                      about (
+                          describe (Node.Iri "https://example.org/g1") {
+                              typ "schema:Game"
+                              propertyNode "schema:numberOfPlayers" players
+                          }
+                      )
+
+                      about (
+                          describe players {
+                              typ "schema:QuantitativeValue"
+                              propertyInt "schema:value" 2
+                          }
+                      )
+                  }
+
+              let bufferWriter = TestBufferWriter()
+              let task = Doc.writeJsonLdAsync doc bufferWriter
+              task.Wait()
+              let json = bufferWriter.ToString()
+
+              let originalGraph = Doc.toGraph doc :> IGraph
+              let parsedGraph = json |> parseBackToGraph
+
+              Expect.isTrue (originalGraph.Equals(parsedGraph)) "Multi-subject document round-trips correctly"
           } ]

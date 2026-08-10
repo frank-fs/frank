@@ -1,3 +1,13 @@
+### New in 7.3.3 (Released 2026-08-10)
+
+**Frank.Rdf - Async IBufferWriter Streaming**
+
+- **New: `Doc.writeJsonLdAsync doc bufferWriter`** — async overload that writes JSON-LD expanded-form directly to an `IBufferWriter<byte>` (e.g. `HttpResponse.BodyWriter`/`PipeWriter`), without intermediate string allocation or copying. Encodes UTF8 directly to the buffer for maximum efficiency in response streaming. Completes after serialization and flushing to the buffer.
+- **Recommended for response streaming:** `writeJsonLdAsync` is the preferred method when serving JSON-LD from a Frank handler over HTTP. Streaming directly to `PipeWriter` avoids `AllowSynchronousIO` requirements and eliminates intermediate buffering layers that `StreamWriter` would introduce.
+- **Three serialization options now available:** Use `writeJsonLdAsync` for HTTP responses (most efficient), `writeJsonLd` for flexibility with any `TextWriter`, and `toJsonLd` for testing/debugging.
+- **Sample updated:** `sample/Frank.Rdf.Sample` demonstrates `Doc.writeJsonLdAsync` streaming the `application/ld+json` representation directly to the response body via `negotiate { }` content negotiation.
+- **Test coverage:** comprehensive test cases for `writeJsonLdAsync` including single and multi-subject documents, language-tagged strings, and round-trip parsing.
+
 ### New in 7.3.2 (Released 2026-08-09)
 
 **Frank Core - HandlerDefinition Metadata Refactor**

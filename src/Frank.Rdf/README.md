@@ -60,10 +60,17 @@ Doc.toJsonLd gameDoc
 ## Serializing
 
 - `Doc.toGraph doc` - Builds a `VDS.RDF.Graph`
-- `Doc.writeJsonLd doc writer` - Streams expanded-form JSON-LD straight into a `System.IO.TextWriter` (e.g. wrapping `HttpResponse.Body`), without materializing the whole document as a string first
+- `Doc.writeJsonLd doc writer` - Streams expanded-form JSON-LD into a `System.IO.TextWriter` (synchronous, flexible for any stream)
+- `Doc.writeJsonLdAsync doc bufferWriter` - **Streams expanded-form JSON-LD asynchronously into an `IBufferWriter<byte>` (e.g. `HttpResponse.BodyWriter`)** — best for response streaming, encodes UTF8 directly to the buffer with no intermediate string allocation
 - `Doc.toJsonLd doc` - Convenience wrapper returning the JSON-LD as a `string`
 
 Output is always **expanded-form** JSON-LD: no `@context`, every predicate and type expanded to its absolute IRI. There is no compact-form option.
+
+### Choosing a serialization method
+
+- Use `writeJsonLdAsync` when streaming to HTTP responses (most efficient, async-friendly)
+- Use `writeJsonLd` when you have a `TextWriter` from a third-party API or need flexibility
+- Use `toJsonLd` for testing, debugging, or when the full document fits in memory
 
 ## Related Packages
 
