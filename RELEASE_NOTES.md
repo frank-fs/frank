@@ -1,4 +1,4 @@
-### New in 7.3.2 (Unreleased)
+### New in 7.3.2 (Released 2026-08-09)
 
 **Frank Core - HandlerDefinition Metadata Refactor**
 
