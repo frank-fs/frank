@@ -88,8 +88,9 @@ let private getGame =
             match games.TryGetValue id with
             | true, name ->
                 let baseUri = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
-                let json = Doc.toJsonLd (gameDoc baseUri id name)
-                do! ctx.Response.WriteAsync(json)
+                use writer = new System.IO.StreamWriter(ctx.Response.Body)
+                Doc.writeJsonLd (gameDoc baseUri id name) writer
+                do! writer.FlushAsync()
             | false, _ -> ctx.Response.StatusCode <- 404
         }))
     }
