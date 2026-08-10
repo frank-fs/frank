@@ -1,6 +1,21 @@
 namespace Frank.Rdf
 
 open System
+open System.Buffers
+open System.IO
+open System.Text
+
+// TextWriter adapter for IBufferWriter<byte>, enabling direct writes to PipeWriter
+// without intermediate buffering. Used by writeJsonLdAsync for streaming to response bodies.
+type private PipeTextWriter(bufferWriter: IBufferWriter<byte>) =
+    inherit TextWriter()
+    override _.Encoding = Encoding.UTF8
+    override _.Write(value: string) =
+        if not (isNull value) && value.Length > 0 then
+            let byteCount = Encoding.UTF8.GetByteCount(value)
+            let buffer = bufferWriter.GetSpan(byteCount)
+            let bytesWritten = Encoding.UTF8.GetBytes(value, buffer)
+            bufferWriter.Advance(bytesWritten)
 
 [<AutoOpen>]
 module Rdf =
@@ -118,6 +133,12 @@ module Rdf =
             let store = new TripleStore()
             store.Add(graph) |> ignore
             (new JsonLdWriter()).Save(store, writer, true)
+
+        let writeJsonLdAsync (doc: Doc) (bufferWriter: System.Buffers.IBufferWriter<byte>) : System.Threading.Tasks.Task =
+            task {
+                use writer = new PipeTextWriter(bufferWriter)
+                writeJsonLd doc writer
+            }
 
         let toJsonLd (doc: Doc) : string =
             use writer = new System.IO.StringWriter()

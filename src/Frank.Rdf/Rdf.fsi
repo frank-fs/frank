@@ -121,6 +121,12 @@ module Rdf =
         /// materializing the whole document as a string first).
         val writeJsonLd: doc: Doc -> writer: System.IO.TextWriter -> unit
 
+        /// Writes JSON-LD in expanded form asynchronously into the given IBufferWriter<byte> (e.g.
+        /// HttpResponse.BodyWriter / PipeWriter). Best for streaming to response bodies: encodes UTF8
+        /// directly to the buffer with no intermediate string allocation or copying. Returns a Task
+        /// completed after serialization and flushing to the buffer.
+        val writeJsonLdAsync: doc: Doc -> bufferWriter: System.Buffers.IBufferWriter<byte> -> System.Threading.Tasks.Task
+
         /// Convenience wrapper over writeJsonLd for callers that need the whole document as a string
         /// (tests that reparse it, mainly). Prefer writeJsonLd directly when writing to a response.
         val toJsonLd: doc: Doc -> string

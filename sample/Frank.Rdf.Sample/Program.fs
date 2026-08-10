@@ -1,24 +1,8 @@
 module Sample.Rdf.Program
 
-open System
-open System.Buffers
-open System.IO
-open System.Text
 open Microsoft.AspNetCore.Http
 open Frank.Builder
 open Frank.Rdf
-
-// TextWriter adapter for IBufferWriter<byte>, enabling direct writes to PipeWriter
-// without intermediate buffering in StreamWriter.
-type private PipeTextWriter(bufferWriter: IBufferWriter<byte>) =
-    inherit TextWriter()
-    override _.Encoding = Encoding.UTF8
-    override _.Write(value: string) =
-        if not (isNull value) && value.Length > 0 then
-            let byteCount = Encoding.UTF8.GetByteCount(value)
-            let buffer = bufferWriter.GetSpan(byteCount)
-            let bytesWritten = Encoding.UTF8.GetBytes(value, buffer)
-            bufferWriter.Advance(bytesWritten)
 
 // A tiny in-memory "database" -- just enough to have more than one game to curl.
 let private games = dict [ "1", "Tic-tac-toe"; "2", "Connect Four" ]
@@ -104,9 +88,7 @@ let private getGame =
             match games.TryGetValue id with
             | true, name ->
                 let baseUri = $"{ctx.Request.Scheme}://{ctx.Request.Host}"
-                use writer = new PipeTextWriter(ctx.Response.BodyWriter)
-                Doc.writeJsonLd (gameDoc baseUri id name) writer
-                do! ctx.Response.BodyWriter.FlushAsync()
+                do! Doc.writeJsonLdAsync (gameDoc baseUri id name) ctx.Response.BodyWriter
             | false, _ -> ctx.Response.StatusCode <- 404
         }))
     }
