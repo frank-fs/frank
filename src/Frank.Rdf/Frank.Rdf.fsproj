@@ -16,8 +16,10 @@
   <ItemGroup>
     <Compile Include="RdfTypes.fsi" />
     <Compile Include="RdfTypes.fs" />
-    <Compile Include="Rdf.fsi" />
-    <Compile Include="Rdf.fs" />
+    <Compile Include="Doc.fsi" />
+    <Compile Include="Doc.fs" />
+    <Compile Include="Builder.fsi" />
+    <Compile Include="Builder.fs" />
   </ItemGroup>
 
   <ItemGroup>

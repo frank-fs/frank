@@ -255,7 +255,7 @@ let tests =
 
                     Expect.exists
                         doc.Statements
-                        (fun (s, p, v) -> s = subject && p = Rdf.RdfTypeIri && v = Value.Node(Node.Iri "sh:NodeShape"))
+                        (fun (s, p, v) -> s = subject && p = RdfTypeIri && v = Value.Node(Node.Iri "sh:NodeShape"))
                         "rdf:type sh:NodeShape"
 
                     Expect.exists

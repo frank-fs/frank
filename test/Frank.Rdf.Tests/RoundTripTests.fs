@@ -35,9 +35,9 @@ type private TestBufferWriter() =
 
         member _.Advance(count: int) : unit =
             if count > 0 then
-                buffer.AddRange(workingBuffer.AsSpan(0, count))
+                buffer.AddRange(workingBuffer.[0 .. count - 1])
 
-    member _.ToString() : string =
+    override _.ToString() : string =
         Encoding.UTF8.GetString(buffer.ToArray())
 
 [<Tests>]

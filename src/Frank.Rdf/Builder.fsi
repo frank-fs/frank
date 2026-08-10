@@ -1,29 +1,7 @@
 namespace Frank.Rdf
 
 [<AutoOpen>]
-module Rdf =
-    /// Resolves a CURIE ("prefix:local") against declared prefixes, or passes an absolute IRI through
-    /// unchanged. A declared prefix always takes priority over "is this already a well-formed URI" --
-    /// see the comment on the .fs implementation for why the other order is a real bug, not a style choice.
-    /// When the text before the colon isn't a declared prefix, the string only passes through as an
-    /// absolute IRI if it looks genuinely absolute -- the part immediately after the parsed scheme's
-    /// colon starts with "//" (not merely "://" appearing anywhere later in the string, which would
-    /// wrongly admit a typo like "schema:http://weird"), or the string starts with an allow-listed
-    /// non-hierarchical scheme ("urn:", "mailto:", "tel:", matched case-insensitively per RFC 3986 §3.1)
-    /// -- *and* is well-formed under System.Uri.IsWellFormedUriString. Anything else raises, including
-    /// strings that System.Uri.IsWellFormedUriString alone would call well-formed (almost any
-    /// "word:word" string qualifies under its loose absolute-URI rules, which is why that check alone
-    /// isn't enough to catch a typo'd, undeclared CURIE prefix like "foaf:name"). Raises if there's no
-    /// colon at all.
-    val internal resolveIri: prefixes: (string * string) list -> s: string -> string
-
-    /// Raises if the same prefix name appears more than once with different URIs.
-    val internal validatePrefixes: prefixes: (string * string) list -> unit
-
-    /// rdf:type, as an absolute IRI. `typ` asserts a statement with this predicate directly, never
-    /// resolved through a declared prefix -- it's a universal RDF constant, not app vocabulary.
-    val RdfTypeIri: string
-
+module Builder =
     /// Builds a `Description`: statements about one subject, to be attached to an `rdf { }` document
     /// via `about`. Self-contained -- mirrors Frank core's `HandlerBuilder`/`handler { }` exactly: one
     /// accumulator, no Combine/Delay, `Run` returns a plain value.
@@ -106,32 +84,3 @@ module Rdf =
 
     /// Enters an `rdf { }` block.
     val rdf: RdfBuilder
-
-    /// Serializes a Doc's triples and building blocks.
-    module Doc =
-        /// Builds a dotNetRDF Graph: registers declared prefixes, resolves every Node.Iri/CURIE, mints
-        /// one real blank node per distinct Node.Blank label, and asserts one triple per statement.
-        /// Raises the same way `resolveIri`/`validatePrefixes` do, for the same reasons.
-        val toGraph: doc: Doc -> VDS.RDF.Graph
-
-        /// Writes JSON-LD in expanded form directly into the given TextWriter -- an array with one
-        /// node-object per distinct subject, no @context, every predicate and type fully expanded to
-        /// its absolute IRI. There is no compact-form option -- see the design doc for why. Never closes
-        /// or disposes the writer; the caller owns it (pass one wrapping a response stream to avoid
-        /// materializing the whole document as a string first).
-        val writeJsonLd: doc: Doc -> writer: System.IO.TextWriter -> unit
-
-        /// Writes JSON-LD in expanded form asynchronously into the given IBufferWriter<byte> (e.g.
-        /// HttpResponse.BodyWriter / PipeWriter). Best for streaming to response bodies: encodes UTF8
-        /// directly to the buffer with no intermediate string allocation or copying. Returns a Task
-        /// completed after serialization and flushing to the buffer.
-        val writeJsonLdAsync: doc: Doc -> bufferWriter: System.Buffers.IBufferWriter<byte> -> System.Threading.Tasks.Task
-
-        /// Convenience wrapper over writeJsonLd for callers that need the whole document as a string
-        /// (tests that reparse it, mainly). Prefer writeJsonLd directly when writing to a response.
-        val toJsonLd: doc: Doc -> string
-
-        /// Combines two independently-built documents: concatenates Prefixes and Statements, nothing
-        /// more. Safe because Node.blank mints a GUID (never a per-Doc counter, see RdfTypes.fsi) and
-        /// because prefix-conflict/duplicate-statement handling already lives in toGraph, not here.
-        val merge: a: Doc -> b: Doc -> Doc
