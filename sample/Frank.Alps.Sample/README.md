@@ -261,9 +261,12 @@ curl -s -H "Accept: application/alps+json" \
   http://localhost:5000/intersections/$ID/walk | jq '.alps.descriptor[].id'
 
 # The fan-out transitions are unconditional -- always present, regardless of state.
-curl -s -H "Accept: application/alps+json" \
+# emergencyOverride/emergencyClear are requireRole "operator"-gated on BOTH methods (see
+# "Operator-gated emergency endpoints" above) -- an operator credential is required here too,
+# not just on the POSTs below, or this 401s with an empty body.
+curl -s -H "X-Api-Key: operator-key" -H "Accept: application/alps+json" \
   http://localhost:5000/intersections/$ID/emergencyOverride | jq '.alps.descriptor[].id'
-curl -s -H "Accept: application/alps+json" \
+curl -s -H "X-Api-Key: operator-key" -H "Accept: application/alps+json" \
   http://localhost:5000/intersections/$ID/emergencyClear | jq '.alps.descriptor[].id'
 
 # Walk -- the guard was satisfied, so this succeeds.
@@ -279,15 +282,15 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:5000/intersect
 # Plain-JSON view: vehicle=vehicleRed, pedestrian=pedWalk.
 curl -s http://localhost:5000/intersections/$ID | jq
 
-# Emergency override -- unconditional, always succeeds.
-curl -s -X POST http://localhost:5000/intersections/$ID/emergencyOverride
+# Emergency override -- unconditional, always succeeds. Operator-gated: needs the credential.
+curl -s -H "X-Api-Key: operator-key" -X POST http://localhost:5000/intersections/$ID/emergencyOverride
 
 # Both regions entered their flashing state.
 curl -s http://localhost:5000/intersections/$ID | jq
 # => { "vehicle": "vehicleFlashing", "pedestrian": "pedFlashing" }
 
 # Emergency clear -- History restores each region's ACTUAL prior state, not a hardcoded reset.
-curl -s -X POST http://localhost:5000/intersections/$ID/emergencyClear
+curl -s -H "X-Api-Key: operator-key" -X POST http://localhost:5000/intersections/$ID/emergencyClear
 
 # vehicle=vehicleRed, pedestrian=pedWalk -- the state right before the override (post-walk),
 # not pedWaiting (the initial state). This is the real proof History differs from "reset to
