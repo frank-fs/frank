@@ -41,7 +41,18 @@
       <Output TaskParameter="Lines" ItemName="ReleaseNoteLines" />
     </ReadLinesFromFile>
     <PropertyGroup>
-      <PackageReleaseNotes>@(ReleaseNoteLines, '%0a')</PackageReleaseNotes>
+      <!-- NuGet caps PackageReleaseNotes at 35000 chars; RELEASE_NOTES.md's full history (all
+           versions back to 2014) is well past that, and even just the current version's own
+           section can be. Keep only the current (first) version section, then hard truncate with
+           a pointer to the full file: this is what broke the v7.3.0/v7.3.1 publish attempts. -->
+      <_AllReleaseNotes>@(ReleaseNoteLines, '%0a')</_AllReleaseNotes>
+      <_NextHeadingIndex>$(_AllReleaseNotes.IndexOf('%0a### New in'))</_NextHeadingIndex>
+      <_CurrentSection Condition="'$(_NextHeadingIndex)' != '-1'">$(_AllReleaseNotes.Substring(0, $(_NextHeadingIndex)))</_CurrentSection>
+      <_CurrentSection Condition="'$(_NextHeadingIndex)' == '-1'">$(_AllReleaseNotes)</_CurrentSection>
+      <_MaxReleaseNotesLength>30000</_MaxReleaseNotesLength>
+      <_TruncationNotice>%0a%0a...(truncated -- full release notes: https://github.com/frank-fs/frank/blob/master/RELEASE_NOTES.md)</_TruncationNotice>
+      <PackageReleaseNotes Condition="'$(_CurrentSection.Length)' &gt; '$(_MaxReleaseNotesLength)'">$(_CurrentSection.Substring(0, $(_MaxReleaseNotesLength)))$(_TruncationNotice)</PackageReleaseNotes>
+      <PackageReleaseNotes Condition="'$(_CurrentSection.Length)' &lt;= '$(_MaxReleaseNotesLength)'">$(_CurrentSection)</PackageReleaseNotes>
     </PropertyGroup>
   </Target>
 </Project>
