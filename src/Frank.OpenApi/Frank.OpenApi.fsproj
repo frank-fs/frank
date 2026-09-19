@@ -26,9 +26,9 @@
          (fsprojects/FSharp.Data.JsonSchema#30). Fixed upstream in
          FSharp.Data.JsonSchema.OpenApi 3.1.0 — floating again. -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.*" />
-    <!-- Overrides the transitive floor Microsoft.AspNetCore.OpenApi pulls (2.0.0),
-         which carries NU1903 (GHSA-v5pm-xwqc-g5wc). Keep >= 2.7.5 regardless of the pin above. -->
-    <PackageReference Include="Microsoft.OpenApi" Version="2.9.0" />
+    <!-- Matches the transitive floor Microsoft.AspNetCore.OpenApi 10.0.12+ pulls
+         (>= 2.12.0), which also carries the NU1903 (GHSA-v5pm-xwqc-g5wc) fix. -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.12.0" />
     <PackageReference Include="FSharp.Data.JsonSchema.OpenApi" Version="3.1.0" />
     <PackageReference Include="Scalar.AspNetCore" Version="1.2.38" />
   </ItemGroup>
