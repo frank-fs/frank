@@ -76,3 +76,5 @@ sample/Frank.TicTacToe.Sample/frank/
 PROMPT.md
 BenchmarkDotNet.Artifacts/
 sample/**/TestResults/
+
+.pi_probe.txt
